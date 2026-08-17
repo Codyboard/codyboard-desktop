@@ -1,9 +1,18 @@
 import { contextBridge, ipcRenderer } from "electron";
+
 import type { CodyboardAPI, ProfileEvent } from "../shared/hid.js";
 
 const api: CodyboardAPI = {
+  applications: {
+    pick: () => ipcRenderer.invoke("applications:pick"),
+    resolve: (bundleId) => ipcRenderer.invoke("applications:resolve", bundleId),
+  },
   listHIDs: (options) => ipcRenderer.invoke("hid:list", options),
   keyboard: { send: (output) => ipcRenderer.invoke("keyboard:send", output) },
+  permissions: {
+    status: () => ipcRenderer.invoke("permissions:status"),
+    openSettings: (permission) => ipcRenderer.invoke("permissions:open-settings", permission),
+  },
   profiles: {
     load: () => ipcRenderer.invoke("profiles:load"),
     reload: () => ipcRenderer.invoke("profiles:reload"),
@@ -20,13 +29,13 @@ const api: CodyboardAPI = {
     }
   },
   diagnostics: {
+    setKeyboardType: (keyboardType) => ipcRenderer.invoke("diagnostics:set", keyboardType),
     onKey: (handler) => {
       const listener = (_event: Electron.IpcRendererEvent, value: Parameters<typeof handler>[0]) => handler(value);
       ipcRenderer.on("diagnostics:key", listener);
       return () => ipcRenderer.removeListener("diagnostics:key", listener);
     }
-  },
-  window: { hide: async () => undefined }
+  }
 };
 
 contextBridge.exposeInMainWorld("codyboard", api);

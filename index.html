@@ -1,10 +1,12 @@
 <!doctype html>
-<html lang="zh-CN" class="dark">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
     <title>Codyboard</title>
+    <script>
+      document.documentElement.dataset.theme = localStorage.getItem("codyboard-theme") === "light" ? "light" : "dark";
+    </script>
   </head>
   <body>
     <div id="root"></div>
