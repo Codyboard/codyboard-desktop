@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --background: 195 14% 4%;
+    --foreground: 180 8% 93%;
+    --card: 195 12% 7%;
+    --border: 190 10% 16%;
+    --muted: 190 10% 12%;
+    --muted-foreground: 190 7% 56%;
+    --primary: 159 82% 55%;
+    --primary-foreground: 167 50% 7%;
+  }
+  * { @apply border-border; }
+  body {
+    @apply m-0 min-w-[640px] bg-background text-foreground antialiased;
+    background-image: radial-gradient(circle at 72% -20%, hsl(var(--primary) / 0.08), transparent 35%);
+  }
+  button, a { -webkit-app-region: no-drag; }
+}

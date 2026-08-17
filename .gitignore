@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-electron/
+resources/bin/
+native/.build/
+.DS_Store
+npm-debug.log*
