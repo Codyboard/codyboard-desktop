@@ -1,6 +1,7 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
@@ -10,5 +11,8 @@ export default defineConfig({
       "@shared": fileURLToPath(new URL("./src/shared", import.meta.url))
     }
   },
-  build: { outDir: "dist", emptyOutDir: true }
+  build: {
+    outDir: "dist",
+    emptyOutDir: true
+  }
 });
