@@ -88,6 +88,21 @@ const KEY_OUTPUT_GROUPS: readonly KeyOutputGroup[] = [
     ],
   },
   {
+    label: "Navigation",
+    options: [
+      {
+        id: "browser-back",
+        label: "Browser Back",
+        output: { kind: "keyboard", key: "[", modifiers: ["command"] },
+      },
+      {
+        id: "browser-forward",
+        label: "Browser Forward",
+        output: { kind: "keyboard", key: "]", modifiers: ["command"] },
+      },
+    ],
+  },
+  {
     label: "Special Keys",
     options: [
       { id: "command", label: "Command", output: { kind: "modifier", key: "command", modifiers: [] } },
