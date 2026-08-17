@@ -20,6 +20,20 @@ export interface HIDListOptions {
   includeVirtual?: boolean;
 }
 
+export interface CodyboardApplicationInfo {
+  bundleId: string;
+  iconDataUrl: string;
+  name: string;
+  path: string;
+}
+
+export type CodyboardPermission = "accessibility" | "inputMonitoring";
+
+export interface PermissionStatus {
+  accessibility: boolean;
+  inputMonitoring: boolean;
+}
+
 export interface HIDKeyEvent {
   device: HIDDeviceInfo;
   eventType: "keydown" | "keyup" | "flagschanged" | "systemdefined";
@@ -42,46 +56,57 @@ export interface HIDDiagnosticEvent {
   timestamp: number;
 }
 
-export type KeyboardInput = {
+export interface KeyboardInput {
   kind: "keyboard";
   key?: string;
   keyCode?: number;
   modifiers?: HIDModifier[];
-};
+}
 
-export type ModifierInput = {
+export interface ModifierInput {
   kind: "modifier";
   key: HIDModifier | "capsLock";
   modifiers?: HIDModifier[];
-};
+}
 
-export type SystemInput = {
+export interface SystemInput {
   kind: "system";
   key?: string;
   systemCode?: number;
-};
+}
 
-export type HIDUsageInput = {
+export interface HIDUsageInput {
   kind: "hidUsage";
   usage: number;
-};
+}
 
 export type MappingInput = KeyboardInput | ModifierInput | SystemInput | HIDUsageInput;
 
-export type KeyboardOutput = {
+export interface KeyboardOutput {
   kind: "keyboard";
   key?: string;
   keyCode?: number;
   modifiers?: HIDModifier[];
-};
+}
 
-export type SystemOutput = {
+export interface ModifierOutput {
+  kind: "modifier";
+  key: HIDModifier | "capsLock";
+  modifiers?: HIDModifier[];
+}
+
+export interface SystemOutput {
   kind: "system";
   key?: string;
   systemCode?: number;
-};
+}
 
-export type MappingOutput = KeyboardOutput | SystemOutput | { kind: "passthrough" } | { kind: "suppress" };
+export interface LaunchApplicationOutput {
+  kind: "launchApplication";
+  bundleId: string;
+}
+
+export type MappingOutput = KeyboardOutput | LaunchApplicationOutput | ModifierOutput | SystemOutput | { kind: "passthrough" } | { kind: "suppress" };
 
 export interface KeyMapping {
   id: string;
@@ -105,7 +130,7 @@ export interface ProfileDraft {
 
 export interface ProfileDocument {
   version: 1;
-  keyboards: Array<{ type: number; profiles: ProfileDraft[] }>;
+  keyboards: { type: number; profiles: ProfileDraft[] }[];
 }
 
 export interface ProfileStateDocument {
@@ -114,7 +139,7 @@ export interface ProfileStateDocument {
 }
 
 export interface ProfileSnapshot {
-  profiles: ReadonlyArray<ProfileDraft>;
+  profiles: readonly ProfileDraft[];
   activeProfile?: ProfileDraft;
 }
 
@@ -130,8 +155,10 @@ export interface CompiledTrigger {
 }
 
 export interface CompiledOutput {
-  kind: "keyboard" | "system" | "passthrough" | "suppress";
+  kind: "keyboard" | "launchApplication" | "modifier" | "system" | "passthrough" | "suppress";
+  bundleId?: string;
   code?: number;
+  modifier?: HIDModifier | "capsLock";
   modifiers: HIDModifier[];
 }
 
@@ -177,9 +204,19 @@ export interface RawProfilesAPI {
 }
 
 export interface CodyboardAPI {
+  applications: {
+    pick(): Promise<CodyboardApplicationInfo | undefined>;
+    resolve(bundleId: string): Promise<CodyboardApplicationInfo | undefined>;
+  };
   listHIDs(options?: HIDListOptions): Promise<HIDDeviceInfo[]>;
   keyboard: { send(output: CompiledOutput): Promise<void> };
+  permissions: {
+    status(): Promise<PermissionStatus>;
+    openSettings(permission: CodyboardPermission): Promise<void>;
+  };
   profiles: RawProfilesAPI;
-  diagnostics: { onKey(handler: (event: HIDDiagnosticEvent) => void): () => void };
-  window: { hide(): Promise<void> };
+  diagnostics: {
+    setKeyboardType(keyboardType?: number): Promise<{ generation: number; listening: boolean }>;
+    onKey(handler: (event: HIDDiagnosticEvent) => void): () => void;
+  };
 }

@@ -19,6 +19,18 @@ final class KeyboardSimulator {
             event.setIntegerValueField(.keyboardEventAutorepeat, value: autorepeat ? 1 : 0)
             event.setIntegerValueField(.eventSourceUserData, value: syntheticEventMarker)
             event.post(tap: .cghidEventTap)
+        case "modifier":
+            guard let code = output.code,
+                  let modifier = output.modifier,
+                  let event = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: pressed) else {
+                throw simulationError("Unable to create modifier event")
+            }
+            var eventFlags = flags(output.modifiers)
+            if pressed { eventFlags.formUnion(flag(for: modifier)) }
+            event.flags = eventFlags
+            event.type = .flagsChanged
+            event.setIntegerValueField(.eventSourceUserData, value: syntheticEventMarker)
+            event.post(tap: .cghidEventTap)
         case "system":
             guard let code = output.code else { throw simulationError("Missing system key code") }
             let state = pressed ? 0x0A : 0x0B
@@ -44,6 +56,18 @@ final class KeyboardSimulator {
             case "fn": flags.insert(.maskSecondaryFn)
             default: break
             }
+        }
+    }
+
+    private func flag(for modifier: String) -> CGEventFlags {
+        switch modifier {
+        case "command": return .maskCommand
+        case "control": return .maskControl
+        case "option": return .maskAlternate
+        case "shift": return .maskShift
+        case "fn": return .maskSecondaryFn
+        case "capsLock": return .maskAlphaShift
+        default: return []
         }
     }
 

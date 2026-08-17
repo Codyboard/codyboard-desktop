@@ -1,5 +1,5 @@
-import { cp, mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { cp, mkdir } from "node:fs/promises";
 import path from "node:path";
 
 const configuration = process.env.NODE_ENV === "development" ? "debug" : "release";

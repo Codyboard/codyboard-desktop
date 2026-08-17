@@ -1,9 +1,9 @@
 import { z } from "zod";
+
 import type {
   CompiledActiveProfile,
   CompiledMapping,
   CompiledProfileSet,
-  HIDModifier,
   KeyMapping,
   MappingInput,
   MappingOutput,
@@ -11,6 +11,7 @@ import type {
   ProfileDraft,
   ProfileStateDocument
 } from "../shared/hid.js";
+
 import { KEY_CODES, MODIFIER_KEY_CODES, SYSTEM_KEY_CODES, normalizeModifiers } from "./key-codes.js";
 
 const idSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]*$/, "must use lowercase letters, numbers, - or _");
@@ -44,9 +45,20 @@ const hidUsageInputSchema = z.object({ kind: z.literal("hidUsage"), usage: z.num
 const inputSchema = z.union([keyboardInputSchema, modifierInputSchema, systemInputSchema, hidUsageInputSchema]);
 
 const keyboardOutputSchema = z.object({ kind: z.literal("keyboard"), ...keyReference, modifiers: modifiersSchema }).strict().superRefine(exactlyOne);
+const modifierOutputSchema = z.object({
+  kind: z.literal("modifier"),
+  key: z.enum(["command", "control", "option", "shift", "fn", "capsLock"]),
+  modifiers: modifiersSchema,
+}).strict();
 const systemOutputSchema = z.object({ kind: z.literal("system"), ...systemReference }).strict().superRefine(exactlyOneSystem);
+const launchApplicationOutputSchema = z.object({
+  kind: z.literal("launchApplication"),
+  bundleId: z.string().trim().min(1),
+}).strict();
 const outputSchema = z.union([
   keyboardOutputSchema,
+  launchApplicationOutputSchema,
+  modifierOutputSchema,
   systemOutputSchema,
   z.object({ kind: z.literal("passthrough") }).strict(),
   z.object({ kind: z.literal("suppress") }).strict()
@@ -95,7 +107,7 @@ function validateProfile(profile: ProfileDraft): void {
 }
 
 export function parseProfileDocument(value: unknown): ProfileDocument {
-  const document = profileDocumentSchema.parse(value) as ProfileDocument;
+  const document = profileDocumentSchema.parse(value);
   ensureUnique(document.keyboards.map(({ type }) => String(type)), "keyboard type");
   for (const keyboard of document.keyboards) {
     ensureUnique(keyboard.profiles.map(({ id }) => id), `profile id for keyboard type ${keyboard.type}`);
@@ -105,7 +117,7 @@ export function parseProfileDocument(value: unknown): ProfileDocument {
 }
 
 export function parseStateDocument(value: unknown): ProfileStateDocument {
-  const state = stateDocumentSchema.parse(value) as ProfileStateDocument;
+  const state = stateDocumentSchema.parse(value);
   for (const type of Object.keys(state.activeProfiles)) {
     if (!/^\d+$/.test(type)) throw new Error(`Invalid keyboard type in activeProfiles: ${type}`);
   }
@@ -128,6 +140,15 @@ function resolveSystem(input: { key?: string; systemCode?: number }): number {
 
 function compileOutput(output: MappingOutput): CompiledMapping["output"] {
   if (output.kind === "passthrough" || output.kind === "suppress") return { kind: output.kind, modifiers: [] };
+  if (output.kind === "launchApplication") return { kind: "launchApplication", bundleId: output.bundleId, modifiers: [] };
+  if (output.kind === "modifier") {
+    return {
+      kind: "modifier",
+      code: MODIFIER_KEY_CODES[output.key],
+      modifier: output.key,
+      modifiers: normalizeModifiers(output.modifiers),
+    };
+  }
   if (output.kind === "system") return { kind: "system", code: resolveSystem(output), modifiers: [] };
   return { kind: "keyboard", code: resolveKey(output), modifiers: normalizeModifiers(output.modifiers) };
 }

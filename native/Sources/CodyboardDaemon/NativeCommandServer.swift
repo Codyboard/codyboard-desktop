@@ -45,9 +45,14 @@ final class NativeCommandServer {
                 let result = try keyboard.setDiagnostics(keyboardType: command.params?.keyboardType)
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: result))
             case "permissions.status":
-                NativeOutput.shared.send(SuccessResponse(id: command.id, data: ["trusted": keyboard.requestPermission(prompt: false)]))
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: permissionStatus()))
             case "permissions.request":
-                NativeOutput.shared.send(SuccessResponse(id: command.id, data: ["trusted": keyboard.requestPermission(prompt: true)]))
+                switch command.params?.permission {
+                case "accessibility": _ = keyboard.requestPermission(prompt: true)
+                case "inputMonitoring": _ = RawHIDMonitor.requestInputMonitoringAccess()
+                default: throw commandError("Unknown permission")
+                }
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: permissionStatus()))
             default:
                 NativeOutput.shared.error(id: command.id, code: "unknownMethod", message: "Unknown method: \(command.method)")
             }
@@ -59,5 +64,12 @@ final class NativeCommandServer {
 
     private func commandError(_ message: String) -> NSError {
         NSError(domain: "app.codyboard.command", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+
+    private func permissionStatus() -> PermissionStatus {
+        PermissionStatus(
+            accessibility: keyboard.requestPermission(prompt: false),
+            inputMonitoring: RawHIDMonitor.hasInputMonitoringAccess
+        )
     }
 }

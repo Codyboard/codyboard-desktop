@@ -1,7 +1,16 @@
-import { EventEmitter } from "node:events";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { createInterface } from "node:readline";
-import type { CompiledOutput, CompiledProfileSet, HIDDeviceInfo, HIDListOptions, NativeError } from "../shared/hid.js";
+
+import type {
+  CodyboardPermission,
+  CompiledOutput,
+  CompiledProfileSet,
+  HIDDeviceInfo,
+  HIDListOptions,
+  NativeError,
+  PermissionStatus,
+} from "../shared/hid.js";
 
 interface NativeMessage {
   id?: string;
@@ -17,7 +26,8 @@ interface PendingRequest {
   timeout: NodeJS.Timeout;
 }
 
-export class HIDBridge extends EventEmitter {
+/** Typed, request-response client for the long-lived Swift daemon. */
+export class CodyboardDaemonClient extends EventEmitter {
   private child?: ChildProcessWithoutNullStreams;
   private sequence = 0;
   private readonly pending = new Map<string, PendingRequest>();
@@ -36,11 +46,11 @@ export class HIDBridge extends EventEmitter {
     child.once("error", (error) => this.fail(error));
     child.once("exit", (code, signal) => {
       this.child = undefined;
-      this.fail(new Error(`HID helper exited (${signal ?? code ?? "unknown"})`));
+      this.fail(new Error(`Codyboard daemon exited (${signal ?? code ?? "unknown"})`));
     });
   }
 
-  list(options?: HIDListOptions): Promise<HIDDeviceInfo[]> {
+  listDevices(options?: HIDListOptions): Promise<HIDDeviceInfo[]> {
     return this.request<HIDDeviceInfo[]>("devices.list", { includeVirtual: options?.includeVirtual ?? false });
   }
 
@@ -48,11 +58,19 @@ export class HIDBridge extends EventEmitter {
     return this.request("profiles.replace", { snapshot });
   }
 
-  send(output: CompiledOutput): Promise<void> {
+  sendKeyboardInput(output: CompiledOutput): Promise<void> {
     return this.request("keyboard.send", { output });
   }
 
-  setDiagnostics(keyboardType?: number): Promise<{ generation: number; listening: boolean }> {
+  permissionStatus(): Promise<PermissionStatus> {
+    return this.request("permissions.status");
+  }
+
+  requestPermission(permission: CodyboardPermission): Promise<PermissionStatus> {
+    return this.request("permissions.request", { permission });
+  }
+
+  setDiagnosticKeyboardType(keyboardType?: number): Promise<{ generation: number; listening: boolean }> {
     return this.request("diagnostics.set", keyboardType === undefined ? {} : { keyboardType });
   }
 
@@ -70,7 +88,7 @@ export class HIDBridge extends EventEmitter {
         reject(new Error(`Native HID request timed out: ${method}`));
       }, 5_000);
       this.pending.set(id, {
-        resolve: resolve as (value: unknown) => void,
+        resolve: resolve,
         reject,
         timeout
       });

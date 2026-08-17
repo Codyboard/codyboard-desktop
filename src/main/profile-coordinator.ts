@@ -2,11 +2,28 @@ import { EventEmitter } from "node:events";
 import { cp, mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+
 import { parse, stringify } from "yaml";
 import { z } from "zod";
-import type { NativeError, ProfileDocument, ProfileDraft, ProfileEvent, ProfilesSnapshot, ProfileStateDocument } from "../shared/hid.js";
-import { HIDBridge } from "./hid-bridge.js";
+
+import type {
+  CompiledProfileSet,
+  NativeError,
+  ProfileDocument,
+  ProfileDraft,
+  ProfileEvent,
+  ProfilesSnapshot,
+  ProfileStateDocument,
+} from "../shared/hid.js";
+
 import { compileProfiles, parseProfileDocument, parseStateDocument, profileDraftSchema, validateActiveProfiles } from "./profile-schema.js";
+
+export interface ProfileRuntimeClient {
+  replaceProfiles(snapshot: CompiledProfileSet): Promise<{
+    generation: number;
+    listening: boolean;
+  }>;
+}
 
 const EMPTY_PROFILES: ProfileDocument = { version: 1, keyboards: [] };
 const EMPTY_STATE: ProfileStateDocument = { version: 1, activeProfiles: {} };
@@ -19,14 +36,14 @@ const settingsSchema = z.object({
 const clone = <T>(value: T): T => structuredClone(value);
 
 /** Cold-path configuration owner. The Swift daemon receives compiled snapshots. */
-export class ProfileService extends EventEmitter {
+export class ProfileCoordinator extends EventEmitter {
   private document: ProfileDocument = clone(EMPTY_PROFILES);
   private state: ProfileStateDocument = clone(EMPTY_STATE);
   private generation = 0;
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(
-    private readonly bridge: HIDBridge,
+    private readonly runtime: ProfileRuntimeClient,
     readonly rootDirectory = path.join(homedir(), ".codyboard", "profiles"),
     private readonly defaultConfigDirectory?: string
   ) { super(); }
@@ -127,14 +144,14 @@ export class ProfileService extends EventEmitter {
       }
 
       for (const entry of entries) {
-        const match = entry.isDirectory() ? entry.name.match(TYPE_DIRECTORY) : null;
+        const match = entry.isDirectory() ? (TYPE_DIRECTORY.exec(entry.name)) : null;
         if (!match) continue;
         const keyboardType = Number(match[1]);
         const directory = path.join(this.rootDirectory, entry.name);
         const files = await readdir(directory, { withFileTypes: true });
         const profiles: ProfileDraft[] = [];
         for (const file of files) {
-          const profileMatch = file.isFile() && file.name !== "state.yaml" ? file.name.match(PROFILE_FILE) : null;
+          const profileMatch = file.isFile() && file.name !== "state.yaml" ? (PROFILE_FILE.exec(file.name)) : null;
           if (!profileMatch) continue;
           const profile = profileDraftSchema.parse(parse(await readFile(path.join(directory, file.name), "utf8"))) as ProfileDraft;
           if (profile.id !== profileMatch[1]) throw new Error(`${file.name}: profile id must match its filename`);
@@ -148,7 +165,7 @@ export class ProfileService extends EventEmitter {
       const parsedDocument = parseProfileDocument(document);
       const parsedState = parseStateDocument(state);
       for (const message of validateActiveProfiles(parsedDocument, parsedState)) {
-        const match = message.match(/keyboard type (\d+)$/);
+        const match = /keyboard type (\d+)$/.exec(message);
         if (match) delete parsedState.activeProfiles[match[1]];
         this.emitConfigurationError(message);
       }
@@ -167,7 +184,7 @@ export class ProfileService extends EventEmitter {
     const nextGeneration = this.generation + 1;
     const nextCompiled = compileProfiles(document, state, nextGeneration);
     const previousCompiled = compileProfiles(this.document, this.state, this.generation);
-    await this.bridge.replaceProfiles(nextCompiled);
+    await this.runtime.replaceProfiles(nextCompiled);
 
     if (persist) {
       const affectedTypes = new Set([...this.document.keyboards, ...document.keyboards].map(({ type }) => type));
@@ -194,7 +211,7 @@ export class ProfileService extends EventEmitter {
         }
         await this.writeAtomic(this.settingsPath, stringify(settings));
       } catch (error) {
-        await this.bridge.replaceProfiles(previousCompiled).catch(() => undefined);
+        await this.runtime.replaceProfiles(previousCompiled).catch(() => undefined);
         for (const [file, contents] of originals) await this.restore(file, contents);
         throw error;
       }

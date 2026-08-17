@@ -1,10 +1,12 @@
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import type { CompiledProfileSet, ProfileDraft } from "../shared/hid.js";
-import type { HIDBridge } from "./hid-bridge.js";
-import { ProfileService } from "./profile-service.js";
+
+import { ProfileCoordinator } from "./profile-coordinator.js";
 
 class FakeDaemon {
   snapshots: CompiledProfileSet[] = [];
@@ -20,12 +22,12 @@ const draft: ProfileDraft = {
   groups: [{ id: "global", scope: { kind: "global" }, mappings: [] }]
 };
 
-describe("ProfileService", () => {
+describe("ProfileCoordinator", () => {
   it("stores one file per profile and one shared active setting", async () => {
     const temporary = await mkdtemp(path.join(tmpdir(), "codyboard-profile-test-"));
     const root = path.join(temporary, ".codyboard", "profiles");
     const daemon = new FakeDaemon();
-    const service = new ProfileService(daemon as unknown as HIDBridge, root);
+    const service = new ProfileCoordinator(daemon, root);
     await service.load();
     const created = await service.create(40, draft);
     expect(created.keyboards["40"].activeProfile?.id).toBe("presenter");

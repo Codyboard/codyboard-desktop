@@ -1,5 +1,5 @@
 import XCTest
-@testable import CodyboardHIDHelper
+@testable import CodyboardDaemon
 
 final class ProfileRuntimeTests: XCTestCase {
     private let left = CompiledTrigger(kind: "keyboard", code: 123, modifiers: [])
@@ -34,6 +34,29 @@ final class ProfileRuntimeTests: XCTestCase {
         runtime.replace(CompiledProfileSet(generation: 1, profiles: [first, second]))
         guard case .ambiguous = runtime.resolve(trigger: trigger, keyboardType: nil, bundleIdentifier: nil)
         else { return XCTFail("Expected ambiguity") }
+    }
+
+    func testLaunchApplicationOutputDecodesBundleIdentifier() throws {
+        let data = Data(#"{"kind":"launchApplication","bundleId":"com.apple.Keynote","modifiers":[]}"#.utf8)
+        let output = try JSONDecoder().decode(CompiledOutput.self, from: data)
+        XCTAssertEqual(output.kind, "launchApplication")
+        XCTAssertEqual(output.bundleId, "com.apple.Keynote")
+        XCTAssertNil(output.code)
+    }
+
+    func testLegacyKeyboardOutputDecodesWithoutBundleIdentifier() throws {
+        let data = Data(#"{"kind":"keyboard","code":37,"modifiers":[]}"#.utf8)
+        let output = try JSONDecoder().decode(CompiledOutput.self, from: data)
+        XCTAssertNil(output.bundleId)
+        XCTAssertEqual(output.code, 37)
+    }
+
+    func testModifierOutputDecodesModifierName() throws {
+        let data = Data(#"{"kind":"modifier","code":63,"modifier":"fn","modifiers":[]}"#.utf8)
+        let output = try JSONDecoder().decode(CompiledOutput.self, from: data)
+        XCTAssertEqual(output.kind, "modifier")
+        XCTAssertEqual(output.modifier, "fn")
+        XCTAssertEqual(output.code, 63)
     }
 
     private func profile(type: Int) -> CompiledActiveProfile {

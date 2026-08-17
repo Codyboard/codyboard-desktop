@@ -14,6 +14,12 @@ struct CommandParams: Decodable {
     let snapshot: CompiledProfileSet?
     let output: CompiledOutput?
     let keyboardType: Int?
+    let permission: String?
+}
+
+struct PermissionStatus: Codable {
+    let accessibility: Bool
+    let inputMonitoring: Bool
 }
 
 struct DiagnosticKeyEvent: Codable {
@@ -126,5 +132,15 @@ struct CompiledTrigger: Codable, Hashable {
 struct CompiledOutput: Codable {
     let kind: String
     let code: Int?
+    let bundleId: String?
+    let modifier: String?
     let modifiers: [String]
+
+    init(kind: String, code: Int?, modifiers: [String], bundleId: String? = nil, modifier: String? = nil) {
+        self.kind = kind
+        self.code = code
+        self.bundleId = bundleId
+        self.modifier = modifier
+        self.modifiers = modifiers
+    }
 }

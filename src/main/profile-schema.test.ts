@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+
 import type { ProfileDocument, ProfileStateDocument } from "../shared/hid.js";
+
 import { compileProfiles, parseProfileDocument } from "./profile-schema.js";
 
 const validDocument: ProfileDocument = {
@@ -37,6 +39,45 @@ describe("profile schema", () => {
     const invalid = structuredClone(validDocument);
     invalid.keyboards[0].profiles[0].groups = invalid.keyboards[0].profiles[0].groups.slice(1);
     expect(() => parseProfileDocument(invalid)).toThrow(/exactly one global group/);
+  });
+
+  it("preserves launch-application outputs in the daemon snapshot", () => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0].to = {
+      kind: "launchApplication",
+      bundleId: "com.apple.Keynote",
+    };
+    const compiled = compileProfiles(document, { version: 1, activeProfiles: { "40": "presenter" } }, 8);
+    expect(compiled.profiles[0].global[0].output).toEqual({
+      bundleId: "com.apple.Keynote",
+      kind: "launchApplication",
+      modifiers: [],
+    });
+  });
+
+  it("rejects a launch-application output without a bundle identifier", () => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0].to = {
+      kind: "launchApplication",
+      bundleId: "",
+    };
+    expect(() => parseProfileDocument(document)).toThrow();
+  });
+
+  it("compiles an Fn modifier stroke", () => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0].to = {
+      kind: "modifier",
+      key: "fn",
+      modifiers: [],
+    };
+    const compiled = compileProfiles(document, { version: 1, activeProfiles: { "40": "presenter" } }, 9);
+    expect(compiled.profiles[0].global[0].output).toEqual({
+      code: 63,
+      kind: "modifier",
+      modifier: "fn",
+      modifiers: [],
+    });
   });
 
   it("rejects duplicate normalized triggers in a group", () => {
