@@ -5,7 +5,7 @@ let package = Package(
     name: "CodyboardNative",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "CodyboardHIDHelper", targets: ["CodyboardHIDHelper"])
+        .executable(name: "CodyboardDaemon", targets: ["CodyboardHIDHelper"])
     ],
     targets: [
         .executableTarget(
@@ -13,9 +13,11 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("ApplicationServices"),
+                .linkedFramework("IOKit"),
                 .linkedFramework("CoreFoundation")
             ]
-        )
+        ),
+        .testTarget(name: "CodyboardHIDHelperTests", dependencies: ["CodyboardHIDHelper"])
     ],
     swiftLanguageModes: [.v5]
 )

@@ -1,14 +1,14 @@
 import { EventEmitter } from "node:events";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
-import type { HIDDeviceInfo, HIDEventMap, HIDEventName, HIDFilter } from "../shared/hid.js";
+import type { CompiledOutput, CompiledProfileSet, HIDDeviceInfo, HIDListOptions, NativeError } from "../shared/hid.js";
 
 interface NativeMessage {
   id?: string;
-  event?: HIDEventName | "ready";
+  event?: string;
   ok?: boolean;
   data?: unknown;
-  error?: string;
+  error?: string | NativeError;
 }
 
 interface PendingRequest {
@@ -40,10 +40,20 @@ export class HIDBridge extends EventEmitter {
     });
   }
 
-  async get(filter: HIDFilter): Promise<HIDDeviceInfo[]> {
-    const devices = await this.request<HIDDeviceInfo[]>("get", filter);
-    await this.request("watch", filter);
-    return devices;
+  list(options?: HIDListOptions): Promise<HIDDeviceInfo[]> {
+    return this.request<HIDDeviceInfo[]>("devices.list", { includeVirtual: options?.includeVirtual ?? false });
+  }
+
+  replaceProfiles(snapshot: CompiledProfileSet): Promise<{ generation: number; listening: boolean }> {
+    return this.request("profiles.replace", { snapshot });
+  }
+
+  send(output: CompiledOutput): Promise<void> {
+    return this.request("keyboard.send", { output });
+  }
+
+  setDiagnostics(keyboardType?: number): Promise<{ generation: number; listening: boolean }> {
+    return this.request("diagnostics.set", keyboardType === undefined ? {} : { keyboardType });
   }
 
   stop(): void {
@@ -51,7 +61,7 @@ export class HIDBridge extends EventEmitter {
     this.child = undefined;
   }
 
-  private request<T = void>(method: string, filter?: HIDFilter): Promise<T> {
+  request<T = void>(method: string, params: Record<string, unknown> = {}): Promise<T> {
     this.start();
     const id = String(++this.sequence);
     return new Promise<T>((resolve, reject) => {
@@ -64,7 +74,7 @@ export class HIDBridge extends EventEmitter {
         reject,
         timeout
       });
-      this.child!.stdin.write(`${JSON.stringify({ id, method, filter })}\n`);
+      this.child!.stdin.write(`${JSON.stringify({ id, method, params })}\n`);
     });
   }
 
@@ -83,12 +93,18 @@ export class HIDBridge extends EventEmitter {
       clearTimeout(request.timeout);
       this.pending.delete(message.id);
       if (message.ok) request.resolve(message.data);
-      else request.reject(new Error(message.error ?? "Native HID request failed"));
+      else {
+        const error = typeof message.error === "string" ? { code: "nativeError", message: message.error } : message.error;
+        request.reject(Object.assign(new Error(error?.message ?? "Native HID request failed"), { code: error?.code, details: error?.details }));
+      }
       return;
     }
 
     if (message.event && message.event !== "ready") {
-      if (message.event === "error") this.emit("error", { message: message.error ?? "Native HID error" });
+      if (message.event === "error") {
+        const error = typeof message.error === "string" ? message.error : message.error?.message;
+        this.emit("error", { message: error ?? "Native HID error" });
+      }
       else this.emit(message.event, message.data);
     }
   }
@@ -101,8 +117,4 @@ export class HIDBridge extends EventEmitter {
     this.pending.clear();
     this.emit("error", { message: error.message });
   }
-}
-
-export interface HIDBridge {
-  on<K extends HIDEventName>(event: K, listener: (payload: HIDEventMap[K]) => void): this;
 }

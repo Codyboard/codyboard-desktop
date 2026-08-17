@@ -1,101 +1,100 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { HIDEventName, HIDFilter } from "../shared/hid.js";
+import type { HIDListOptions, ProfileDraft, ProfileEvent } from "../shared/hid.js";
 import { HIDBridge } from "./hid-bridge.js";
+import { ProfileService } from "./profile-service.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
-const helperPath = app.isPackaged
-  ? path.join(process.resourcesPath, "bin", "CodyboardHIDHelper")
-  : path.join(currentDir, "..", "resources", "bin", "CodyboardHIDHelper");
-
-let mainWindow: BrowserWindow | null = null;
+const daemonPath = app.isPackaged
+  ? path.join(process.resourcesPath, "bin", "CodyboardDaemon")
+  : path.join(currentDir, "..", "resources", "bin", "CodyboardDaemon");
+const defaultConfigPath = app.isPackaged
+  ? path.join(process.resourcesPath, "default-config")
+  : path.join(currentDir, "..", "resources", "default-config");
 let tray: Tray | null = null;
+let settingsWindow: BrowserWindow | null = null;
 let isQuitting = false;
-const bridge = new HIDBridge(helperPath);
-
-function createWindow(): BrowserWindow {
-  const window = new BrowserWindow({
-    width: 820,
-    height: 620,
-    minWidth: 640,
-    minHeight: 480,
-    show: false,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 16 },
-    backgroundColor: "#090b0c",
-    webPreferences: {
-      preload: path.join(currentDir, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  });
-
-  window.once("ready-to-show", () => window.show());
-  window.on("close", (event) => {
-    if (!isQuitting) {
-      event.preventDefault();
-      window.hide();
-    }
-  });
-  if (isDevelopment) void window.loadURL(process.env.VITE_DEV_SERVER_URL!);
-  else void window.loadFile(path.join(currentDir, "..", "dist", "index.html"));
-  return window;
-}
+const daemon = new HIDBridge(daemonPath);
+const profiles = new ProfileService(daemon, undefined, defaultConfigPath);
 
 function trayIcon(): Electron.NativeImage {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path fill="black" d="M3 2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm1.5 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm4.5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm4.5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM4.5 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm4.5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm4.5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>`;
+  // Seven keycaps form a pixel-sharp "C" at macOS menu-bar size.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><g fill="black"><rect x="1.5" y="2" width="4" height="4" rx="1"/><rect x="7" y="2" width="4" height="4" rx="1"/><rect x="12.5" y="2" width="4" height="4" rx="1"/><rect x="1.5" y="7" width="4" height="4" rx="1"/><rect x="1.5" y="12" width="4" height="4" rx="1"/><rect x="7" y="12" width="4" height="4" rx="1"/><rect x="12.5" y="12" width="4" height="4" rx="1"/></g></svg>`;
   const icon = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`);
   icon.setTemplateImage(true);
   return icon;
 }
 
-function createTray(): void {
+function publishProfileEvent(event: ProfileEvent): void {
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send("profiles:event", event);
+}
+
+function showSettings(): void {
+  if (!settingsWindow) {
+    settingsWindow = new BrowserWindow({
+      width: 720,
+      height: 520,
+      show: false,
+      title: "Codyboard Settings",
+      backgroundColor: "#090b0c",
+      webPreferences: {
+        preload: path.join(currentDir, "preload.cjs"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true
+      }
+    });
+    settingsWindow.on("close", (event) => {
+      if (!isQuitting) {
+        event.preventDefault();
+        settingsWindow?.hide();
+        void daemon.setDiagnostics().catch((error: unknown) => console.error("Unable to stop diagnostics", error));
+      }
+    });
+    if (isDevelopment) void settingsWindow.loadURL(process.env.VITE_DEV_SERVER_URL!);
+    else void settingsWindow.loadFile(path.join(currentDir, "..", "dist", "index.html"));
+  }
+  settingsWindow.show();
+  settingsWindow.focus();
+  void daemon.setDiagnostics(40).catch((error: unknown) => publishProfileEvent({
+    type: "runtimeError",
+    error: { code: "diagnosticsError", message: error instanceof Error ? error.message : String(error) }
+  }));
+}
+
+ipcMain.handle("hid:list", (_event, options?: HIDListOptions) => daemon.list(options));
+ipcMain.handle("keyboard:send", (_event, output) => daemon.send(output));
+ipcMain.handle("profiles:load", () => profiles.load());
+ipcMain.handle("profiles:reload", () => profiles.reload());
+ipcMain.handle("profiles:snapshot", () => profiles.snapshot());
+ipcMain.handle("profiles:create", (_event, type: number, draft: ProfileDraft) => profiles.create(type, draft));
+ipcMain.handle("profiles:update", (_event, type: number, id: string, draft: ProfileDraft) => profiles.update(type, id, draft));
+ipcMain.handle("profiles:remove", (_event, type: number, id: string) => profiles.remove(type, id));
+ipcMain.handle("profiles:activate", (_event, type: number, id: string) => profiles.activate(type, id));
+ipcMain.handle("profiles:deactivate", (_event, type: number) => profiles.deactivate(type));
+
+profiles.on("event", publishProfileEvent);
+daemon.on("error", (payload: { message: string }) => publishProfileEvent({
+  type: "runtimeError", error: { code: "daemonError", message: payload.message }
+}));
+daemon.on("diagnosticKey", (payload) => {
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send("diagnostics:key", payload);
+});
+
+app.whenReady().then(async () => {
+  daemon.start();
   tray = new Tray(trayIcon());
-  tray.setToolTip("Codyboard Presenter");
+  tray.setToolTip("Codyboard Daemon");
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "打开 Codyboard", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+    { label: "Settings…", click: showSettings },
     { type: "separator" },
-    { label: "退出", click: () => { isQuitting = true; app.quit(); } }
+    { label: "Quit", role: "quit" }
   ]));
-  tray.on("click", () => {
-    if (mainWindow?.isVisible()) mainWindow.hide();
-    else { mainWindow?.show(); mainWindow?.focus(); }
-  });
-}
-
-for (const event of ["keydown", "keyup", "deviceconnected", "devicedisconnected", "error"] as HIDEventName[]) {
-  bridge.on(event, (payload) => {
-    for (const window of BrowserWindow.getAllWindows()) window.webContents.send(`hid:${event}`, payload);
-  });
-}
-
-ipcMain.handle("hid:get", (_event, filter: HIDFilter) => bridge.get(filter));
-ipcMain.handle("window:hide", () => mainWindow?.hide());
-
-app.whenReady().then(() => {
-  bridge.start();
-  // Native capture belongs to the app process, not the renderer window lifecycle.
-  // It remains active while the window is hidden and the tray app is still running.
-  void bridge.get({ type: 40 }).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("hid:error", { message });
-  });
-  mainWindow = createWindow();
-  createTray();
-  app.on("activate", () => {
-    if (!mainWindow) mainWindow = createWindow();
-    mainWindow.show();
-  });
+  try { await profiles.load(); }
+  catch (error) { console.error("Unable to load Codyboard profiles", error); }
 });
 
-app.on("before-quit", () => {
-  isQuitting = true;
-  bridge.stop();
-});
-
-app.on("window-all-closed", () => {
-  // macOS menu bar apps stay alive until the tray menu explicitly quits.
-});
+app.on("before-quit", () => { isQuitting = true; daemon.stop(); });
+app.on("window-all-closed", () => { /* Tray daemon stays alive. */ });

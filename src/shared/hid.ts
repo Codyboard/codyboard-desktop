@@ -1,14 +1,4 @@
-export interface HIDFilter {
-  /** Value of CGEventField.keyboardEventKeyboardType (Codyboard Presenter is 40). */
-  type?: number;
-  vendorId?: number;
-  productId?: number;
-  usagePage?: number;
-  usage?: number;
-  transport?: string;
-  /** Reserved for selecting a physical IOHID device in the multi-device milestone. */
-  id?: string;
-}
+export type HIDModifier = "command" | "control" | "option" | "shift" | "fn";
 
 export interface HIDDeviceInfo {
   id: string;
@@ -22,11 +12,17 @@ export interface HIDDeviceInfo {
   serialNumber?: string;
   transport?: string;
   locationId?: number;
+  isVirtual: boolean;
   properties: Record<string, string>;
+}
+
+export interface HIDListOptions {
+  includeVirtual?: boolean;
 }
 
 export interface HIDKeyEvent {
   device: HIDDeviceInfo;
+  eventType: "keydown" | "keyup" | "flagschanged" | "systemdefined";
   key: string;
   code: number;
   usagePage: number;
@@ -36,22 +32,154 @@ export interface HIDKeyEvent {
   flags: number;
 }
 
-export interface HIDEventMap {
-  keydown: HIDKeyEvent;
-  keyup: HIDKeyEvent;
-  deviceconnected: HIDDeviceInfo;
-  devicedisconnected: HIDDeviceInfo;
-  error: { message: string };
+export interface HIDDiagnosticEvent {
+  keyboardType: number;
+  eventType: "keydown" | "keyup" | "flagschanged";
+  source: "keyCode" | "hidUsage";
+  code: number;
+  keyCode?: number;
+  flags: number;
+  timestamp: number;
 }
 
-export type HIDEventName = keyof HIDEventMap;
+export type KeyboardInput = {
+  kind: "keyboard";
+  key?: string;
+  keyCode?: number;
+  modifiers?: HIDModifier[];
+};
+
+export type ModifierInput = {
+  kind: "modifier";
+  key: HIDModifier | "capsLock";
+  modifiers?: HIDModifier[];
+};
+
+export type SystemInput = {
+  kind: "system";
+  key?: string;
+  systemCode?: number;
+};
+
+export type HIDUsageInput = {
+  kind: "hidUsage";
+  usage: number;
+};
+
+export type MappingInput = KeyboardInput | ModifierInput | SystemInput | HIDUsageInput;
+
+export type KeyboardOutput = {
+  kind: "keyboard";
+  key?: string;
+  keyCode?: number;
+  modifiers?: HIDModifier[];
+};
+
+export type SystemOutput = {
+  kind: "system";
+  key?: string;
+  systemCode?: number;
+};
+
+export type MappingOutput = KeyboardOutput | SystemOutput | { kind: "passthrough" } | { kind: "suppress" };
+
+export interface KeyMapping {
+  id: string;
+  from: MappingInput;
+  to: MappingOutput;
+}
+
+export type MappingScope = { kind: "global" } | { kind: "application"; bundleId: string };
+
+export interface KeyMappingGroup {
+  id: string;
+  scope: MappingScope;
+  mappings: KeyMapping[];
+}
+
+export interface ProfileDraft {
+  id: string;
+  name: string;
+  groups: KeyMappingGroup[];
+}
+
+export interface ProfileDocument {
+  version: 1;
+  keyboards: Array<{ type: number; profiles: ProfileDraft[] }>;
+}
+
+export interface ProfileStateDocument {
+  version: 1;
+  activeProfiles: Record<string, string>;
+}
+
+export interface ProfileSnapshot {
+  profiles: ReadonlyArray<ProfileDraft>;
+  activeProfile?: ProfileDraft;
+}
+
+export interface ProfilesSnapshot {
+  generation: number;
+  keyboards: Record<string, ProfileSnapshot>;
+}
+
+export interface CompiledTrigger {
+  kind: "keyboard" | "modifier" | "system" | "hidUsage";
+  code: number;
+  modifiers: HIDModifier[];
+}
+
+export interface CompiledOutput {
+  kind: "keyboard" | "system" | "passthrough" | "suppress";
+  code?: number;
+  modifiers: HIDModifier[];
+}
+
+export interface CompiledMapping {
+  id: string;
+  trigger: CompiledTrigger;
+  output: CompiledOutput;
+}
+
+export interface CompiledActiveProfile {
+  keyboardType: number;
+  profileId: string;
+  global: CompiledMapping[];
+  applications: Record<string, CompiledMapping[]>;
+}
+
+export interface CompiledProfileSet {
+  generation: number;
+  profiles: CompiledActiveProfile[];
+}
+
+export interface NativeError {
+  code: string;
+  message: string;
+  details?: Record<string, string>;
+}
+
+export type ProfileEvent =
+  | { type: "changed"; snapshot: ProfilesSnapshot }
+  | { type: "configurationError"; error: NativeError }
+  | { type: "runtimeError"; error: NativeError };
+
+export interface RawProfilesAPI {
+  load(): Promise<ProfilesSnapshot>;
+  reload(): Promise<ProfilesSnapshot>;
+  snapshot(): Promise<ProfilesSnapshot>;
+  create(keyboardType: number, draft: ProfileDraft): Promise<ProfilesSnapshot>;
+  update(keyboardType: number, profileId: string, draft: ProfileDraft): Promise<ProfilesSnapshot>;
+  remove(keyboardType: number, profileId: string): Promise<ProfilesSnapshot>;
+  activate(keyboardType: number, profileId: string): Promise<ProfilesSnapshot>;
+  deactivate(keyboardType: number): Promise<ProfilesSnapshot>;
+  onEvent(handler: (event: ProfileEvent) => void): () => void;
+}
 
 export interface CodyboardAPI {
-  getHID(filter: HIDFilter): Promise<HIDDeviceInfo[]>;
-  hid: {
-    on<K extends HIDEventName>(event: K, handler: (payload: HIDEventMap[K]) => void): () => void;
-  };
-  window: {
-    hide(): Promise<void>;
-  };
+  listHIDs(options?: HIDListOptions): Promise<HIDDeviceInfo[]>;
+  keyboard: { send(output: CompiledOutput): Promise<void> };
+  profiles: RawProfilesAPI;
+  diagnostics: { onKey(handler: (event: HIDDiagnosticEvent) => void): () => void };
+  window: { hide(): Promise<void> };
 }

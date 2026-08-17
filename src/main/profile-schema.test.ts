@@ -1,0 +1,49 @@
+import { describe, expect, it } from "vitest";
+import type { ProfileDocument, ProfileStateDocument } from "../shared/hid.js";
+import { compileProfiles, parseProfileDocument } from "./profile-schema.js";
+
+const validDocument: ProfileDocument = {
+  version: 1,
+  keyboards: [{
+    type: 40,
+    profiles: [{
+      id: "presenter",
+      name: "Presenter",
+      groups: [
+        { id: "global", scope: { kind: "global" }, mappings: [{
+          id: "left-to-l", from: { kind: "keyboard", key: "arrowLeft" }, to: { kind: "keyboard", key: "l" }
+        }] },
+        { id: "codex", scope: { kind: "application", bundleId: "com.openai.codex" }, mappings: [{
+          id: "left-to-command-b", from: { kind: "keyboard", key: "arrowLeft" },
+          to: { kind: "keyboard", key: "b", modifiers: ["command"] }
+        }] }
+      ]
+    }]
+  }]
+};
+
+describe("profile schema", () => {
+  it("compiles symbolic mappings into a daemon snapshot", () => {
+    const state: ProfileStateDocument = { version: 1, activeProfiles: { "40": "presenter" } };
+    const compiled = compileProfiles(parseProfileDocument(validDocument), state, 7);
+    expect(compiled.generation).toBe(7);
+    expect(compiled.profiles[0].global[0].trigger.code).toBe(123);
+    expect(compiled.profiles[0].applications["com.openai.codex"][0].output).toEqual({
+      kind: "keyboard", code: 11, modifiers: ["command"]
+    });
+  });
+
+  it("requires exactly one global group", () => {
+    const invalid = structuredClone(validDocument);
+    invalid.keyboards[0].profiles[0].groups = invalid.keyboards[0].profiles[0].groups.slice(1);
+    expect(() => parseProfileDocument(invalid)).toThrow(/exactly one global group/);
+  });
+
+  it("rejects duplicate normalized triggers in a group", () => {
+    const invalid = structuredClone(validDocument);
+    invalid.keyboards[0].profiles[0].groups[0].mappings.push({
+      id: "duplicate", from: { kind: "keyboard", key: "arrowLeft", modifiers: [] }, to: { kind: "suppress" }
+    });
+    expect(() => parseProfileDocument(invalid)).toThrow(/Duplicate trigger/);
+  });
+});

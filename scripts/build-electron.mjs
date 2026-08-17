@@ -7,7 +7,9 @@ await Promise.all([
     platform: "node",
     format: "esm",
     bundle: true,
-    external: ["electron"],
+    // Keep Node-facing dependencies native ESM. Bundling yaml's CommonJS bridge
+    // into an ESM Electron entrypoint produces a dynamic-require runtime failure.
+    external: ["electron", "yaml", "zod"],
     sourcemap: true
   }),
   build({

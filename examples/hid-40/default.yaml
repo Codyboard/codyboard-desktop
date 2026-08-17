@@ -1,0 +1,39 @@
+id: default
+name: Codyboard Default
+groups:
+  - id: global
+    scope:
+      kind: global
+    mappings: []
+  - id: codex
+    scope:
+      kind: application
+      bundleId: com.openai.codex
+    mappings:
+      - id: left-to-command-bracket-left
+        from: { kind: keyboard, key: arrowLeft, modifiers: [fn] }
+        to: { kind: keyboard, key: "[", modifiers: [command] }
+      - id: right-to-command-bracket-right
+        from: { kind: keyboard, key: arrowRight, modifiers: [fn] }
+        to: { kind: keyboard, key: "]", modifiers: [command] }
+      - id: backtick-to-control-shift-m
+        from: { kind: keyboard, key: "`" }
+        to: { kind: keyboard, key: m, modifiers: [control, shift] }
+      - id: enter-to-option-command-s
+        from: { kind: keyboard, key: enter }
+        to: { kind: keyboard, key: s, modifiers: [option, command] }
+      - id: keycode-115-to-command-j
+        from: { kind: keyboard, keyCode: 115, modifiers: [fn] }
+        to: { kind: keyboard, key: j, modifiers: [command] }
+      - id: keycode-110-to-command-option-b
+        from: { kind: keyboard, keyCode: 110 }
+        to: { kind: keyboard, key: b, modifiers: [command, option] }
+      - id: back-to-command-b
+        from: { kind: hidUsage, usage: 241 }
+        to: { kind: keyboard, key: b, modifiers: [command] }
+      - id: volume-up-to-control-shift-command-1
+        from: { kind: system, key: volumeUp }
+        to: { kind: keyboard, key: "1", modifiers: [control, shift, command] }
+      - id: volume-down-to-control-option-bracket-left
+        from: { kind: system, key: volumeDown }
+        to: { kind: keyboard, key: "[", modifiers: [control, option] }

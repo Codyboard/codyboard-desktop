@@ -15,4 +15,4 @@ await new Promise((resolve, reject) => {
 });
 
 await mkdir("resources/bin", { recursive: true });
-await cp(path.join("native", ".build", configuration, "CodyboardHIDHelper"), "resources/bin/CodyboardHIDHelper");
+await cp(path.join("native", ".build", configuration, "CodyboardDaemon"), "resources/bin/CodyboardDaemon");

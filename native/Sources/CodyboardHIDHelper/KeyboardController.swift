@@ -1,0 +1,284 @@
+import AppKit
+import ApplicationServices
+import CoreFoundation
+import Foundation
+
+final class KeyboardController: @unchecked Sendable {
+    private let runtime: ProfileRuntime
+    private let simulator: KeyboardSimulator
+    private var tap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
+    private var frontmostBundleIdentifier: String?
+    private var activationObserver: NSObjectProtocol?
+    private var diagnosticKeyboardType: Int?
+    private lazy var rawHIDMonitor: RawHIDMonitor = {
+        let monitor = RawHIDMonitor()
+        monitor.onUsage = { [weak self] usage, pressed in
+            self?.receiveRawHIDUsage(usage, pressed: pressed)
+        }
+        return monitor
+    }()
+
+    init(runtime: ProfileRuntime, simulator: KeyboardSimulator) {
+        self.runtime = runtime
+        self.simulator = simulator
+        self.frontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        self.activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            self?.frontmostBundleIdentifier = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
+        }
+    }
+
+    deinit {
+        if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+    }
+
+    var isListening: Bool { tap != nil }
+
+    func replaceProfiles(_ snapshot: CompiledProfileSet, promptForPermission: Bool) throws -> ReplaceResult {
+        let needsRawHID = snapshot.profiles.contains { profile in
+            profile.keyboardType == RawHIDMonitor.keyboardType &&
+                (profile.global.contains { $0.trigger.kind == "hidUsage" } ||
+                 profile.applications.values.joined().contains { $0.trigger.kind == "hidUsage" })
+        }
+        let rawHIDWasRunning = rawHIDMonitor.isRunning
+        if needsRawHID { try rawHIDMonitor.start() }
+        if snapshot.profiles.isEmpty {
+            runtime.replace(snapshot)
+            rawHIDMonitor.stop()
+            if diagnosticKeyboardType == nil { stop() }
+        } else if !start(promptForPermission: promptForPermission) {
+            if !rawHIDWasRunning { rawHIDMonitor.stop() }
+            throw NSError(
+                domain: "app.codyboard.permissions", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "需要辅助功能权限。请在系统设置 → 隐私与安全性 → 辅助功能中允许 Codyboard。"]
+            )
+        } else {
+            // Event taps and commands run on the main loop, so replacement is atomic
+            // relative to input callbacks. Permission failure leaves the old generation intact.
+            runtime.replace(snapshot)
+            if !needsRawHID { rawHIDMonitor.stop() }
+        }
+        return ReplaceResult(generation: snapshot.generation, listening: isListening)
+    }
+
+    func send(_ output: CompiledOutput) throws {
+        guard requestPermission(prompt: true) else {
+            throw NSError(domain: "app.codyboard.permissions", code: 1, userInfo: [NSLocalizedDescriptionKey: "Accessibility permission is required"])
+        }
+        try simulator.sendStroke(output)
+    }
+
+    func setDiagnostics(keyboardType: Int?) throws -> ReplaceResult {
+        if let keyboardType {
+            guard keyboardType >= 0 else {
+                throw NSError(domain: "app.codyboard.diagnostics", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid keyboard type"])
+            }
+            guard start(promptForPermission: true) else {
+                throw NSError(domain: "app.codyboard.permissions", code: 1, userInfo: [NSLocalizedDescriptionKey: "Accessibility permission is required"])
+            }
+            diagnosticKeyboardType = keyboardType
+        } else {
+            diagnosticKeyboardType = nil
+            if runtime.isEmpty { stop() }
+        }
+        return ReplaceResult(generation: runtime.generation, listening: isListening)
+    }
+
+    func requestPermission(prompt: Bool) -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: prompt]
+        return AXIsProcessTrustedWithOptions(options as CFDictionary)
+    }
+
+    func stop() {
+        if let source = runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+        if let tap { CFMachPortInvalidate(tap) }
+        runLoopSource = nil
+        tap = nil
+    }
+
+    private func start(promptForPermission: Bool) -> Bool {
+        if tap != nil { return true }
+        guard requestPermission(prompt: promptForPermission) else { return false }
+
+        let systemDefined = CGEventType(rawValue: systemDefinedEventRawValue)!
+        var mask: CGEventMask = 0
+        mask |= CGEventMask(1) << CGEventType.keyDown.rawValue
+        mask |= CGEventMask(1) << CGEventType.keyUp.rawValue
+        mask |= CGEventMask(1) << CGEventType.flagsChanged.rawValue
+        mask |= CGEventMask(1) << systemDefined.rawValue
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        guard let created = CGEvent.tapCreate(
+            tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+            eventsOfInterest: mask, callback: keyboardEventTapCallback, userInfo: context
+        ) else { return false }
+
+        tap = created
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, created, 0)
+        runLoopSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: created, enable: true)
+        return true
+    }
+
+    fileprivate func receive(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            return Unmanaged.passUnretained(event)
+        }
+        if event.getIntegerValueField(.eventSourceUserData) == syntheticEventMarker {
+            return Unmanaged.passUnretained(event)
+        }
+
+        let systemDefined = CGEventType(rawValue: systemDefinedEventRawValue)!
+        guard type == .keyDown || type == .keyUp || type == .flagsChanged || type == systemDefined else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        let system = type == systemDefined ? parseSystemEvent(event) : nil
+        if type == systemDefined && system == nil { return Unmanaged.passUnretained(event) }
+        let code = system?.code ?? Int(event.getIntegerValueField(.keyboardEventKeycode))
+        let kind = type == systemDefined ? "system" : type == .flagsChanged ? "modifier" : "keyboard"
+        var modifiers = modifierNames(event.flags)
+        if kind == "modifier", let ownModifier = modifierName(for: code) { modifiers.removeAll(where: { $0 == ownModifier }) }
+        let trigger = CompiledTrigger(kind: kind, code: code, modifiers: modifiers.sorted())
+        let keyboardType = type == systemDefined ? nil : Int(event.getIntegerValueField(.keyboardEventKeyboardType))
+        let bundleIdentifier = frontmostBundleIdentifier
+        let pressed = system?.pressed ?? eventPressed(type: type, keyCode: code, flags: event.flags)
+        if let keyboardType, keyboardType == diagnosticKeyboardType {
+            let eventName = type == .keyDown ? "keydown" : type == .keyUp ? "keyup" : "flagschanged"
+            NativeOutput.shared.send(NativeEvent(
+                event: "diagnosticKey",
+                data: DiagnosticKeyEvent(
+                    keyboardType: keyboardType, eventType: eventName, source: "keyCode",
+                    code: code, keyCode: code,
+                    flags: event.flags.rawValue, timestamp: event.timestamp
+                )
+            ))
+        }
+
+        switch runtime.resolve(trigger: trigger, keyboardType: keyboardType, bundleIdentifier: bundleIdentifier) {
+        case .none:
+            return Unmanaged.passUnretained(event)
+        case .ambiguous:
+            NativeOutput.shared.error(
+                id: nil, code: "ambiguousSource",
+                message: "A system-defined event matched more than one active keyboard profile",
+                details: ["code": String(code)]
+            )
+            return Unmanaged.passUnretained(event)
+        case .output(let output):
+            if output.kind == "passthrough" { return Unmanaged.passUnretained(event) }
+            if output.kind == "suppress" { return nil }
+            do {
+                let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+                try simulator.post(output, pressed: pressed, autorepeat: autorepeat)
+                return nil
+            } catch {
+                NativeOutput.shared.error(id: nil, code: "simulationFailed", message: error.localizedDescription)
+                return Unmanaged.passUnretained(event)
+            }
+        }
+    }
+
+    private func receiveRawHIDUsage(_ usage: UInt16, pressed: Bool) {
+        if diagnosticKeyboardType == RawHIDMonitor.keyboardType {
+            NativeOutput.shared.send(NativeEvent(
+                event: "diagnosticKey",
+                data: DiagnosticKeyEvent(
+                    keyboardType: RawHIDMonitor.keyboardType,
+                    eventType: pressed ? "keydown" : "keyup",
+                    source: "hidUsage", code: Int(usage), keyCode: nil,
+                    flags: 0, timestamp: 0
+                )
+            ))
+        }
+        let trigger = CompiledTrigger(kind: "hidUsage", code: Int(usage), modifiers: [])
+        switch runtime.resolve(
+            trigger: trigger,
+            keyboardType: RawHIDMonitor.keyboardType,
+            bundleIdentifier: frontmostBundleIdentifier
+        ) {
+        case .none, .ambiguous:
+            return
+        case .output(let output):
+            guard output.kind != "passthrough", output.kind != "suppress" else { return }
+            do { try simulator.post(output, pressed: pressed, autorepeat: false) }
+            catch {
+                NativeOutput.shared.error(
+                    id: nil, code: "simulationFailed", message: error.localizedDescription,
+                    details: ["hidUsage": String(usage)]
+                )
+            }
+        }
+    }
+}
+
+private let keyboardEventTapCallback: CGEventTapCallBack = { _, type, event, context in
+    guard let context else { return Unmanaged.passUnretained(event) }
+    return Unmanaged<KeyboardController>.fromOpaque(context).takeUnretainedValue().receive(type: type, event: event)
+}
+
+private func modifierNames(_ flags: CGEventFlags) -> [String] {
+    var values: [String] = []
+    if flags.contains(.maskCommand) { values.append("command") }
+    if flags.contains(.maskControl) { values.append("control") }
+    if flags.contains(.maskAlternate) { values.append("option") }
+    if flags.contains(.maskShift) { values.append("shift") }
+    if flags.contains(.maskSecondaryFn) { values.append("fn") }
+    return values
+}
+
+private func modifierName(for keyCode: Int) -> String? {
+    switch keyCode {
+    case 54, 55: "command"
+    case 56, 60: "shift"
+    case 58, 61: "option"
+    case 59, 62: "control"
+    case 63: "fn"
+    default: nil
+    }
+}
+
+private func eventPressed(type: CGEventType, keyCode: Int, flags: CGEventFlags) -> Bool {
+    if type == .keyDown { return true }
+    if type == .keyUp { return false }
+    let flag: CGEventFlags? = switch keyCode {
+    case 54, 55: .maskCommand
+    case 56, 60: .maskShift
+    case 57: .maskAlphaShift
+    case 58, 61: .maskAlternate
+    case 59, 62: .maskControl
+    case 63: .maskSecondaryFn
+    default: nil
+    }
+    return flag.map(flags.contains) ?? false
+}
+
+private func parseSystemEvent(_ event: CGEvent) -> (code: Int, key: String, pressed: Bool)? {
+    guard let nsEvent = NSEvent(cgEvent: event), nsEvent.subtype.rawValue == 8 else { return nil }
+    let data = UInt32(bitPattern: Int32(truncatingIfNeeded: nsEvent.data1))
+    let code = Int((data & 0xFFFF0000) >> 16)
+    let state = Int((data & 0x0000FF00) >> 8)
+    return (code, systemKeyName(code), state == 0x0A)
+}
+
+private func systemKeyName(_ code: Int) -> String {
+    [
+        0: "volumeUp", 1: "volumeDown", 2: "brightnessUp", 3: "brightnessDown", 4: "capsLock",
+        6: "power", 7: "mute", 14: "eject", 15: "videoMirror", 16: "playPause", 17: "nextTrack",
+        18: "previousTrack", 19: "fastForward", 20: "rewind", 21: "keyboardBrightnessUp",
+        22: "keyboardBrightnessDown", 23: "keyboardBrightnessToggle"
+    ][code] ?? "system.\(code)"
+}
+
+private func keyName(_ code: Int) -> String {
+    [
+        0: "a", 1: "s", 2: "d", 3: "f", 4: "h", 5: "g", 6: "z", 7: "x", 8: "c", 9: "v",
+        11: "b", 12: "q", 13: "w", 14: "e", 15: "r", 16: "y", 17: "t", 36: "enter",
+        37: "l", 38: "j", 40: "k", 45: "n", 46: "m", 48: "tab", 49: "space", 51: "backspace",
+        53: "escape", 63: "fn", 115: "home", 116: "pageUp", 117: "deleteForward", 119: "end",
+        121: "pageDown", 123: "arrowLeft", 124: "arrowRight", 125: "arrowDown", 126: "arrowUp"
+    ][code] ?? "keycode.\(code)"
+}
