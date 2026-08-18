@@ -3,6 +3,8 @@ import ApplicationServices
 import Foundation
 
 final class KeyboardSimulator {
+    private var modifierLedger = SyntheticModifierLedger()
+
     func sendStroke(_ output: CompiledOutput) throws {
         try post(output, pressed: true, autorepeat: false)
         try post(output, pressed: false, autorepeat: false)
@@ -15,22 +17,21 @@ final class KeyboardSimulator {
                   let event = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: pressed) else {
                 throw simulationError("Unable to create keyboard event")
             }
-            event.flags = flags(output.modifiers)
+            if pressed && !autorepeat { acquire(output.modifiers) }
+            event.flags = flags(modifierLedger.activeModifiers)
             event.setIntegerValueField(.keyboardEventAutorepeat, value: autorepeat ? 1 : 0)
             event.setIntegerValueField(.eventSourceUserData, value: syntheticEventMarker)
             event.post(tap: .cghidEventTap)
+            if !pressed { release(output.modifiers.reversed()) }
         case "modifier":
-            guard let code = output.code,
-                  let modifier = output.modifier,
-                  let event = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: pressed) else {
-                throw simulationError("Unable to create modifier event")
+            guard let modifier = output.modifier else { throw simulationError("Missing modifier name") }
+            if pressed {
+                acquire(output.modifiers)
+                acquire([modifier])
+            } else {
+                release([modifier])
+                release(output.modifiers.reversed())
             }
-            var eventFlags = flags(output.modifiers)
-            if pressed { eventFlags.formUnion(flag(for: modifier)) }
-            event.flags = eventFlags
-            event.type = .flagsChanged
-            event.setIntegerValueField(.eventSourceUserData, value: syntheticEventMarker)
-            event.post(tap: .cghidEventTap)
         case "system":
             guard let code = output.code else { throw simulationError("Missing system key code") }
             let state = pressed ? 0x0A : 0x0B
@@ -44,6 +45,29 @@ final class KeyboardSimulator {
         default:
             throw simulationError("Output kind \(output.kind) cannot be simulated")
         }
+    }
+
+    private func acquire<S: Sequence>(_ modifiers: S) where S.Element == String {
+        for modifier in modifiers where modifierLedger.press(modifier) {
+            postModifier(modifier, pressed: true)
+        }
+    }
+
+    private func release<S: Sequence>(_ modifiers: S) where S.Element == String {
+        for modifier in modifiers where modifierLedger.release(modifier) {
+            postModifier(modifier, pressed: false)
+        }
+    }
+
+    private func postModifier(_ modifier: String, pressed: Bool) {
+        guard let code = modifierKeyCode(modifier),
+              let event = CGEvent(
+                  keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: pressed
+              ) else { return }
+        event.flags = flags(modifierLedger.activeModifiers)
+        event.type = .flagsChanged
+        event.setIntegerValueField(.eventSourceUserData, value: syntheticEventMarker)
+        event.post(tap: .cghidEventTap)
     }
 
     private func flags(_ modifiers: [String]) -> CGEventFlags {
@@ -71,7 +95,41 @@ final class KeyboardSimulator {
         }
     }
 
+    private func modifierKeyCode(_ modifier: String) -> Int? {
+        switch modifier {
+        case "command": return 55
+        case "control": return 59
+        case "option": return 58
+        case "shift": return 56
+        case "fn": return 63
+        case "capsLock": return 57
+        default: return nil
+        }
+    }
+
     private func simulationError(_ message: String) -> NSError {
         NSError(domain: "app.codyboard.keyboard", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+}
+
+struct SyntheticModifierLedger {
+    private var holdCounts: [String: Int] = [:]
+
+    var activeModifiers: [String] { holdCounts.keys.sorted() }
+
+    mutating func press(_ modifier: String) -> Bool {
+        let count = holdCounts[modifier, default: 0]
+        holdCounts[modifier] = count + 1
+        return count == 0
+    }
+
+    mutating func release(_ modifier: String) -> Bool {
+        guard let count = holdCounts[modifier] else { return false }
+        if count > 1 {
+            holdCounts[modifier] = count - 1
+            return false
+        }
+        holdCounts.removeValue(forKey: modifier)
+        return true
     }
 }

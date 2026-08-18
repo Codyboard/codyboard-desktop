@@ -32,7 +32,7 @@
 - `AppToolbar` is exactly 60px tall. Its title group uses a 3px downward optical adjustment for glyphs with descenders, and the native traffic lights are centered on the same header axis.
 - Keep the device-selection header compact like a desktop application, not an oversized marketing hero. Every device card is a strict 1:1 square.
 - When no supported hardware is found, show the designed empty state with supported-model guidance and a working rescan action; do not leave a bare diagnostic message.
-- Supported-device filtering is exact VID/PID matching: Xiaomi Presenter is `0x2717/0x32B8`; Sweep Pro is `0x1D50/0x615E`.
+- Supported-device filtering is exact VID/PID matching: 小米蓝牙语音遥控器 is `0x2717/0x32B8`; Sweep Pro is `0x1D50/0x615E`.
 - `Device` is the TSX boundary for a physical-device view and receives a `keyboardType` prop for internal device behavior; do not display that implementation identifier in the device UI or hardcode it inside the remote renderer.
 - `XiaomiRemote` exposes `onKeyPress` for both `down` and `up` phases and must provide pressed/released visual feedback for pointer and real type-40 hardware events.
 - `SweepPro` currently uses the Xiaomi remote illustration as an explicit temporary placeholder; keep it as a separately named component so its future design can diverge.

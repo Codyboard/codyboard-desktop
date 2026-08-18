@@ -236,7 +236,7 @@ function showSettings(route = '/'): void {
 }
 
 function deviceProfileDomain(device: SupportedDevice): ProfileDomain {
-  return device.hid.id;
+  return device.profileDomain;
 }
 
 function deviceSettingsRoute(device: SupportedDevice): string {
@@ -312,7 +312,7 @@ async function buildTrayMenu(): Promise<Menu> {
   return Menu.buildFromTemplate([
     ...connectedDeviceGroup,
     { label: 'Open Codyboard…', click: () => showSettings('/') },
-    { label: 'Permissions…', click: () => showSettings('/permissions') },
+    { label: 'Manage Permissions…', click: () => showSettings('/permissions') },
     { type: 'separator' },
     { label: 'Quit', role: 'quit' },
   ]);

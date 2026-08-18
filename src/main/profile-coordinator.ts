@@ -30,7 +30,7 @@ export interface ProfileRuntimeClient {
 
 const EMPTY_PROFILES: ProfileDocument = { version: 1, keyboards: [] };
 const EMPTY_STATE: ProfileStateDocument = { version: 1, activeProfiles: {} };
-const DEVICE_DIRECTORY = /^device-([a-z0-9][a-z0-9_-]*)$/;
+const DEVICE_DIRECTORY_PREFIX = "device-";
 const PROFILE_FILE = /^([a-z0-9][a-z0-9_-]*)\.yaml$/;
 const settingsSchema = z.object({
   version: z.literal(1),
@@ -149,9 +149,11 @@ export class ProfileCoordinator extends EventEmitter {
       }
 
       for (const entry of entries) {
-        const deviceMatch = entry.isDirectory() ? DEVICE_DIRECTORY.exec(entry.name) : null;
-        if (!deviceMatch) continue;
-        const domain: ProfileDomain = deviceMatch[1];
+        const domain = entry.isDirectory() && entry.name.startsWith(DEVICE_DIRECTORY_PREFIX)
+          ? entry.name.slice(DEVICE_DIRECTORY_PREFIX.length)
+          : "";
+        if (!domain) continue;
+        this.assertDomain(domain);
         const directory = path.join(this.rootDirectory, entry.name);
         const files = await readdir(directory, { withFileTypes: true });
         const profiles: ProfileDraft[] = [];
@@ -265,7 +267,9 @@ export class ProfileCoordinator extends EventEmitter {
     await this.writeAtomic(this.settingsPath, defaultSettings);
   }
   private assertDomain(domain: ProfileDomain): void {
-    if (!/^[a-z0-9][a-z0-9_-]*$/.test(domain)) throw new Error(`Invalid device id: ${domain}`);
+    if (domain === "." || domain === ".." || !domain || /[\\/\0]/u.test(domain)) {
+      throw new Error(`Invalid device name: ${domain}`);
+    }
   }
   private async readOptional(file: string): Promise<string | undefined> {
     try { return await readFile(file, "utf8"); }

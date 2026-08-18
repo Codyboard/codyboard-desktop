@@ -57,9 +57,10 @@ final class PhysicalKeyboardHIDMonitor {
         let element = IOHIDValueGetElement(value)
         let usagePage = IOHIDElementGetUsagePage(element)
         let device = IOHIDElementGetDevice(element)
-        var registryID: UInt64 = 0
-        guard IORegistryEntryGetRegistryEntryID(IOHIDDeviceGetService(device), &registryID) == kIOReturnSuccess else { return }
-        let deviceId = String(format: "0x%llx", registryID)
+        let deviceId = HIDProfileDomain.named(
+            IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String,
+            fallbackName: "Sweep Pro"
+        )
         let usage = IOHIDElementGetUsage(element)
         let pressed = IOHIDValueGetIntegerValue(value) != 0
         if usagePage == UInt32(kHIDPage_KeyboardOrKeypad), let keyCode = Self.keyCodes[usage] {

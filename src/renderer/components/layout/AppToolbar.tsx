@@ -1,7 +1,7 @@
 import { ArrowLeft, Moon, Sun } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
-import { ViewTransitionLink } from "../navigation/ViewTransitionLink";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 
 type Theme = "dark" | "light";
@@ -19,13 +19,13 @@ export function AppToolbar({ actions, backTo, className = "", title, titleToolti
     <header className={`app-toolbar ${className}`.trim()}>
       <div className="app-toolbar-title">
         {backTo && (
-          <ViewTransitionLink className="toolbar-back" direction="back" to={backTo} aria-label="Back to devices">
+          <Link className="toolbar-back" to={backTo} aria-label="Back to devices">
             <ArrowLeft />
-          </ViewTransitionLink>
+          </Link>
         )}
-        <ViewTransitionLink aria-label="Go to devices" className="app-toolbar-home" direction="back" to="/">
+        <Link aria-label="Go to devices" className="app-toolbar-home" to="/">
           <strong>Codyboard</strong>
-        </ViewTransitionLink>
+        </Link>
         {titleTooltip
           ? (
               <TooltipProvider delayDuration={250}>

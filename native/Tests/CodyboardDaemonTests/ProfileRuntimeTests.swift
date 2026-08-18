@@ -17,6 +17,21 @@ final class ProfileRuntimeTests: XCTestCase {
         XCTAssertEqual(PhysicalKeyboardHIDMonitor.keyCodes[0xE1], 56)
     }
 
+    func testProfileDomainsPreserveDeviceNamesExactly() {
+        XCTAssertEqual(
+            HIDProfileDomain.named("Sweep Pro", fallbackName: "Sweep Pro"),
+            "Sweep Pro"
+        )
+        XCTAssertEqual(
+            HIDProfileDomain.named("  Sweep  PRO  ", fallbackName: "Sweep Pro"),
+            "  Sweep  PRO  "
+        )
+        XCTAssertEqual(
+            HIDProfileDomain.named("", fallbackName: "小米蓝牙语音遥控器"),
+            "小米蓝牙语音遥控器"
+        )
+    }
+
     func testApplicationMappingOverridesGlobal() {
         let runtime = ProfileRuntime()
         runtime.replace(CompiledProfileSet(generation: 1, profiles: [profile(deviceId: "0x100004baa")]))
@@ -72,6 +87,55 @@ final class ProfileRuntimeTests: XCTestCase {
         XCTAssertEqual(output.kind, "modifier")
         XCTAssertEqual(output.modifier, "fn")
         XCTAssertEqual(output.code, 63)
+    }
+
+    func testActiveDevicePressKeepsDownMappingUntilMatchingUp() {
+        var presses = ActiveDevicePressStore()
+        let input = DeviceInputIdentity(deviceId: "sweep", kind: "keyboard", code: 17)
+        let downOutput = CompiledOutput(kind: "keyboard", code: 11, modifiers: ["command"])
+
+        presses.begin(input, action: .output(downOutput))
+
+        guard case .output(let repeatOutput) = presses.uniqueAction(kind: "keyboard", code: 17) else {
+            return XCTFail("Expected repeat to use the active down mapping")
+        }
+        XCTAssertEqual(repeatOutput.code, 11)
+        XCTAssertEqual(repeatOutput.modifiers, ["command"])
+
+        guard case .output(let upOutput) = presses.end(input) else {
+            return XCTFail("Expected key up to release the active down mapping")
+        }
+        XCTAssertEqual(upOutput.code, 11)
+        XCTAssertNil(presses.action(for: input))
+    }
+
+    func testRepeatMappingRequiresOneUnambiguousActiveDevice() {
+        var presses = ActiveDevicePressStore()
+        presses.begin(
+            DeviceInputIdentity(deviceId: "sweep-a", kind: "keyboard", code: 17),
+            action: .suppress
+        )
+        presses.begin(
+            DeviceInputIdentity(deviceId: "sweep-b", kind: "keyboard", code: 17),
+            action: .passthrough
+        )
+
+        XCTAssertNil(presses.uniqueAction(kind: "keyboard", code: 17))
+    }
+
+    func testSyntheticModifiersRemainHeldUntilEveryChordReleasesThem() {
+        var ledger = SyntheticModifierLedger()
+
+        XCTAssertTrue(ledger.press("control"))
+        XCTAssertTrue(ledger.press("shift"))
+        XCTAssertFalse(ledger.press("control"))
+        XCTAssertEqual(ledger.activeModifiers, ["control", "shift"])
+
+        XCTAssertFalse(ledger.release("control"))
+        XCTAssertEqual(ledger.activeModifiers, ["control", "shift"])
+        XCTAssertTrue(ledger.release("shift"))
+        XCTAssertTrue(ledger.release("control"))
+        XCTAssertTrue(ledger.activeModifiers.isEmpty)
     }
 
     private func profile(deviceId: String) -> CompiledActiveProfile {

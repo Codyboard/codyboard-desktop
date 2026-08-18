@@ -12,13 +12,14 @@ export interface SupportedDeviceDefinition {
 
 export interface SupportedDevice extends SupportedDeviceDefinition {
   hid: HIDDeviceInfo;
+  profileDomain: string;
 }
 
 export const SUPPORTED_DEVICES: readonly SupportedDeviceDefinition[] = [
   {
     keyboardType: 40,
     model: 'xiaomi-presenter',
-    name: 'Xiaomi Presenter',
+    name: '小米蓝牙语音遥控器',
     vendorId: 0x2717,
     productId: 0x32b8,
   },
@@ -38,8 +39,18 @@ export function findSupportedDevices(
       ({ productId, vendorId }) =>
         hid.productId === productId && hid.vendorId === vendorId,
     );
-    return definition ? [{ ...definition, hid }] : [];
+    return definition
+      ? [{ ...definition, hid, profileDomain: profileDomainForDevice(definition, hid) }]
+      : [];
   });
+}
+
+export function profileDomainForDevice(
+  definition: SupportedDeviceDefinition | undefined,
+  hid: HIDDeviceInfo,
+): string {
+  if (hid.product) return hid.product;
+  return definition?.name || hid.id;
 }
 
 export function getDeviceDefinition(

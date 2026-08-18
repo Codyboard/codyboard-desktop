@@ -79,10 +79,10 @@ final class RawHIDMonitor {
             )
         }
         if let device = (IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>)?.first {
-            var registryID: UInt64 = 0
-            if IORegistryEntryGetRegistryEntryID(IOHIDDeviceGetService(device), &registryID) == kIOReturnSuccess {
-                deviceId = String(format: "0x%llx", registryID)
-            }
+            deviceId = HIDProfileDomain.named(
+                IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String,
+                fallbackName: "小米蓝牙语音遥控器"
+            )
         }
         self.manager = manager
     }

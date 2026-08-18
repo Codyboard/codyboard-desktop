@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type PointerEvent } from "react";
+import type { LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
 
 import type { HIDDiagnosticEvent } from "../../../shared/hid";
 
@@ -10,7 +11,14 @@ const letterKeys = [
   "Q", "A", "Z",
 ] as const;
 
-export type SweepProKey = typeof letterKeys[number] | "leftShift" | "tab";
+export type SweepProKey = typeof letterKeys[number]
+  | "leftShift" | "mute" | "tab" | "volumeDown" | "volumeUp";
+
+export type DeviceMappingPreview =
+  | { bundleId: string; iconDataUrl?: string; kind: "application"; label: string }
+  | { compact?: boolean; icon?: LucideIcon; kind: "key"; label: string };
+
+export type SweepProMappingPreviews = Partial<Record<SweepProKey, DeviceMappingPreview>>;
 
 export interface SweepProKeyPressEvent {
   key: SweepProKey;
@@ -20,24 +28,33 @@ export interface SweepProKeyPressEvent {
 
 export interface SweepProProps {
   ariaLabel?: string;
+  deviceId: string;
   listenToHardware?: boolean;
+  mappingPreviews?: SweepProMappingPreviews;
   onKeyPress?: (event: SweepProKeyPressEvent) => void;
   selectedKey?: SweepProKey;
 }
 
-const keySet = new Set<string>(letterKeys);
 const keyCodeToKey: Readonly<Record<number, SweepProKey>> = {
   0: "A", 1: "S", 2: "D", 3: "F", 5: "G", 6: "Z", 7: "X", 8: "C", 9: "V",
   11: "B", 12: "Q", 13: "W", 14: "E", 15: "R", 17: "T", 48: "tab", 56: "leftShift",
 };
+const consumerUsageToKey: Readonly<Record<number, SweepProKey>> = {
+  0xe2: "mute",
+  0xe9: "volumeUp",
+  0xea: "volumeDown",
+};
 
 export function SweepPro({
   ariaLabel = "Sweep Pro macropad",
+  deviceId,
   listenToHardware = true,
+  mappingPreviews,
   onKeyPress,
   selectedKey,
 }: SweepProProps) {
   const [hardwarePressed, setHardwarePressed] = useState<ReadonlySet<SweepProKey>>(new Set());
+  const [knobRotation, setKnobRotation] = useState(0);
   const [pointerPressed, setPointerPressed] = useState<ReadonlySet<SweepProKey>>(new Set());
 
   useEffect(() => {
@@ -46,27 +63,22 @@ export function SweepPro({
     const update = (key: SweepProKey | undefined, phase: "down" | "up", source: "hardware") => {
       if (!key) return;
       setHardwarePressed((current) => changedSet(current, key, phase === "down"));
+      if (phase === "down") setKnobRotation((current) => current + sweepProKnobDelta(key));
       onKeyPress?.({ key, phase, source });
     };
-    const onKeyDown = (event: KeyboardEvent) => update(sweepProKeyFor(event), "down", "hardware");
-    const onKeyUp = (event: KeyboardEvent) => update(sweepProKeyFor(event), "up", "hardware");
     const clearPressed = () => setHardwarePressed(new Set());
     const unsubscribeDiagnostics = window.codyboard?.diagnostics?.onKey((event) => {
-      const key = sweepProKeyForDiagnostic(event);
+      const key = sweepProKeyForDiagnostic(event, deviceId);
       const phase = event.eventType === "keyup" ? "up" : "down";
       update(key, phase, "hardware");
     });
 
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", clearPressed);
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", clearPressed);
       unsubscribeDiagnostics?.();
     };
-  }, [listenToHardware, onKeyPress]);
+  }, [deviceId, listenToHardware, onKeyPress]);
 
   const pressed = useMemo(
     () => new Set<SweepProKey>([...hardwarePressed, ...pointerPressed]),
@@ -76,6 +88,14 @@ export function SweepPro({
   const pointer = (key: SweepProKey, phase: "down" | "up") => {
     setPointerPressed((current) => changedSet(current, key, phase === "down"));
     onKeyPress?.({ key, phase, source: "pointer" });
+  };
+  const knobSelected = selectedKey === "mute" || selectedKey === "volumeDown" || selectedKey === "volumeUp";
+  const knobPressed = pressed.has("mute") || pressed.has("volumeDown") || pressed.has("volumeUp");
+  const turnKnob = (event: WheelEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    const key = event.deltaY < 0 ? "volumeUp" : "volumeDown";
+    pointer(key, "down");
+    pointer(key, "up");
   };
 
   return (
@@ -99,7 +119,7 @@ export function SweepPro({
               }}
               onPointerUp={() => pointer(key, "up")}
             >
-              <span className="sweep-pro-key-legend" aria-hidden="true">{key}</span>
+              <MappingPreview preview={mappingPreviews?.[key]} />
             </button>
           ))}
         </div>
@@ -116,7 +136,7 @@ export function SweepPro({
             }}
             onPointerUp={() => pointer("leftShift", "up")}
           >
-            <span className="sweep-pro-side-key-legend" aria-hidden="true">⇧</span>
+            <MappingPreview className="sweep-pro-side-key-legend" preview={mappingPreviews?.leftShift} />
           </button>
           <button
             type="button"
@@ -129,26 +149,69 @@ export function SweepPro({
             }}
             onPointerUp={() => pointer("tab", "up")}
           >
-            <span className="sweep-pro-side-key-legend" aria-hidden="true">⇥</span>
+            <MappingPreview className="sweep-pro-side-key-legend" preview={mappingPreviews?.tab} />
           </button>
-          <button type="button" className="sweep-pro-knob" aria-label="Rotary knob" />
+          <button
+            type="button"
+            aria-label="Volume control: press to mute, scroll to adjust volume"
+            className={`sweep-pro-knob ${knobPressed ? "is-pressed" : ""} ${knobSelected ? "is-selected" : ""}`.trim()}
+            onPointerCancel={() => pointer("mute", "up")}
+            onPointerDown={(event: PointerEvent<HTMLButtonElement>) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              pointer("mute", "down");
+            }}
+            onPointerUp={() => pointer("mute", "up")}
+            onWheel={turnKnob}
+          >
+            <span
+              className="sweep-pro-knob-mark"
+              aria-hidden="true"
+              style={{ "--sweep-pro-knob-rotation": `${knobRotation}deg` } as CSSProperties}
+            />
+            <MappingPreview className="sweep-pro-knob-legend" preview={mappingPreviews?.mute} />
+          </button>
         </div>
       </section>
     </>
   );
 }
 
-function sweepProKeyFor(event: KeyboardEvent): SweepProKey | undefined {
-  if (event.code === "ShiftLeft") return "leftShift";
-  if (event.key === "Tab") return "tab";
-  const key = event.key.toUpperCase();
-  return keySet.has(key) ? key as SweepProKey : undefined;
+function MappingPreview({
+  className = "sweep-pro-key-legend",
+  preview,
+}: {
+  className?: string;
+  preview?: DeviceMappingPreview;
+}) {
+  if (!preview) return null;
+  const Icon = preview.kind === "key" ? preview.icon : undefined;
+  return (
+    <span
+      aria-hidden="true"
+      className={`${className} ${preview.kind === "application" ? "is-application" : ""} ${preview.kind === "key" && preview.compact ? "is-compact" : ""}`.trim()}
+      title={preview.label}
+    >
+      {preview.kind === "application" && preview.iconDataUrl
+        ? <img alt="" src={preview.iconDataUrl} />
+        : Icon
+          ? <Icon />
+        : <span>{preview.label}</span>}
+    </span>
+  );
 }
 
-function sweepProKeyForDiagnostic(event: HIDDiagnosticEvent): SweepProKey | undefined {
-  return event.deviceId !== undefined && event.source === "keyCode"
-    ? keyCodeToKey[event.code]
-    : undefined;
+export function sweepProKeyForDiagnostic(
+  event: HIDDiagnosticEvent,
+  deviceId: string,
+): SweepProKey | undefined {
+  if (event.deviceId !== deviceId) return undefined;
+  return event.source === "keyCode" ? keyCodeToKey[event.code] : consumerUsageToKey[event.code];
+}
+
+export function sweepProKnobDelta(key: SweepProKey): number {
+  if (key === "volumeUp") return 12;
+  if (key === "volumeDown") return -12;
+  return 0;
 }
 
 function changedSet(current: ReadonlySet<SweepProKey>, key: SweepProKey, isPressed: boolean) {

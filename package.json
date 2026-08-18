@@ -13,6 +13,7 @@
     "build:electron": "node scripts/build-electron.mjs",
     "lint": "eslint --max-warnings 0 .",
     "lint:fix": "eslint --fix .",
+    "package:mac": "pnpm build && node scripts/package-macos.mjs",
     "prepare": "husky",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -33,6 +34,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electron/packager": "^20.3.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.3",

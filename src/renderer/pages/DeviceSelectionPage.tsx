@@ -1,12 +1,17 @@
 import { Bluetooth, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Link } from "react-router-dom";
 
-import { findSupportedDevices, SUPPORTED_DEVICES, type SupportedDevice } from "../../shared/device-catalog";
+import {
+  findSupportedDevices,
+  profileDomainForDevice,
+  SUPPORTED_DEVICES,
+  type SupportedDevice,
+} from "../../shared/device-catalog";
 import type { HIDDeviceInfo } from "../../shared/hid";
 import { SweepPro } from "../components/devices/SweepPro";
 import { XiaomiRemote } from "../components/devices/XiaomiRemote";
 import { AppToolbar } from "../components/layout/AppToolbar";
-import { ViewTransitionLink } from "../components/navigation/ViewTransitionLink";
 
 type DeviceLoadState =
   | { status: "loading" }
@@ -23,10 +28,10 @@ export function DeviceSelectionPage() {
     if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("preview")) {
       setState({
         status: "ready",
-        devices: SUPPORTED_DEVICES.map((device) => ({
-          ...device,
-          hid: { id: `preview-${device.model}`, isVirtual: false, properties: {} },
-        })),
+        devices: SUPPORTED_DEVICES.map((device) => {
+          const hid = { id: `preview-${device.model}`, isVirtual: false, properties: {} };
+          return { ...device, hid, profileDomain: profileDomainForDevice(device, hid) };
+        }),
       });
       return;
     }
@@ -94,7 +99,7 @@ export function DeviceSelectionPage() {
 }
 
 function DeviceCard({ device, index }: { device: SupportedDevice; index: number }) {
-  const displayName = device.hid.product?.trim() || device.name;
+  const displayName = device.hid.product || device.name;
   const route = `/devices/${encodeURIComponent(device.hid.id)}?model=${encodeURIComponent(device.model)}`;
 
   return (
@@ -103,15 +108,14 @@ function DeviceCard({ device, index }: { device: SupportedDevice; index: number 
       <div className="device-preview" aria-hidden="true">
         {device.model === "xiaomi-presenter"
           ? <XiaomiRemote listenToHardware={false} />
-          : <SweepPro listenToHardware={false} />}
+          : <SweepPro deviceId={device.profileDomain} listenToHardware={false} />}
       </div>
       <div className="device-card-caption">
         <p>{displayName}</p>
         <span>PHYSICAL ID · {device.hid.id}</span>
       </div>
-      <ViewTransitionLink
+      <Link
         className="device-card-link"
-        direction="forward"
         to={route}
         aria-label={`Open ${displayName}`}
       />
@@ -136,7 +140,7 @@ function DeviceEmptyState({ onRetry }: { onRetry: () => Promise<void> }) {
       </div>
       <h2>No devices found</h2>
       <p>Turn on your device and make sure it is connected to this Mac.</p>
-      <span className="empty-device-support">Xiaomi Presenter · Sweep Pro</span>
+      <span className="empty-device-support">小米蓝牙语音遥控器 · Sweep Pro</span>
       <button type="button" onClick={() => void onRetry()}>
         <RefreshCw />
         Scan again

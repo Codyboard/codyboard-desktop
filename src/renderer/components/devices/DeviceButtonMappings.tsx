@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  CircleHelp,
   CirclePlay,
   Command,
   CornerDownLeft,
@@ -84,7 +83,7 @@ import {
   SelectValue,
 } from "../ui/select";
 
-import type { SweepProKey } from "./SweepPro";
+import type { DeviceMappingPreview, SweepProKey } from "./SweepPro";
 import type { XiaomiRemoteKey } from "./XiaomiRemote";
 
 export interface DeviceControl<Key extends string> {
@@ -232,6 +231,27 @@ export const SWEEP_PRO_CONTROLS: readonly DeviceControl<SweepProKey>[] = [
     label: "Tab",
     legend: "⇥",
   },
+  {
+    defaultOutput: { key: "mute", kind: "system" },
+    icon: VolumeX,
+    input: { key: "mute", kind: "system" },
+    key: "mute",
+    label: "Mute",
+  },
+  {
+    defaultOutput: { key: "volumeUp", kind: "system" },
+    icon: Volume2,
+    input: { key: "volumeUp", kind: "system" },
+    key: "volumeUp",
+    label: "Volume Up",
+  },
+  {
+    defaultOutput: { key: "volumeDown", kind: "system" },
+    icon: Volume1,
+    input: { key: "volumeDown", kind: "system" },
+    key: "volumeDown",
+    label: "Volume Down",
+  },
   ...[
     "T", "G", "B", "R", "F", "V", "E", "D", "C", "W", "S", "X", "Q", "A", "Z",
   ].map((key) => ({
@@ -268,12 +288,13 @@ export const XIAOMI_REMOTE_DEFAULT_PROFILE: ProfileDraft = {
     scope: { kind: "global" },
   }],
   id: "default",
-  name: "Xiaomi Presenter Default",
+  name: "小米蓝牙语音遥控器 Default",
 };
 
 interface DeviceButtonMappingsProps<Key extends string> {
   controls: readonly DeviceControl<Key>[];
   profileDomain?: ProfileDomain;
+  onPreviewChange?: (previews: Partial<Record<Key, DeviceMappingPreview>>) => void;
   onSelectKey?: (key: Key) => void;
   selectedKey?: Key;
 }
@@ -281,6 +302,7 @@ interface DeviceButtonMappingsProps<Key extends string> {
 export function DeviceButtonMappings<Key extends string>({
   controls,
   profileDomain,
+  onPreviewChange,
   onSelectKey,
   selectedKey,
 }: DeviceButtonMappingsProps<Key>) {
@@ -354,7 +376,15 @@ export function DeviceButtonMappings<Key extends string>({
       resolution: resolveProfileMapping(activeProfile, selectedGroup, control.input),
     }));
   }, [activeProfile, controls, selectedGroup]);
+  const mappingPreviews = useMemo(() => Object.fromEntries(mappings.flatMap(({ control, resolution }) => {
+    const preview = mappingPreviewForControl(control, resolution.effective?.to, applicationInfo);
+    return preview ? [[control.key, preview]] : [];
+  })) as Partial<Record<Key, DeviceMappingPreview>>, [applicationInfo, mappings]);
   const isApplicationScope = selectedGroup?.scope.kind === "application";
+
+  useEffect(() => {
+    onPreviewChange?.(mappingPreviews);
+  }, [mappingPreviews, onPreviewChange]);
 
   const saveOutput = async (control: DeviceControl<Key>, output: MappingOutput) => {
     if (profileDomain === undefined || !activeProfile || !selectedGroup) return;
@@ -498,11 +528,6 @@ export function DeviceButtonMappings<Key extends string>({
           </Select>
         </div>
       </header>
-
-      <div className="mapping-console-guide">
-        <span className="mapping-guide-index"><CircleHelp aria-hidden="true" /></span>
-        <p>Choose an action, then record a shortcut or select an application. Press <strong>Backspace</strong> to block the button safely.</p>
-      </div>
 
       {profileDomain === undefined && <PanelNotice>Profile identity is unavailable for this device.</PanelNotice>}
       {profileDomain !== undefined && snapshot && !activeProfile && <PanelNotice>Activate a profile to edit its buttons.</PanelNotice>}
@@ -710,6 +735,40 @@ function describeOutput(output: MappingOutput | undefined): string {
   if (output.kind === "system") return output.key ?? `System ${output.systemCode}`;
   const modifiers = (output.modifiers ?? []).map((modifier) => MODIFIER_GLYPHS[modifier]);
   return [...modifiers, displayKey(output.key ?? `Key ${output.keyCode}`)].join("  ");
+}
+
+export function mappingPreviewForControl<Key extends string>(
+  control: DeviceControl<Key>,
+  output: MappingOutput | undefined,
+  applicationInfo: Readonly<Record<string, CodyboardApplicationInfo>>,
+): DeviceMappingPreview | undefined {
+  if (!output || output.kind === "suppress") return undefined;
+  if (output.kind === "launchApplication") {
+    const application = applicationInfo[output.bundleId];
+    return {
+      bundleId: output.bundleId,
+      iconDataUrl: application?.iconDataUrl || undefined,
+      kind: "application",
+      label: application?.name ?? output.bundleId,
+    };
+  }
+  if (output.kind === "passthrough") {
+    const input = control.input;
+    if (input.kind === "hidUsage") return undefined;
+    return keyPreview(input);
+  }
+  return keyPreview(output);
+}
+
+function keyPreview(output: Exclude<MappingOutput, { kind: "launchApplication" | "passthrough" | "suppress" }>): DeviceMappingPreview {
+  const option = KEY_OUTPUT_OPTIONS_BY_SIGNATURE.get(mappingOutputSignature(output));
+  const compact = "modifiers" in output && (output.modifiers?.length ?? 0) > 0;
+  return {
+    ...(compact ? { compact: true } : {}),
+    ...(option ? { icon: option.icon } : {}),
+    kind: "key",
+    label: describeOutput(output),
+  };
 }
 
 const MODIFIER_GLYPHS: Readonly<Record<HIDModifier, string>> = {

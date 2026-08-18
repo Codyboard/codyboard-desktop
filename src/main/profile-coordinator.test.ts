@@ -24,6 +24,24 @@ const draft: ProfileDraft = {
 };
 
 describe("ProfileCoordinator", () => {
+  it("preserves capitalization and spaces in physical device names", async () => {
+    const temporary = await mkdtemp(path.join(tmpdir(), "codyboard-device-name-test-"));
+    const root = path.join(temporary, ".codyboard", "profiles");
+    const daemon = new FakeDaemon();
+    const service = new ProfileCoordinator(daemon, root);
+    await service.load();
+
+    const created = await service.create("Sweep Pro", { ...draft, id: "default" });
+
+    expect(created.keyboards["device:Sweep Pro"].activeProfile?.id).toBe("default");
+    expect(await readFile(path.join(root, "device-Sweep Pro", "default.yaml"), "utf8"))
+      .toContain("id: default");
+    expect(daemon.snapshots.at(-1)?.profiles[0]?.deviceId).toBe("Sweep Pro");
+
+    const reloaded = await new ProfileCoordinator(new FakeDaemon(), root).load();
+    expect(reloaded.keyboards["device:Sweep Pro"].activeProfile?.id).toBe("default");
+  });
+
   it("stores a physical device profile under its device id", async () => {
     const temporary = await mkdtemp(path.join(tmpdir(), "codyboard-device-profile-test-"));
     const root = path.join(temporary, ".codyboard", "profiles");

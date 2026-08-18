@@ -62,7 +62,6 @@
     z-index: 1;
     min-height: 100vh;
     opacity: 1;
-    view-transition-name: route-selection;
   }
 
   .device-route-stack.has-detail .route-layer-selection {
@@ -75,7 +74,6 @@
     z-index: 2;
     inset: 0;
     min-height: 100vh;
-    view-transition-name: route-detail;
   }
 
   .app-toolbar-title {
@@ -827,38 +825,6 @@
   .mapping-scope-trigger .application-select-identity svg { width: 22px; height: 22px; }
   .cody-select-item.is-add-application { color: rgba(137, 224, 188, 0.82); }
 
-  .mapping-console-guide {
-    display: grid;
-    min-height: 60px;
-    align-items: center;
-    grid-template-columns: 38px minmax(0, 1fr);
-    gap: 15px;
-    padding: 0 26px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.065);
-    background: rgba(96, 207, 164, 0.035);
-  }
-
-  .mapping-guide-index {
-    display: grid;
-    width: 34px;
-    height: 34px;
-    place-items: center;
-    border: 1px solid rgba(108, 224, 178, 0.2);
-    border-radius: 50%;
-    color: rgba(126, 224, 184, 0.72);
-  }
-  .mapping-guide-index svg { width: 16px; height: 16px; stroke-width: 1.8; }
-
-  .mapping-console-guide p {
-    max-width: 610px;
-    margin: 0;
-    color: rgba(220, 226, 224, 0.48);
-    font-size: 11px;
-    line-height: 1.55;
-  }
-
-  .mapping-console-guide strong { color: rgba(239, 244, 242, 0.78); font-weight: 600; }
-
   .mapping-list {
     flex: 1 1 auto;
     min-height: 0;
@@ -1076,8 +1042,6 @@
       padding-inline: 20px;
     }
 
-    .mapping-console-guide { padding-inline: 20px; }
-
     .mapping-row {
       min-height: 112px;
       grid-template-columns: 46px minmax(80px, 0.7fr) minmax(120px, 1fr);
@@ -1158,6 +1122,109 @@
 
   .profile-select-trigger .cody-select-chevron { width: 11px; height: 11px; }
   .profile-select-menu { min-width: 180px; }
+  .profile-menu-action > span {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .profile-menu-action svg { width: 14px; height: 14px; stroke-width: 1.9; }
+  .profile-menu-action.is-destructive { color: rgba(244, 143, 143, 0.82); }
+  .profile-menu-action.is-destructive[data-highlighted] { background: rgba(222, 81, 81, 0.12); color: rgb(255, 171, 171); }
+
+  .profile-dialog-backdrop {
+    position: fixed;
+    z-index: 1300;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(5, 7, 7, 0.48);
+    backdrop-filter: blur(12px) saturate(90%);
+    -webkit-app-region: no-drag;
+  }
+
+  .profile-dialog {
+    position: relative;
+    width: min(390px, calc(100vw - 48px));
+    box-sizing: border-box;
+    padding: 28px;
+    border: 1px solid rgba(178, 199, 190, 0.2);
+    border-radius: 18px;
+    background:
+      radial-gradient(circle at 95% 0%, rgba(99, 219, 171, 0.1), transparent 38%),
+      rgba(25, 29, 28, 0.96);
+    box-shadow: 0 32px 90px rgba(0, 0, 0, 0.5), inset 0 1px rgba(255, 255, 255, 0.055);
+    color: rgba(244, 247, 246, 0.94);
+    font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+    animation: cody-select-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .profile-dialog-eyebrow {
+    color: rgba(125, 224, 184, 0.64);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .profile-dialog h2 { margin: 10px 34px 8px 0; font-size: 22px; font-weight: 580; letter-spacing: -0.025em; }
+  .profile-dialog p { margin: 0 0 22px; color: rgba(221, 228, 225, 0.52); font-size: 12px; line-height: 1.55; }
+  .profile-dialog label {
+    display: block;
+    margin-bottom: 8px;
+    color: rgba(222, 229, 226, 0.58);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .profile-dialog input {
+    width: 100%;
+    height: 42px;
+    box-sizing: border-box;
+    padding: 0 13px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    outline: none;
+    background: rgba(8, 11, 10, 0.34);
+    color: rgba(247, 249, 248, 0.94);
+    font: 550 13px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+  }
+  .profile-dialog input:focus { border-color: rgba(115, 224, 180, 0.48); box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.07); }
+  .profile-dialog input::placeholder { color: rgba(220, 227, 224, 0.26); }
+  .profile-dialog-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.055);
+    color: rgba(231, 236, 234, 0.56);
+    cursor: pointer;
+  }
+  .profile-dialog-close:hover { background: rgba(255, 255, 255, 0.09); color: rgba(247, 249, 248, 0.9); }
+  .profile-dialog-close svg { width: 14px; height: 14px; }
+  .profile-dialog .profile-dialog-error { margin: 10px 0 0; color: rgba(255, 157, 157, 0.9); }
+  .profile-dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 24px; }
+  .profile-dialog-actions button {
+    min-width: 88px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.045);
+    color: rgba(239, 243, 241, 0.72);
+    cursor: pointer;
+    font: 600 11px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+  }
+  .profile-dialog-actions button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: rgba(250, 252, 251, 0.94); }
+  .profile-dialog-actions button.is-primary { border-color: rgba(98, 220, 172, 0.32); background: rgba(72, 191, 145, 0.16); color: rgba(143, 237, 199, 0.92); }
+  .profile-dialog-actions button.is-destructive { border-color: rgba(237, 105, 105, 0.28); background: rgba(205, 69, 69, 0.12); color: rgba(255, 157, 157, 0.9); }
+  .profile-dialog-actions button:disabled { cursor: default; opacity: 0.4; }
 
   @keyframes selection-header-in {
     from { opacity: 0; transform: translateY(-18px); }
@@ -1187,63 +1254,6 @@
   @keyframes cody-tooltip-in {
     from { opacity: 0; transform: translateY(-3px) scale(0.98); }
     to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-
-  @keyframes route-layer-fade-out {
-    from { opacity: 1; }
-    to { opacity: 0; }
-  }
-
-  @keyframes route-layer-enter {
-    from { opacity: 0; transform: translateX(52px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-
-  @keyframes route-layer-exit {
-    from { opacity: 1; transform: translateX(0); }
-    to { opacity: 0; transform: translateX(42px); }
-  }
-
-  @keyframes route-layer-reveal {
-    from { opacity: 0.12; }
-    to { opacity: 1; }
-  }
-
-  ::view-transition-old(root),
-  ::view-transition-new(root),
-  ::view-transition-old(route-selection),
-  ::view-transition-new(route-selection),
-  ::view-transition-old(route-detail),
-  ::view-transition-new(route-detail) {
-    animation: none;
-    mix-blend-mode: normal;
-  }
-
-  ::view-transition-group(route-selection),
-  ::view-transition-group(route-detail) {
-    animation-duration: 540ms;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  ::view-transition-group(route-selection) { z-index: 1; }
-  ::view-transition-group(route-detail) { z-index: 2; }
-  ::view-transition-image-pair(route-selection),
-  ::view-transition-image-pair(route-detail) { isolation: isolate; }
-
-  html.route-transition-forward::view-transition-old(route-selection) {
-    animation: route-layer-fade-out 380ms cubic-bezier(0.4, 0, 1, 1) both;
-  }
-
-  html.route-transition-forward::view-transition-new(route-detail) {
-    animation: route-layer-enter 540ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-
-  html.route-transition-back::view-transition-old(route-detail) {
-    animation: route-layer-exit 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
-  }
-
-  html.route-transition-back::view-transition-new(route-selection) {
-    animation: route-layer-reveal 420ms ease-out both;
   }
 
   @keyframes empty-state-in {
@@ -1418,23 +1428,69 @@
     position: relative;
     z-index: 1;
     display: grid;
+    box-sizing: border-box;
     height: 84%;
     place-items: center;
+    padding: 0 0 16%;
     color: #202322;
-    font-size: calc(var(--remote-height) * 0.038);
-    font-weight: 520;
+    font-size: calc(var(--remote-height) * 0.02);
+    font-weight: 560;
     line-height: 1;
     text-shadow: 0 1px rgba(255, 255, 255, 0.48);
+  }
+
+  .sweep-pro-key-legend > span,
+  .sweep-pro-side-key-legend > span {
+    display: block;
+    max-width: 88%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sweep-pro-key-legend.is-application,
+  .sweep-pro-side-key-legend.is-application {
+    font-size: calc(var(--remote-height) * 0.014);
+  }
+
+  .sweep-pro-key-legend.is-compact,
+  .sweep-pro-side-key-legend.is-compact {
+    font-size: calc(var(--remote-height) * 0.015);
+    letter-spacing: -0.02em;
+  }
+
+  .sweep-pro-key-legend img,
+  .sweep-pro-side-key-legend img,
+  .sweep-pro-key-legend svg,
+  .sweep-pro-side-key-legend svg {
+    width: 32%;
+    height: 32%;
+  }
+
+  .sweep-pro-key-legend img,
+  .sweep-pro-side-key-legend img {
+    width: 42%;
+    height: 42%;
+    border-radius: 22%;
+    object-fit: cover;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.24));
+  }
+
+  .sweep-pro-key-legend svg,
+  .sweep-pro-side-key-legend svg {
+    stroke-width: 1.65;
   }
 
   .sweep-pro-side-key-legend {
     position: relative;
     z-index: 1;
     display: grid;
+    box-sizing: border-box;
     height: 84%;
     place-items: center;
+    padding: 0 0 16%;
     color: rgba(32, 35, 34, 0.72);
-    font-size: calc(var(--remote-height) * 0.032);
+    font-size: calc(var(--remote-height) * 0.019);
     font-weight: 560;
     line-height: 1;
   }
@@ -1516,7 +1572,58 @@
     content: "";
   }
 
+  .sweep-pro-knob-mark {
+    position: absolute;
+    z-index: 1;
+    top: 13%;
+    left: 50%;
+    width: 7%;
+    height: 20%;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.54);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.75);
+    transform-origin: 50% 185%;
+    transform: translateX(-50%) rotate(var(--sweep-pro-knob-rotation, 0deg));
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .sweep-pro-knob-legend {
+    position: absolute;
+    z-index: 2;
+    inset: 25%;
+    display: grid;
+    place-items: center;
+    color: rgba(245, 247, 246, 0.86);
+    font-size: calc(var(--remote-height) * 0.015);
+    line-height: 1;
+  }
+
+  .sweep-pro-knob-legend > span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sweep-pro-knob-legend img {
+    width: 100%;
+    height: 100%;
+    border-radius: 24%;
+    object-fit: cover;
+  }
+
+  .sweep-pro-knob-legend svg {
+    width: 100%;
+    height: 100%;
+    stroke-width: 1.6;
+  }
+
   .sweep-pro-knob:active { filter: brightness(0.8); transform: scale(0.97); }
+  .sweep-pro-knob.is-pressed { filter: brightness(0.8); transform: scale(0.97); }
+  .sweep-pro-knob.is-selected {
+    outline: calc(var(--remote-height) * 0.004) solid rgba(40, 134, 101, 0.78);
+    outline-offset: calc(var(--remote-height) * 0.004);
+  }
 
   .mi-remote {
     position: relative;
@@ -1915,10 +2022,6 @@
     .cody-tooltip-arrow { fill: rgba(244, 246, 245, 0.84); }
     .mapping-console-header { border-bottom-color: rgba(20, 25, 23, 0.09); background: linear-gradient(90deg, rgba(46, 151, 110, 0.065), transparent 58%), linear-gradient(180deg, rgba(255, 255, 255, 0.25), transparent); }
     .mapping-console-header p { color: rgba(23, 120, 82, 0.7); }
-    .mapping-console-guide { border-bottom-color: rgba(20, 25, 23, 0.08); background: rgba(40, 143, 103, 0.045); }
-    .mapping-guide-index { border-color: rgba(27, 136, 93, 0.24); color: rgba(22, 126, 85, 0.72); }
-    .mapping-console-guide p { color: rgba(25, 31, 29, 0.55); }
-    .mapping-console-guide strong { color: rgba(15, 20, 18, 0.8); }
     .mapping-row { border-color: rgba(20, 25, 23, 0.09); background: linear-gradient(108deg, rgba(255, 255, 255, 0.28), transparent 48%), rgba(221, 225, 223, 0.38); box-shadow: inset 0 1px rgba(255, 255, 255, 0.48); }
     .mapping-row:hover { border-color: rgba(20, 25, 23, 0.17); background-color: rgba(230, 233, 231, 0.5); }
     .mapping-row.is-selected { border-color: rgba(24, 139, 94, 0.32); background: linear-gradient(100deg, rgba(58, 165, 122, 0.12), transparent 58%), rgba(224, 230, 227, 0.52); box-shadow: 0 16px 38px rgba(51, 65, 59, 0.12); }
@@ -1945,6 +2048,28 @@
     .cody-select-label { color: rgba(25, 31, 29, 0.38); }
     .cody-select-separator { background: rgba(20, 25, 23, 0.09); }
     .cody-select-scroll-button { color: rgba(24, 30, 28, 0.5); }
+    .profile-menu-action.is-destructive { color: rgba(176, 56, 56, 0.84); }
+    .profile-menu-action.is-destructive[data-highlighted] { background: rgba(199, 56, 56, 0.09); color: rgba(153, 38, 38, 0.96); }
+    .profile-dialog-backdrop { background: rgba(43, 49, 46, 0.24); }
+    .profile-dialog {
+      border-color: rgba(20, 25, 23, 0.14);
+      background:
+        radial-gradient(circle at 95% 0%, rgba(41, 159, 111, 0.09), transparent 38%),
+        rgba(246, 248, 247, 0.97);
+      box-shadow: 0 32px 90px rgba(43, 53, 49, 0.24), inset 0 1px rgba(255, 255, 255, 0.9);
+      color: rgba(17, 22, 20, 0.94);
+    }
+    .profile-dialog-eyebrow { color: rgba(22, 126, 84, 0.7); }
+    .profile-dialog p { color: rgba(26, 33, 30, 0.54); }
+    .profile-dialog label { color: rgba(25, 32, 29, 0.56); }
+    .profile-dialog input { border-color: rgba(20, 25, 23, 0.14); background: rgba(255, 255, 255, 0.58); color: rgba(14, 19, 17, 0.94); }
+    .profile-dialog input::placeholder { color: rgba(23, 30, 27, 0.3); }
+    .profile-dialog-close { background: rgba(20, 25, 23, 0.055); color: rgba(24, 30, 28, 0.56); }
+    .profile-dialog-close:hover { background: rgba(20, 25, 23, 0.09); color: rgba(13, 18, 16, 0.9); }
+    .profile-dialog-actions button { border-color: rgba(20, 25, 23, 0.12); background: rgba(255, 255, 255, 0.52); color: rgba(20, 27, 24, 0.72); }
+    .profile-dialog-actions button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.88); color: rgba(11, 16, 14, 0.94); }
+    .profile-dialog-actions button.is-primary { border-color: rgba(29, 143, 98, 0.28); background: rgba(42, 155, 111, 0.1); color: rgba(17, 117, 77, 0.94); }
+    .profile-dialog-actions button.is-destructive { border-color: rgba(205, 66, 66, 0.24); background: rgba(205, 66, 66, 0.08); color: rgba(169, 43, 43, 0.94); }
     .key-output-option svg { color: rgba(24, 30, 28, 0.56); }
     .application-select-identity svg { color: rgba(24, 30, 28, 0.56); }
     .keystroke-recorder input::placeholder { color: rgba(25, 31, 29, 0.32); }
@@ -1972,13 +2097,6 @@
     .device-card { animation: none; opacity: 1; transform: none; }
     .device-loading span,
     .empty-device-radar span { animation: none; }
-
-    ::view-transition-old(root),
-    ::view-transition-new(root),
-    ::view-transition-old(route-selection),
-    ::view-transition-new(route-selection),
-    ::view-transition-old(route-detail),
-    ::view-transition-new(route-detail) { animation: none; }
 
   }
 }

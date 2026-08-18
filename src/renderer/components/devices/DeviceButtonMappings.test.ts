@@ -1,18 +1,27 @@
 import { describe, expect, it } from "vitest";
 
-import { recordedKeyboardOutput, SWEEP_PRO_CONTROLS } from "./DeviceButtonMappings";
+import {
+  mappingPreviewForControl,
+  recordedKeyboardOutput,
+  SWEEP_PRO_CONTROLS,
+} from "./DeviceButtonMappings";
 
 describe("Sweep Pro controls", () => {
   it("maps every physical key to itself by default", () => {
     expect(SWEEP_PRO_CONTROLS.map(({ key }) => key)).toEqual([
-      "leftShift", "tab",
+      "leftShift", "tab", "mute", "volumeUp", "volumeDown",
       "T", "G", "B", "R", "F", "V", "E", "D", "C", "W", "S", "X", "Q", "A", "Z",
     ]);
     expect(SWEEP_PRO_CONTROLS[0]?.input).toEqual({ key: "shift", kind: "modifier", modifiers: [] });
     expect(SWEEP_PRO_CONTROLS[0]?.defaultOutput).toEqual({ key: "shift", kind: "modifier", modifiers: [] });
     expect(SWEEP_PRO_CONTROLS[1]?.input).toEqual({ key: "tab", kind: "keyboard", modifiers: [] });
     expect(SWEEP_PRO_CONTROLS[1]?.defaultOutput).toEqual({ key: "tab", kind: "keyboard", modifiers: [] });
-    for (const control of SWEEP_PRO_CONTROLS.slice(2)) {
+    expect(SWEEP_PRO_CONTROLS.slice(2, 5).map(({ input }) => input)).toEqual([
+      { key: "mute", kind: "system" },
+      { key: "volumeUp", kind: "system" },
+      { key: "volumeDown", kind: "system" },
+    ]);
+    for (const control of SWEEP_PRO_CONTROLS.slice(5)) {
       expect(control.input).toEqual({ kind: "keyboard", key: control.key.toLowerCase(), modifiers: [] });
       expect(control.defaultOutput).toEqual({ kind: "keyboard", key: control.key.toLowerCase(), modifiers: [] });
     }
@@ -45,6 +54,39 @@ describe("keystroke recording", () => {
       key: "[",
       kind: "keyboard",
       modifiers: ["shift"],
+    });
+  });
+});
+
+describe("device mapping previews", () => {
+  const control = SWEEP_PRO_CONTROLS.find(({ key }) => key === "A")!;
+
+  it("shows only successfully resolved outputs", () => {
+    expect(mappingPreviewForControl(control, undefined, {})).toBeUndefined();
+    expect(mappingPreviewForControl(control, { kind: "suppress" }, {})).toBeUndefined();
+    expect(mappingPreviewForControl(control, { key: "k", kind: "keyboard", modifiers: ["command"] }, {}))
+      .toEqual({ compact: true, kind: "key", label: "⌘  K" });
+  });
+
+  it("prefers a Lucide icon for a known special key", () => {
+    const preview = mappingPreviewForControl(control, { key: "playPause", kind: "system" }, {});
+    expect(preview).toMatchObject({ kind: "key", label: "Play / Pause" });
+    expect(preview?.kind === "key" && preview.icon).toBeDefined();
+  });
+
+  it("uses the resolved application identity", () => {
+    expect(mappingPreviewForControl(control, { bundleId: "com.openai.codex", kind: "launchApplication" }, {
+      "com.openai.codex": {
+        bundleId: "com.openai.codex",
+        iconDataUrl: "data:image/png;base64,icon",
+        name: "Codex",
+        path: "/Applications/Codex.app",
+      },
+    })).toEqual({
+      bundleId: "com.openai.codex",
+      iconDataUrl: "data:image/png;base64,icon",
+      kind: "application",
+      label: "Codex",
     });
   });
 });

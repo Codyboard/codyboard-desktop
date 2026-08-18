@@ -18,6 +18,10 @@ import { mappingInputSignature } from "../shared/profile-mappings.js";
 import { KEY_CODES, MODIFIER_KEY_CODES, SYSTEM_KEY_CODES, normalizeModifiers } from "./key-codes.js";
 
 const idSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]*$/, "must use lowercase letters, numbers, - or _");
+const profileDomainSchema = z.string().min(1).refine(
+  (value) => value !== "." && value !== ".." && !/[\\/\0]/u.test(value),
+  "must be a safe device name",
+);
 const modifierSchema = z.enum(["command", "control", "option", "shift", "fn"]);
 const modifiersSchema = z.array(modifierSchema).default([]).refine((items) => new Set(items).size === items.length, "duplicate modifier");
 
@@ -74,7 +78,7 @@ const scopeSchema = z.union([
 ]);
 const groupSchema = z.object({ id: idSchema, scope: scopeSchema, mappings: z.array(mappingSchema) }).strict();
 export const profileDraftSchema = z.object({ id: idSchema, name: z.string().min(1), groups: z.array(groupSchema).min(1) }).strict();
-const profileCollectionSchema = z.object({ deviceId: idSchema, profiles: z.array(profileDraftSchema) }).strict();
+const profileCollectionSchema = z.object({ deviceId: profileDomainSchema, profiles: z.array(profileDraftSchema) }).strict();
 const profileDocumentSchema = z.object({
   version: z.literal(1),
   keyboards: z.array(profileCollectionSchema)
@@ -118,9 +122,9 @@ export function parseProfileDocument(value: unknown): ProfileDocument {
 
 export function parseStateDocument(value: unknown): ProfileStateDocument {
   const state = stateDocumentSchema.parse(value);
-  for (const domain of Object.keys(state.activeProfiles)) {
-    if (!/^device:[a-z0-9][a-z0-9_-]*$/.test(domain)) {
-      throw new Error(`Invalid profile domain in activeProfiles: ${domain}`);
+  for (const key of Object.keys(state.activeProfiles)) {
+    if (!key.startsWith("device:") || !profileDomainSchema.safeParse(key.slice("device:".length)).success) {
+      throw new Error(`Invalid profile domain in activeProfiles: ${key}`);
     }
   }
   return state;

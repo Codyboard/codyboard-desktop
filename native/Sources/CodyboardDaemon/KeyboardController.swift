@@ -13,6 +13,7 @@ final class KeyboardController: @unchecked Sendable {
     private var activationObserver: NSObjectProtocol?
     private var diagnosticKeyboardType: Int?
     private var activeLaunchTriggers = Set<ActiveLaunchTrigger>()
+    private var activeDevicePresses = ActiveDevicePressStore()
     private var profilesNeedRawHID = false
     private var pendingPhysicalEvents: [PendingDeviceInputEvent] = []
     private lazy var rawHIDMonitor: RawHIDMonitor = {
@@ -183,16 +184,22 @@ final class KeyboardController: @unchecked Sendable {
         let trigger = CompiledTrigger(kind: kind, code: code, modifiers: modifiers.sorted())
         let keyboardType = type == systemDefined ? nil : Int(event.getIntegerValueField(.keyboardEventKeyboardType))
         let pressed = system?.pressed ?? eventPressed(type: type, keyCode: code, flags: event.flags)
+        let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
         let activeLaunchTrigger = ActiveLaunchTrigger(
             trigger: trigger, source: keyboardType.map { "keyboard-type:\($0)" }
         )
         if !pressed, activeLaunchTriggers.remove(activeLaunchTrigger) != nil { return nil }
+        if pressed, autorepeat,
+           let action = activeDevicePresses.uniqueAction(kind: kind, code: code) {
+            return applyDeviceAction(
+                action, event: event, pressed: true, autorepeat: true,
+                details: ["keyCode": String(code)]
+            )
+        }
         if let deviceId = consumePhysicalDeviceId(kind: kind, code: code, pressed: pressed) {
             return resolveDeviceEvent(
-                deviceId: deviceId, trigger: trigger, event: event,
-                pressed: pressed, activeLaunchTrigger: ActiveLaunchTrigger(
-                    trigger: trigger, source: "device:\(deviceId)"
-                )
+                input: DeviceInputIdentity(deviceId: deviceId, kind: kind, code: code),
+                trigger: trigger, event: event, pressed: pressed, autorepeat: autorepeat
             )
         }
         if let keyboardType, keyboardType == diagnosticKeyboardType {
@@ -224,33 +231,28 @@ final class KeyboardController: @unchecked Sendable {
             ))
             return
         }
-        let trigger = CompiledTrigger(kind: "hidUsage", code: Int(usage), modifiers: [])
-        let activeLaunchTrigger = ActiveLaunchTrigger(trigger: trigger, source: "device:\(deviceId)")
-        if !pressed, activeLaunchTriggers.remove(activeLaunchTrigger) != nil { return }
-        switch runtime.resolve(
-            trigger: trigger,
-            deviceId: deviceId,
-            bundleIdentifier: frontmostBundleIdentifier
-        ) {
-        case .none, .ambiguous:
-            return
-        case .output(let output):
-            guard output.kind != "passthrough", output.kind != "suppress" else { return }
-            if output.kind == "launchApplication" {
-                if pressed, let bundleIdentifier = output.bundleId {
-                    activeLaunchTriggers.insert(activeLaunchTrigger)
-                    applicationLauncher.launch(bundleIdentifier: bundleIdentifier)
-                }
-                return
-            }
-            do { try simulator.post(output, pressed: pressed, autorepeat: false) }
-            catch {
-                NativeOutput.shared.error(
-                    id: nil, code: "simulationFailed", message: error.localizedDescription,
-                    details: ["hidUsage": String(usage)]
+        let input = DeviceInputIdentity(deviceId: deviceId, kind: "hidUsage", code: Int(usage))
+        let action: ActiveDeviceAction
+        var autorepeat = false
+        if pressed {
+            if let active = activeDevicePresses.action(for: input) {
+                action = active
+                autorepeat = true
+            } else {
+                action = resolveDeviceAction(
+                    deviceId: deviceId,
+                    trigger: CompiledTrigger(kind: "hidUsage", code: Int(usage), modifiers: [])
                 )
+                activeDevicePresses.begin(input, action: action)
             }
+        } else {
+            guard let active = activeDevicePresses.end(input) else { return }
+            action = active
         }
+        applyRawHIDAction(
+            action, pressed: pressed, autorepeat: autorepeat,
+            details: ["hidUsage": String(usage)]
+        )
     }
 
     private func receivePhysicalInput(
@@ -284,49 +286,88 @@ final class KeyboardController: @unchecked Sendable {
     }
 
     private func resolveDeviceEvent(
-        deviceId: String, trigger: CompiledTrigger, event: CGEvent, pressed: Bool,
-        activeLaunchTrigger: ActiveLaunchTrigger
+        input: DeviceInputIdentity, trigger: CompiledTrigger, event: CGEvent,
+        pressed: Bool, autorepeat: Bool
     ) -> Unmanaged<CGEvent>? {
-        if !pressed, activeLaunchTriggers.remove(activeLaunchTrigger) != nil { return nil }
-        let resolution = runtime.resolve(
-            trigger: trigger,
-            deviceId: deviceId,
-            bundleIdentifier: frontmostBundleIdentifier
-        )
-        let output: CompiledOutput
-        switch resolution {
-        case .none:
-            return Unmanaged.passUnretained(event)
-        case .ambiguous:
-            return Unmanaged.passUnretained(event)
-        case .output(let mapped):
-            if mapped.kind == "suppress" { return nil }
-            if mapped.kind == "passthrough" {
-                return Unmanaged.passUnretained(event)
-            } else if mapped.kind == "launchApplication" {
-                if pressed && event.getIntegerValueField(.keyboardEventAutorepeat) == 0,
-                   let bundleIdentifier = mapped.bundleId {
-                    activeLaunchTriggers.insert(activeLaunchTrigger)
-                    applicationLauncher.launch(bundleIdentifier: bundleIdentifier)
-                }
-                return nil
+        let action: ActiveDeviceAction
+        if pressed {
+            if let active = activeDevicePresses.action(for: input) {
+                action = active
             } else {
-                output = mapped
+                action = resolveDeviceAction(deviceId: input.deviceId, trigger: trigger)
+                activeDevicePresses.begin(input, action: action)
+            }
+        } else {
+            guard let active = activeDevicePresses.end(input) else {
+                return Unmanaged.passUnretained(event)
+            }
+            action = active
+        }
+        return applyDeviceAction(
+            action, event: event, pressed: pressed, autorepeat: autorepeat,
+            details: ["deviceId": input.deviceId, "keyCode": String(trigger.code)]
+        )
+    }
+
+    private func resolveDeviceAction(deviceId: String, trigger: CompiledTrigger) -> ActiveDeviceAction {
+        switch runtime.resolve(
+            trigger: trigger, deviceId: deviceId, bundleIdentifier: frontmostBundleIdentifier
+        ) {
+        case .none, .ambiguous:
+            return .passthrough
+        case .output(let output):
+            if output.kind == "suppress" { return .suppress }
+            if output.kind == "passthrough" { return .passthrough }
+            if output.kind == "launchApplication" {
+                return output.bundleId.map(ActiveDeviceAction.launchApplication) ?? .suppress
+            }
+            return .output(output)
+        }
+    }
+
+    private func applyDeviceAction(
+        _ action: ActiveDeviceAction, event: CGEvent, pressed: Bool, autorepeat: Bool,
+        details: [String: String]
+    ) -> Unmanaged<CGEvent>? {
+        switch action {
+        case .passthrough:
+            return Unmanaged.passUnretained(event)
+        case .suppress:
+            return nil
+        case .launchApplication(let bundleIdentifier):
+            if pressed && !autorepeat { applicationLauncher.launch(bundleIdentifier: bundleIdentifier) }
+            return nil
+        case .output(let output):
+            do {
+                try simulator.post(output, pressed: pressed, autorepeat: autorepeat)
+                return nil
+            } catch {
+                NativeOutput.shared.error(
+                    id: nil, code: "simulationFailed", message: error.localizedDescription,
+                    details: details
+                )
+                return Unmanaged.passUnretained(event)
             }
         }
-        do {
-            try simulator.post(
-                output, pressed: pressed,
-                autorepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-            )
-            return nil
-        }
-        catch {
-            NativeOutput.shared.error(
-                id: nil, code: "simulationFailed", message: error.localizedDescription,
-                details: ["deviceId": deviceId, "keyCode": String(trigger.code)]
-            )
-            return Unmanaged.passUnretained(event)
+    }
+
+    private func applyRawHIDAction(
+        _ action: ActiveDeviceAction, pressed: Bool, autorepeat: Bool,
+        details: [String: String]
+    ) {
+        switch action {
+        case .passthrough, .suppress:
+            return
+        case .launchApplication(let bundleIdentifier):
+            if pressed && !autorepeat { applicationLauncher.launch(bundleIdentifier: bundleIdentifier) }
+        case .output(let output):
+            do { try simulator.post(output, pressed: pressed, autorepeat: autorepeat) }
+            catch {
+                NativeOutput.shared.error(
+                    id: nil, code: "simulationFailed", message: error.localizedDescription,
+                    details: details
+                )
+            }
         }
     }
 }
@@ -342,6 +383,41 @@ private struct PendingDeviceInputEvent {
 private struct ActiveLaunchTrigger: Hashable {
     let trigger: CompiledTrigger
     let source: String?
+}
+
+struct DeviceInputIdentity: Hashable {
+    let deviceId: String
+    let kind: String
+    let code: Int
+}
+
+enum ActiveDeviceAction {
+    case passthrough
+    case suppress
+    case launchApplication(String)
+    case output(CompiledOutput)
+}
+
+struct ActiveDevicePressStore {
+    private var actions: [DeviceInputIdentity: ActiveDeviceAction] = [:]
+
+    mutating func begin(_ input: DeviceInputIdentity, action: ActiveDeviceAction) {
+        actions[input] = action
+    }
+
+    func action(for input: DeviceInputIdentity) -> ActiveDeviceAction? {
+        actions[input]
+    }
+
+    mutating func end(_ input: DeviceInputIdentity) -> ActiveDeviceAction? {
+        actions.removeValue(forKey: input)
+    }
+
+    func uniqueAction(kind: String, code: Int) -> ActiveDeviceAction? {
+        let matches = actions.filter { input, _ in input.kind == kind && input.code == code }
+        guard matches.count == 1 else { return nil }
+        return matches.first?.value
+    }
 }
 
 private let keyboardEventTapCallback: CGEventTapCallBack = { _, type, event, context in
