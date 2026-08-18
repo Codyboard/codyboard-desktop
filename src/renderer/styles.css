@@ -776,7 +776,7 @@
     overflow: hidden;
     border: 1px solid rgba(180, 195, 189, 0.2);
     border-radius: 13px;
-    background: transparent;
+    background: rgba(30, 34, 33, 0.85);
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.055);
     color: rgba(239, 243, 241, 0.92);
     transform-origin: var(--radix-select-content-transform-origin);
@@ -2127,7 +2127,7 @@
     .cody-select-trigger:focus-visible,
     .cody-select-trigger[data-state="open"] { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.32); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
     .cody-select-chevron { color: rgba(24, 30, 28, 0.48); }
-    .cody-select-content { border-color: rgba(20, 25, 23, 0.16); background: rgba(246, 248, 247, 0.95); box-shadow: 0 24px 70px rgba(46, 56, 52, 0.22), inset 0 1px rgba(255, 255, 255, 0.9); color: rgba(18, 23, 21, 0.92); }
+    .cody-select-content { border-color: rgba(20, 25, 23, 0.16); background: rgba(246, 248, 247, 0.85); box-shadow: 0 24px 70px rgba(46, 56, 52, 0.22), inset 0 1px rgba(255, 255, 255, 0.9); color: rgba(18, 23, 21, 0.92); }
     .cody-select-item[data-highlighted] { background: rgba(37, 151, 106, 0.1); color: rgba(10, 17, 14, 0.98); }
     .cody-select-item[data-state="checked"] { color: rgba(19, 126, 84, 0.96); }
     .cody-select-label { color: rgba(25, 31, 29, 0.38); }
