@@ -82,6 +82,15 @@ final class ProfileRuntimeTests: XCTestCase {
         XCTAssertNil(output.code)
     }
 
+    func testTypeTextOutputDecodesUnicodeAndEnterPreference() throws {
+        let data = Data(#"{"kind":"typeText","text":"你好, Codyboard","pressEnter":true,"modifiers":[]}"#.utf8)
+        let output = try JSONDecoder().decode(CompiledOutput.self, from: data)
+        XCTAssertEqual(output.kind, "typeText")
+        XCTAssertEqual(output.text, "你好, Codyboard")
+        XCTAssertEqual(output.pressEnter, true)
+        XCTAssertNil(output.code)
+    }
+
     func testLegacyKeyboardOutputDecodesWithoutBundleIdentifier() throws {
         let data = Data(#"{"kind":"keyboard","code":37,"modifiers":[]}"#.utf8)
         let output = try JSONDecoder().decode(CompiledOutput.self, from: data)

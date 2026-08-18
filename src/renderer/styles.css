@@ -912,7 +912,9 @@
   .mapping-row.is-recording { border-color: rgba(126, 228, 188, 0.5); }
   .mapping-row.is-inherited .mapping-button-name small { color: rgba(124, 220, 181, 0.58); }
   .mapping-row.is-inherited .keystroke-recorder input:not(:focus),
-  .mapping-row.is-inherited .launch-application-value:not(:focus-visible) {
+  .mapping-row.is-inherited .launch-application-value:not(:focus-visible),
+  .mapping-row.is-inherited .open-url-value:not(:focus),
+  .mapping-row.is-inherited .type-text-value:not(:focus) {
     color: rgba(224, 231, 228, 0.52);
     background: rgba(5, 7, 7, 0.14);
   }
@@ -945,11 +947,13 @@
   .mapping-action-select,
   .keystroke-recorder,
   .launch-application-picker,
-  .open-url-picker { display: grid; min-width: 0; }
+  .open-url-picker,
+  .type-text-picker { display: grid; min-width: 0; }
 
   .keystroke-recorder input,
   .launch-application-picker .launch-application-value,
-  .open-url-value {
+  .open-url-value,
+  .type-text-value {
     box-sizing: border-box;
     min-width: 0;
     width: 100%;
@@ -981,7 +985,8 @@
 
   .key-press-combobox,
   .launch-application-picker,
-  .open-url-picker { position: relative; min-width: 0; }
+  .open-url-picker,
+  .type-text-picker { position: relative; min-width: 0; }
 
   .open-url-value {
     padding: 0 44px 0 42px;
@@ -1006,6 +1011,54 @@
     transform: translateY(-50%);
   }
   .open-url-picker .mapping-value-clear { right: 7px; }
+
+  .type-text-value {
+    padding: 0 82px 0 42px;
+    font: 550 12px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+  }
+  .type-text-value::placeholder { color: rgba(215, 222, 219, 0.25); }
+  .type-text-value:focus {
+    border-color: rgba(115, 224, 180, 0.58);
+    background: rgba(31, 53, 44, 0.23);
+    box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.075);
+  }
+  .type-text-value:disabled { cursor: default; opacity: 0.44; }
+  .type-text-icon {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 14px;
+    width: 17px;
+    height: 17px;
+    color: rgba(209, 218, 214, 0.56);
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+  .type-text-clear { right: 42px; }
+  .type-text-enter {
+    position: absolute;
+    z-index: 2;
+    top: 50%;
+    right: 7px;
+    display: grid;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 7px;
+    outline: none;
+    background: transparent;
+    color: rgba(220, 227, 224, 0.4);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  }
+  .type-text-enter:hover { background: rgba(255, 255, 255, 0.07); color: rgba(240, 244, 242, 0.82); }
+  .type-text-enter:focus-visible { box-shadow: 0 0 0 2px rgba(115, 224, 180, 0.34); color: #86e2bb; }
+  .type-text-enter.is-active { background: rgba(101, 208, 167, 0.13); color: #86e2bb; }
+  .type-text-enter:disabled { cursor: default; opacity: 0.35; }
+  .type-text-enter svg { width: 15px; height: 15px; stroke-width: 1.9; }
 
   .key-output-current-icon {
     position: absolute;
@@ -1128,7 +1181,9 @@
     .mapping-action-select { grid-column: 3; }
 
     .keystroke-recorder,
-    .launch-application-picker {
+    .launch-application-picker,
+    .open-url-picker,
+    .type-text-picker {
       grid-column: 2 / -1;
       grid-row: 2;
     }
@@ -2113,7 +2168,9 @@
     .mapping-row.is-recording { border-color: rgba(25, 143, 96, 0.46); }
     .mapping-row.is-inherited .mapping-button-name small { color: rgba(20, 126, 84, 0.68); }
     .mapping-row.is-inherited .keystroke-recorder input:not(:focus),
-    .mapping-row.is-inherited .launch-application-picker button:not(:focus-visible) {
+    .mapping-row.is-inherited .launch-application-picker button:not(:focus-visible),
+    .mapping-row.is-inherited .open-url-value:not(:focus),
+    .mapping-row.is-inherited .type-text-value:not(:focus) {
       color: rgba(24, 31, 28, 0.56);
       background: rgba(255, 255, 255, 0.22);
     }
@@ -2122,7 +2179,9 @@
     .mapping-button-name small { color: rgba(25, 31, 29, 0.42); }
     .cody-select-trigger,
     .keystroke-recorder input,
-    .launch-application-picker button { border-color: rgba(20, 25, 23, 0.09); background: rgba(255, 255, 255, 0.16); color: rgba(15, 20, 18, 0.9); }
+    .launch-application-picker button,
+    .open-url-value,
+    .type-text-value { border-color: rgba(20, 25, 23, 0.09); background: rgba(255, 255, 255, 0.16); color: rgba(15, 20, 18, 0.9); }
     .cody-select-trigger:hover { border-color: rgba(26, 143, 97, 0.24); background: rgba(255, 255, 255, 0.24); }
     .cody-select-trigger:focus-visible,
     .cody-select-trigger[data-state="open"] { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.32); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
@@ -2166,6 +2225,13 @@
     .key-output-trigger .cody-select-chevron { color: rgba(24, 30, 28, 0.48); }
     .key-output-current-icon { color: rgba(24, 30, 28, 0.6); }
     .key-press-combobox:focus-within input { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.32); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
+    .open-url-value:focus,
+    .type-text-value:focus { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.32); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
+    .open-url-icon,
+    .type-text-icon { color: rgba(24, 30, 28, 0.52); }
+    .type-text-enter { color: rgba(24, 30, 28, 0.42); }
+    .type-text-enter:hover { background: rgba(20, 25, 23, 0.055); color: rgba(13, 18, 16, 0.86); }
+    .type-text-enter.is-active { background: rgba(37, 151, 106, 0.1); color: rgba(18, 124, 82, 0.9); }
     .launch-application-picker button:hover { border-color: rgba(26, 143, 97, 0.24); background: rgba(255, 255, 255, 0.24); }
     .launch-application-picker button:focus-visible { border-color: rgba(27, 143, 97, 0.48); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
     .launch-application-picker svg { color: rgba(24, 30, 28, 0.52); }

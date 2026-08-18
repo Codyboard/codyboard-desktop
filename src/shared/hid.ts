@@ -113,7 +113,13 @@ export interface OpenURLOutput {
   url: string;
 }
 
-export type MappingOutput = KeyboardOutput | LaunchApplicationOutput | ModifierOutput | OpenURLOutput | SystemOutput | { kind: "passthrough" } | { kind: "suppress" };
+export interface TypeTextOutput {
+  kind: "typeText";
+  pressEnter: boolean;
+  text: string;
+}
+
+export type MappingOutput = KeyboardOutput | LaunchApplicationOutput | ModifierOutput | OpenURLOutput | SystemOutput | TypeTextOutput | { kind: "passthrough" } | { kind: "suppress" };
 
 export interface KeyMapping {
   id: string;
@@ -172,11 +178,13 @@ export interface CompiledTrigger {
 }
 
 export interface CompiledOutput {
-  kind: "keyboard" | "launchApplication" | "modifier" | "openURL" | "system" | "passthrough" | "suppress";
+  kind: "keyboard" | "launchApplication" | "modifier" | "openURL" | "system" | "typeText" | "passthrough" | "suppress";
   bundleId?: string;
   code?: number;
   modifier?: HIDModifier | "capsLock";
   modifiers: HIDModifier[];
+  pressEnter?: boolean;
+  text?: string;
   url?: string;
 }
 

@@ -95,4 +95,14 @@ describe("device mapping previews", () => {
     expect(preview).toMatchObject({ kind: "key", label: "file:///tmp/demo.pdf" });
     expect(preview?.kind === "key" && preview.icon).toBeDefined();
   });
+
+  it("shows typed Unicode text as a text action", () => {
+    const preview = mappingPreviewForControl(control, {
+      kind: "typeText",
+      pressEnter: true,
+      text: "你好, Codyboard",
+    }, {});
+    expect(preview).toMatchObject({ kind: "key", label: "你好, Codyboard" });
+    expect(preview?.kind === "key" && preview.icon).toBeDefined();
+  });
 });

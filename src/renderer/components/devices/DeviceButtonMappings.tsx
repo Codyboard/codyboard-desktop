@@ -46,6 +46,7 @@ import {
   StickyNote,
   SunDim,
   SunMedium,
+  TextCursorInput,
   Trash2,
   Tv,
   Undo2,
@@ -66,6 +67,7 @@ import type {
   ProfileDraft,
   ProfilesSnapshot,
   ProfileDomain,
+  TypeTextOutput,
 } from "../../../shared/hid";
 import { profileDomainKey } from "../../../shared/hid";
 import {
@@ -85,6 +87,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 
 import type { DeviceMappingPreview, SweepProKey } from "./SweepPro";
 import type { XiaomiRemoteKey } from "./XiaomiRemote";
@@ -312,6 +315,7 @@ export function DeviceButtonMappings<Key extends string>({
   const [applicationInfo, setApplicationInfo] = useState<Record<string, CodyboardApplicationInfo>>({});
   const [snapshot, setSnapshot] = useState<ProfilesSnapshot>();
   const [recordingKey, setRecordingKey] = useState<Key>();
+  const [editingTextKey, setEditingTextKey] = useState<Key>();
   const [editingURLKey, setEditingURLKey] = useState<Key>();
   const [urlDraft, setURLDraft] = useState("");
   const [savingKey, setSavingKey] = useState<Key>();
@@ -369,6 +373,13 @@ export function DeviceButtonMappings<Key extends string>({
     setSelectedScopeId("global");
     setScopePendingRemovalId(undefined);
   }, [activeProfile?.id, profileDomain]);
+
+  useEffect(() => {
+    setEditingTextKey(undefined);
+    setEditingURLKey(undefined);
+    setRecordingKey(undefined);
+    setURLDraft("");
+  }, [activeProfile?.id, selectedScopeId]);
 
   useEffect(() => {
     if (!scopePendingRemovalId) return;
@@ -508,6 +519,7 @@ export function DeviceButtonMappings<Key extends string>({
   };
 
   const beginKeyRecording = (control: DeviceControl<Key>) => {
+    setEditingTextKey(undefined);
     setEditingURLKey(undefined);
     setURLDraft("");
     setRecordingKey(control.key);
@@ -521,11 +533,19 @@ export function DeviceButtonMappings<Key extends string>({
       ? resolveProfileMapping(activeProfile, selectedGroup, control.input).effective?.to
       : undefined;
     setRecordingKey(undefined);
+    setEditingTextKey(undefined);
     setURLDraft(output?.kind === "openURL" ? output.url : "");
     setEditingURLKey(control.key);
     requestAnimationFrame(() => {
       rowReferences.current[control.key]?.querySelector<HTMLInputElement>(".open-url-value")?.focus();
     });
+  };
+
+  const beginTextEditing = (control: DeviceControl<Key>) => {
+    setRecordingKey(undefined);
+    setEditingURLKey(undefined);
+    setURLDraft("");
+    setEditingTextKey(control.key);
   };
 
   const commitURL = async (control: DeviceControl<Key>) => {
@@ -544,15 +564,19 @@ export function DeviceButtonMappings<Key extends string>({
 
   const changeAction = async (control: DeviceControl<Key>, action: string) => {
     if (action === "unchanged") {
+      setEditingTextKey(undefined);
       setEditingURLKey(undefined);
       setURLDraft("");
       await resetOutput(control);
     } else if (action === "launch") {
+      setEditingTextKey(undefined);
       setEditingURLKey(undefined);
       setURLDraft("");
       await chooseApplicationForControl(control);
     } else if (action === "open-url") {
       beginURLEditing(control);
+    } else if (action === "type-text") {
+      beginTextEditing(control);
     } else {
       beginKeyRecording(control);
     }
@@ -647,12 +671,16 @@ export function DeviceButtonMappings<Key extends string>({
           const isInherited = Boolean(isApplicationScope && !override);
           const launchOutput = !isRecording && mapping?.to.kind === "launchApplication" ? mapping.to : undefined;
           const openURLOutput = !isRecording && mapping?.to.kind === "openURL" ? mapping.to : undefined;
+          const typeTextOutput = !isRecording && mapping?.to.kind === "typeText" ? mapping.to : undefined;
+          const isEditingText = editingTextKey === control.key;
           const isEditingURL = editingURLKey === control.key;
           const launchApplication = launchOutput ? applicationInfo[launchOutput.bundleId] : undefined;
           const selectedOutputOption = mapping ? KEY_OUTPUT_OPTIONS_BY_SIGNATURE.get(mappingOutputSignature(mapping.to)) : undefined;
           const SelectedOutputIcon = selectedOutputOption?.icon;
           const actionValue = isRecording
             ? "keystroke"
+            : isEditingText
+              ? "type-text"
             : isEditingURL
               ? "open-url"
             : isInherited
@@ -661,6 +689,8 @@ export function DeviceButtonMappings<Key extends string>({
                 ? "launch"
                 : openURLOutput || isEditingURL
                   ? "open-url"
+                  : typeTextOutput || isEditingText
+                    ? "type-text"
                 : "keystroke";
           return (
             <article
@@ -700,10 +730,11 @@ export function DeviceButtonMappings<Key extends string>({
                     <SelectItem value="keystroke">Key Press</SelectItem>
                     <SelectItem value="launch">Launch Application</SelectItem>
                     <SelectItem value="open-url">Open URL</SelectItem>
+                    <SelectItem value="type-text">Type Text</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {launchOutput && !isEditingURL
+              {launchOutput && !isEditingURL && !isEditingText
                 ? (
                     <div className="launch-application-picker">
                       <button
@@ -729,6 +760,20 @@ export function DeviceButtonMappings<Key extends string>({
                       </button>
                     </div>
                   )
+                : isEditingText || (typeTextOutput && !isEditingURL)
+                  ? (
+                      <TypeTextEditor
+                        controlLabel={control.label}
+                        disabled={!activeProfile || isSaving}
+                        onCancel={() => setEditingTextKey(undefined)}
+                        onClear={() => {
+                          setEditingTextKey(undefined);
+                          void saveOutput(control, { kind: "suppress" });
+                        }}
+                        onSave={(output) => saveOutput(control, output)}
+                        output={typeTextOutput}
+                      />
+                    )
                 : openURLOutput || isEditingURL
                   ? (
                       <div className="open-url-picker">
@@ -890,6 +935,104 @@ export function DeviceButtonMappings<Key extends string>({
   );
 }
 
+function TypeTextEditor({
+  controlLabel,
+  disabled,
+  onCancel,
+  onClear,
+  onSave,
+  output,
+}: {
+  controlLabel: string;
+  disabled: boolean;
+  onCancel: () => void;
+  onClear: () => void;
+  onSave: (output: TypeTextOutput) => Promise<void>;
+  output?: TypeTextOutput;
+}) {
+  const [pressEnter, setPressEnter] = useState(output?.pressEnter ?? false);
+  const [text, setText] = useState(output?.text ?? "");
+
+  useEffect(() => {
+    if (!output) return;
+    setPressEnter(output.pressEnter);
+    setText(output.text);
+  }, [output]);
+
+  const save = (nextText = text, nextPressEnter = pressEnter) => {
+    if (!nextText) return;
+    void onSave({ kind: "typeText", pressEnter: nextPressEnter, text: nextText });
+  };
+
+  return (
+    <div
+      className="type-text-picker"
+      onBlur={(event) => {
+        if (!disabled && (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget))) save();
+      }}
+    >
+      <TextCursorInput aria-hidden="true" className="type-text-icon" />
+      <input
+        aria-label={`${controlLabel} text`}
+        autoCapitalize="none"
+        autoCorrect="off"
+        autoFocus={!output}
+        className="type-text-value"
+        disabled={disabled}
+        maxLength={4_096}
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setPressEnter(output?.pressEnter ?? false);
+            setText(output?.text ?? "");
+            onCancel();
+          }
+        }}
+        placeholder="Text to type"
+        spellCheck={false}
+        value={text}
+      />
+      {(output || text) && (
+        <button
+          aria-label={`Clear ${controlLabel} text`}
+          className="mapping-value-clear type-text-clear"
+          disabled={disabled}
+          onClick={onClear}
+          type="button"
+        >
+          <X aria-hidden="true" />
+        </button>
+      )}
+      <TooltipProvider delayDuration={250}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              aria-label="Press Enter after typing"
+              aria-pressed={pressEnter}
+              className={`type-text-enter ${pressEnter ? "is-active" : ""}`.trim()}
+              disabled={disabled}
+              onClick={() => {
+                const nextPressEnter = !pressEnter;
+                setPressEnter(nextPressEnter);
+                save(text, nextPressEnter);
+              }}
+              onPointerDown={(event) => event.preventDefault()}
+              type="button"
+            >
+              <CornerDownLeft aria-hidden="true" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            {pressEnter ? "Enter will be pressed after typing" : "Press Enter after typing"}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  );
+}
+
 function PanelNotice({ children, tone = "neutral" }: { children: string; tone?: "error" | "neutral" }) {
   return <p className={`mapping-notice is-${tone}`}>{children}</p>;
 }
@@ -928,6 +1071,7 @@ function describeOutput(output: MappingOutput | undefined): string {
   if (output.kind === "passthrough") return "Pass through";
   if (output.kind === "launchApplication") return output.bundleId;
   if (output.kind === "openURL") return output.url;
+  if (output.kind === "typeText") return output.text;
   if (output.kind === "modifier") return output.key === "capsLock" ? "Caps Lock" : MODIFIER_GLYPHS[output.key];
   if (output.kind === "system") return output.key ?? `System ${output.systemCode}`;
   const modifiers = (output.modifiers ?? []).map((modifier) => MODIFIER_GLYPHS[modifier]);
@@ -952,6 +1096,9 @@ export function mappingPreviewForControl<Key extends string>(
   if (output.kind === "openURL") {
     return { icon: Link2, kind: "key", label: output.url };
   }
+  if (output.kind === "typeText") {
+    return { icon: TextCursorInput, kind: "key", label: output.text };
+  }
   if (output.kind === "passthrough") {
     const input = control.input;
     if (input.kind === "hidUsage") return undefined;
@@ -960,7 +1107,7 @@ export function mappingPreviewForControl<Key extends string>(
   return keyPreview(output);
 }
 
-function keyPreview(output: Exclude<MappingOutput, { kind: "launchApplication" | "openURL" | "passthrough" | "suppress" }>): DeviceMappingPreview {
+function keyPreview(output: Exclude<MappingOutput, { kind: "launchApplication" | "openURL" | "passthrough" | "suppress" | "typeText" }>): DeviceMappingPreview {
   const option = KEY_OUTPUT_OPTIONS_BY_SIGNATURE.get(mappingOutputSignature(output));
   const compact = "modifiers" in output && (output.modifiers?.length ?? 0) > 0;
   return {

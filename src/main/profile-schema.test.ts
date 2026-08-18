@@ -81,6 +81,32 @@ describe("profile schema", () => {
     expect(() => parseProfileDocument(document)).toThrow(/absolute URL/);
   });
 
+  it("compiles Unicode text with an optional trailing Enter", () => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0].to = {
+      kind: "typeText",
+      pressEnter: true,
+      text: "你好, Codyboard",
+    };
+    const compiled = compileProfiles(document, { version: 1, activeProfiles: { "device:0x100004baa": "presenter" } }, 10);
+    expect(compiled.profiles[0].global[0].output).toEqual({
+      kind: "typeText",
+      modifiers: [],
+      pressEnter: true,
+      text: "你好, Codyboard",
+    });
+  });
+
+  it("rejects an empty text action", () => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0].to = {
+      kind: "typeText",
+      pressEnter: false,
+      text: "",
+    };
+    expect(() => parseProfileDocument(document)).toThrow();
+  });
+
   it("compiles an Fn modifier stroke", () => {
     const document = structuredClone(validDocument);
     document.keyboards[0].profiles[0].groups[0].mappings[0].to = {

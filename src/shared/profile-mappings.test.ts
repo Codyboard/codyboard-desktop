@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { MappingInput, ProfileDraft } from "./hid";
 import {
+  mappingOutputSignature,
   removeApplicationMappingGroup,
   removeProfileMappingOverride,
   resolveProfileMapping,
@@ -91,5 +92,11 @@ describe("sparse application mappings", () => {
       to: { key: "b", kind: "keyboard", modifiers: ["command"] },
     });
     expect(updated.groups[1].mappings).toEqual([]);
+  });
+
+  it("distinguishes text actions by content and trailing Enter", () => {
+    const plain = { kind: "typeText", pressEnter: false, text: "你好" } as const;
+    const withEnter = { ...plain, pressEnter: true } as const;
+    expect(mappingOutputSignature(plain)).not.toBe(mappingOutputSignature(withEnter));
   });
 });

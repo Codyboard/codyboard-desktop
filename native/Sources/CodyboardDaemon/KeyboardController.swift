@@ -106,7 +106,11 @@ final class KeyboardController: @unchecked Sendable {
         guard requestPermission(prompt: true) else {
             throw NSError(domain: "app.codyboard.permissions", code: 1, userInfo: [NSLocalizedDescriptionKey: "Accessibility permission is required"])
         }
-        try simulator.sendStroke(output)
+        if output.kind == "typeText", let text = output.text {
+            try simulator.sendText(text, pressEnter: output.pressEnter ?? false)
+        } else {
+            try simulator.sendStroke(output)
+        }
     }
 
     func setDiagnostics(keyboardType: Int?) throws -> ReplaceResult {
@@ -328,6 +332,9 @@ final class KeyboardController: @unchecked Sendable {
             if output.kind == "openURL" {
                 return output.url.map(ActiveDeviceAction.openURL) ?? .suppress
             }
+            if output.kind == "typeText" {
+                return output.text.map { ActiveDeviceAction.typeText($0, output.pressEnter ?? false) } ?? .suppress
+            }
             return .output(output)
         }
     }
@@ -346,6 +353,17 @@ final class KeyboardController: @unchecked Sendable {
             return nil
         case .openURL(let url):
             if pressed && !autorepeat { applicationLauncher.open(urlString: url) }
+            return nil
+        case .typeText(let text, let pressEnter):
+            if pressed && !autorepeat {
+                do { try simulator.sendText(text, pressEnter: pressEnter) }
+                catch {
+                    NativeOutput.shared.error(
+                        id: nil, code: "simulationFailed", message: error.localizedDescription,
+                        details: details
+                    )
+                }
+            }
             return nil
         case .output(let output):
             do {
@@ -372,6 +390,16 @@ final class KeyboardController: @unchecked Sendable {
             if pressed && !autorepeat { applicationLauncher.launch(bundleIdentifier: bundleIdentifier) }
         case .openURL(let url):
             if pressed && !autorepeat { applicationLauncher.open(urlString: url) }
+        case .typeText(let text, let pressEnter):
+            if pressed && !autorepeat {
+                do { try simulator.sendText(text, pressEnter: pressEnter) }
+                catch {
+                    NativeOutput.shared.error(
+                        id: nil, code: "simulationFailed", message: error.localizedDescription,
+                        details: details
+                    )
+                }
+            }
         case .output(let output):
             do { try simulator.post(output, pressed: pressed, autorepeat: autorepeat) }
             catch {
@@ -408,6 +436,7 @@ enum ActiveDeviceAction {
     case suppress
     case launchApplication(String)
     case openURL(String)
+    case typeText(String, Bool)
     case output(CompiledOutput)
 }
 

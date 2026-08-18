@@ -73,7 +73,7 @@ export function PermissionsPage() {
         <div className="permission-list" aria-busy={isChecking}>
           <PermissionRow
             allowed={status.accessibility}
-            description="Observe keyboard events and send your mapped shortcuts."
+            description="Observe keyboard events and send your mapped shortcuts or text."
             icon={<Accessibility />}
             isRequesting={requesting === "accessibility"}
             name="Accessibility"

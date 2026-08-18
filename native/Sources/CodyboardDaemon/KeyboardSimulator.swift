@@ -10,6 +10,39 @@ final class KeyboardSimulator {
         try post(output, pressed: false, autorepeat: false)
     }
 
+    func sendText(_ text: String, pressEnter: Bool) throws {
+        guard !text.isEmpty else { throw simulationError("Text cannot be empty") }
+        let codeUnits = Array(text.utf16)
+        var start = 0
+        while start < codeUnits.count {
+            var end = min(start + 20, codeUnits.count)
+            if end < codeUnits.count,
+               (0xD800...0xDBFF).contains(codeUnits[end - 1]),
+               (0xDC00...0xDFFF).contains(codeUnits[end]) {
+                end -= 1
+            }
+            let chunk = Array(codeUnits[start..<end])
+            guard let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
+                  let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else {
+                throw simulationError("Unable to create Unicode keyboard event")
+            }
+            chunk.withUnsafeBufferPointer { buffer in
+                keyDown.keyboardSetUnicodeString(
+                    stringLength: buffer.count,
+                    unicodeString: buffer.baseAddress
+                )
+            }
+            keyDown.setIntegerValueField(.eventSourceUserData, value: syntheticEventMarker)
+            keyUp.setIntegerValueField(.eventSourceUserData, value: syntheticEventMarker)
+            keyDown.post(tap: .cghidEventTap)
+            keyUp.post(tap: .cghidEventTap)
+            start = end
+        }
+        if pressEnter {
+            try sendStroke(CompiledOutput(kind: "keyboard", code: 36, modifiers: []))
+        }
+    }
+
     func post(_ output: CompiledOutput, pressed: Bool, autorepeat: Bool) throws {
         switch output.kind {
         case "keyboard":

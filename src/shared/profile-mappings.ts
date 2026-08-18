@@ -30,6 +30,7 @@ export function mappingOutputSignature(output: MappingOutput): string {
   if (output.kind === "system") return `system:${output.key ?? output.systemCode}`;
   if (output.kind === "launchApplication") return `launchApplication:${output.bundleId}`;
   if (output.kind === "openURL") return `openURL:${output.url}`;
+  if (output.kind === "typeText") return `typeText:${output.pressEnter ? "enter" : "plain"}:${output.text}`;
   return output.kind;
 }
 
