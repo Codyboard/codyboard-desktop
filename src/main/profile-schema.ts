@@ -11,6 +11,7 @@ import type {
   ProfileDraft,
   ProfileStateDocument
 } from "../shared/hid.js";
+import { mappingInputSignature } from "../shared/profile-mappings.js";
 
 import { KEY_CODES, MODIFIER_KEY_CODES, SYSTEM_KEY_CODES, normalizeModifiers } from "./key-codes.js";
 
@@ -83,11 +84,7 @@ const ensureUnique = (values: string[], label: string) => {
 };
 
 export function triggerKey(input: MappingInput): string {
-  const modifiers = normalizeModifiers(input.kind === "keyboard" || input.kind === "modifier" ? input.modifiers : undefined).join("+");
-  if (input.kind === "system") return `system:${input.key ?? input.systemCode}`;
-  if (input.kind === "hidUsage") return `hidUsage:${input.usage}`;
-  if (input.kind === "modifier") return `modifier:${input.key}:${modifiers}`;
-  return `keyboard:${input.key ?? input.keyCode}:${modifiers}`;
+  return mappingInputSignature(input);
 }
 
 function validateProfile(profile: ProfileDraft): void {

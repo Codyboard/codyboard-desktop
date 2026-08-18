@@ -15,6 +15,7 @@ import type {
   ProfilesSnapshot,
   ProfileStateDocument,
 } from "../shared/hid.js";
+import { normalizeApplicationMappings } from "../shared/profile-mappings.js";
 
 import { compileProfiles, parseProfileDocument, parseStateDocument, profileDraftSchema, validateActiveProfiles } from "./profile-schema.js";
 
@@ -66,7 +67,7 @@ export class ProfileCoordinator extends EventEmitter {
   create(keyboardType: number, draft: ProfileDraft): Promise<ProfilesSnapshot> {
     return this.mutate((document, state) => {
       this.assertKeyboardType(keyboardType);
-      const profile = profileDraftSchema.parse(draft) as ProfileDraft;
+      const profile = normalizeApplicationMappings(profileDraftSchema.parse(draft));
       let keyboard = document.keyboards.find(({ type }) => type === keyboardType);
       if (!keyboard) {
         keyboard = { type: keyboardType, profiles: [] };
@@ -83,7 +84,7 @@ export class ProfileCoordinator extends EventEmitter {
     return this.mutate((document) => {
       this.assertKeyboardType(keyboardType);
       if (draft.id !== profileId) throw new Error("Profile id cannot be changed by update");
-      const profile = profileDraftSchema.parse(draft) as ProfileDraft;
+      const profile = normalizeApplicationMappings(profileDraftSchema.parse(draft));
       const keyboard = document.keyboards.find(({ type }) => type === keyboardType);
       const index = keyboard?.profiles.findIndex(({ id }) => id === profileId) ?? -1;
       if (!keyboard || index < 0) throw new Error(`Profile not found: ${profileId}`);
@@ -136,6 +137,7 @@ export class ProfileCoordinator extends EventEmitter {
       const state = clone(EMPTY_STATE);
       const settingsText = await this.readOptional(this.settingsPath);
       const settings = settingsSchema.parse(settingsText ? parse(settingsText) : { version: 1, keyboards: {} });
+      const migrations: { file: string; normalized: ProfileDraft; original: string }[] = [];
       let entries;
       try { entries = await readdir(this.rootDirectory, { withFileTypes: true }); }
       catch (error) {
@@ -153,8 +155,14 @@ export class ProfileCoordinator extends EventEmitter {
         for (const file of files) {
           const profileMatch = file.isFile() && file.name !== "state.yaml" ? (PROFILE_FILE.exec(file.name)) : null;
           if (!profileMatch) continue;
-          const profile = profileDraftSchema.parse(parse(await readFile(path.join(directory, file.name), "utf8"))) as ProfileDraft;
+          const profilePath = path.join(directory, file.name);
+          const original = await readFile(profilePath, "utf8");
+          const parsedProfile = profileDraftSchema.parse(parse(original)) as ProfileDraft;
+          const profile = normalizeApplicationMappings(parsedProfile);
           if (profile.id !== profileMatch[1]) throw new Error(`${file.name}: profile id must match its filename`);
+          if (!profilesEqual(parsedProfile, profile)) {
+            migrations.push({ file: profilePath, normalized: profile, original });
+          }
           profiles.push(profile);
         }
         document.keyboards.push({ type: keyboardType, profiles });
@@ -169,6 +177,7 @@ export class ProfileCoordinator extends EventEmitter {
         if (match) delete parsedState.activeProfiles[match[1]];
         this.emitConfigurationError(message);
       }
+      await this.persistProfileMigrations(migrations);
       return await this.commit(parsedDocument, parsedState, false);
     } catch (error) {
       this.emitConfigurationError(error instanceof Error ? error.message : String(error));
@@ -265,8 +274,28 @@ export class ProfileCoordinator extends EventEmitter {
     if (contents === undefined) await unlink(file).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
     else await this.writeAtomic(file, contents);
   }
+  private async persistProfileMigrations(
+    migrations: { file: string; normalized: ProfileDraft; original: string }[],
+  ): Promise<void> {
+    const written: typeof migrations = [];
+    try {
+      for (const migration of migrations) {
+        await this.writeAtomic(migration.file, stringify(migration.normalized));
+        written.push(migration);
+      }
+    } catch (error) {
+      for (const migration of written.reverse()) {
+        await this.writeAtomic(migration.file, migration.original).catch(() => undefined);
+      }
+      throw error;
+    }
+  }
   private emitConfigurationError(message: string): void {
     const error: NativeError = { code: "configurationError", message };
     this.emit("event", { type: "configurationError", error } satisfies ProfileEvent);
   }
+}
+
+function profilesEqual(left: ProfileDraft, right: ProfileDraft): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

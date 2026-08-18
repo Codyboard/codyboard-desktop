@@ -354,14 +354,17 @@ ipcMain.handle('applications:resolve', (_event, bundleId: string) => {
 ipcMain.handle('keyboard:send', (_event, output: CompiledOutput) =>
   daemon.sendKeyboardInput(output),
 );
-ipcMain.handle('diagnostics:set', (_event, keyboardType?: number) => {
+ipcMain.handle('diagnostics:set', async (_event, keyboardType?: number) => {
   if (
     keyboardType !== undefined &&
-    (!Number.isInteger(keyboardType) || keyboardType < 0)
+    (!Number.isInteger(keyboardType) || keyboardType < -1)
   ) {
     throw new Error('Invalid keyboard type');
   }
-  return daemon.setDiagnosticKeyboardType(keyboardType);
+  console.info(`[diagnostics:set] requested=${keyboardType ?? 'off'}`);
+  const result = await daemon.setDiagnosticKeyboardType(keyboardType);
+  console.info(`[diagnostics:set] listening=${result.listening} generation=${result.generation}`);
+  return result;
 });
 ipcMain.handle('permissions:status', () => daemon.permissionStatus());
 ipcMain.handle(
@@ -408,6 +411,7 @@ daemon.on('error', (payload: { message: string }) =>
   }),
 );
 daemon.on('diagnosticKey', (payload) => {
+  console.info(`[diagnostics:key] ${JSON.stringify(payload)}`);
   for (const window of BrowserWindow.getAllWindows())
     window.webContents.send('diagnostics:key', payload);
 });

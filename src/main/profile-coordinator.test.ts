@@ -1,8 +1,9 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { parse, stringify } from "yaml";
 
 import type { CompiledProfileSet, ProfileDraft } from "../shared/hid.js";
 
@@ -41,5 +42,51 @@ describe("ProfileCoordinator", () => {
     await service.remove(40, "second");
     expect(service.snapshot().keyboards["40"].activeProfile).toBeUndefined();
     expect(daemon.snapshots.at(-1)?.profiles).toHaveLength(0);
+  });
+
+  it("migrates redundant application mappings while loading", async () => {
+    const temporary = await mkdtemp(path.join(tmpdir(), "codyboard-profile-migration-test-"));
+    const root = path.join(temporary, ".codyboard", "profiles");
+    const profilePath = path.join(root, "hid-40", "presenter.yaml");
+    const redundant: ProfileDraft = {
+      ...draft,
+      groups: [
+        {
+          id: "global",
+          mappings: [{
+            from: { key: "arrowLeft", kind: "keyboard", modifiers: ["fn"] },
+            id: "global-left",
+            to: { key: "b", kind: "keyboard", modifiers: ["command"] },
+          }],
+          scope: { kind: "global" },
+        },
+        {
+          id: "codex",
+          mappings: [
+            {
+              from: { key: "arrowLeft", kind: "keyboard", modifiers: ["fn"] },
+              id: "codex-left-copy",
+              to: { key: "b", kind: "keyboard", modifiers: ["command"] },
+            },
+            {
+              from: { key: "arrowRight", kind: "keyboard", modifiers: ["fn"] },
+              id: "codex-right",
+              to: { key: "l", kind: "keyboard", modifiers: ["command"] },
+            },
+          ],
+          scope: { bundleId: "com.openai.codex", kind: "application" },
+        },
+      ],
+    };
+    await mkdir(path.dirname(profilePath), { recursive: true });
+    await writeFile(profilePath, stringify(redundant));
+
+    const service = new ProfileCoordinator(new FakeDaemon(), root);
+    const snapshot = await service.load();
+    const application = snapshot.keyboards["40"].profiles[0].groups[1];
+    expect(application.mappings.map(({ id }) => id)).toEqual(["codex-right"]);
+
+    const persisted = parse(await readFile(profilePath, "utf8")) as ProfileDraft;
+    expect(persisted.groups[1].mappings.map(({ id }) => id)).toEqual(["codex-right"]);
   });
 });

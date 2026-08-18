@@ -59,12 +59,17 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import type {
   CodyboardApplicationInfo,
   HIDModifier,
-  KeyMapping,
   MappingInput,
   MappingOutput,
   ProfileDraft,
   ProfilesSnapshot,
 } from "../../../shared/hid";
+import {
+  mappingOutputSignature,
+  removeProfileMappingOverride,
+  resolveProfileMapping,
+  setProfileMapping,
+} from "../../../shared/profile-mappings";
 import {
   Select,
   SelectContent,
@@ -76,14 +81,16 @@ import {
   SelectValue,
 } from "../ui/select";
 
-import { inheritGlobalMappings } from "./profile-draft";
+import type { SweepProKey } from "./SweepPro";
 import type { XiaomiRemoteKey } from "./XiaomiRemote";
 
-interface DeviceControl {
-  icon: LucideIcon;
+export interface DeviceControl<Key extends string> {
+  defaultOutput?: MappingOutput;
+  icon?: LucideIcon;
   input: MappingInput;
-  key: XiaomiRemoteKey;
+  key: Key;
   label: string;
+  legend?: string;
 }
 
 interface KeyOutputOption {
@@ -187,13 +194,13 @@ const KEY_OUTPUT_GROUPS: readonly KeyOutputGroup[] = [
 
 const KEY_OUTPUT_OPTIONS = new Map(KEY_OUTPUT_GROUPS.flatMap(({ options }) => options.map((option) => [option.id, option])));
 const KEY_OUTPUT_OPTIONS_BY_SIGNATURE = new Map(
-  KEY_OUTPUT_GROUPS.flatMap(({ options }) => options.map((option) => [outputSignature(option.output), option])),
+  KEY_OUTPUT_GROUPS.flatMap(({ options }) => options.map((option) => [mappingOutputSignature(option.output), option])),
 );
 const KEY_OUTPUT_LABELS = new Map(
-  KEY_OUTPUT_GROUPS.flatMap(({ options }) => options.map((option) => [outputSignature(option.output), option.label])),
+  KEY_OUTPUT_GROUPS.flatMap(({ options }) => options.map((option) => [mappingOutputSignature(option.output), option.label])),
 );
 
-const CONTROLS: readonly DeviceControl[] = [
+export const XIAOMI_REMOTE_CONTROLS: readonly DeviceControl<XiaomiRemoteKey>[] = [
   { icon: ChevronUp, input: { kind: "keyboard", key: "arrowUp", modifiers: ["fn"] }, key: "up", label: "Up" },
   { icon: ChevronDown, input: { kind: "keyboard", key: "arrowDown", modifiers: ["fn"] }, key: "down", label: "Down" },
   { icon: ChevronLeft, input: { kind: "keyboard", key: "arrowLeft", modifiers: ["fn"] }, key: "left", label: "Left" },
@@ -207,21 +214,51 @@ const CONTROLS: readonly DeviceControl[] = [
   { icon: Tv, input: { kind: "keyboard", key: "`", modifiers: [] }, key: "tv", label: "TV" },
 ];
 
-interface DeviceButtonMappingsProps {
+export const SWEEP_PRO_CONTROLS: readonly DeviceControl<SweepProKey>[] = [
+  "T", "G", "B", "R", "F", "V", "E", "D", "C", "W", "S", "X", "Q", "A", "Z",
+].map((key) => ({
+  defaultOutput: { kind: "keyboard", key: key.toLowerCase(), modifiers: [] },
+  input: { kind: "keyboard", key: key.toLowerCase(), modifiers: [] },
+  key: key as SweepProKey,
+  label: key,
+  legend: key,
+}));
+
+export const SWEEP_PRO_DEFAULT_PROFILE: ProfileDraft = {
+  groups: [{
+    id: "global",
+    mappings: SWEEP_PRO_CONTROLS.map((control) => ({
+      from: control.input,
+      id: `global-${control.key.toLowerCase()}`,
+      to: control.defaultOutput!,
+    })),
+    scope: { kind: "global" },
+  }],
+  id: "sweep-pro",
+  name: "Sweep Pro Default",
+};
+
+interface DeviceButtonMappingsProps<Key extends string> {
+  controls: readonly DeviceControl<Key>[];
   keyboardType?: number;
-  onSelectKey?: (key: XiaomiRemoteKey) => void;
-  selectedKey?: XiaomiRemoteKey;
+  onSelectKey?: (key: Key) => void;
+  selectedKey?: Key;
 }
 
-export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }: DeviceButtonMappingsProps) {
+export function DeviceButtonMappings<Key extends string>({
+  controls,
+  keyboardType,
+  onSelectKey,
+  selectedKey,
+}: DeviceButtonMappingsProps<Key>) {
   const [applicationInfo, setApplicationInfo] = useState<Record<string, CodyboardApplicationInfo>>({});
   const [snapshot, setSnapshot] = useState<ProfilesSnapshot>();
-  const [recordingKey, setRecordingKey] = useState<XiaomiRemoteKey>();
-  const [savingKey, setSavingKey] = useState<XiaomiRemoteKey>();
+  const [recordingKey, setRecordingKey] = useState<Key>();
+  const [savingKey, setSavingKey] = useState<Key>();
   const [savingScope, setSavingScope] = useState(false);
   const [selectedScopeId, setSelectedScopeId] = useState("global");
   const [error, setError] = useState<string>();
-  const rowReferences = useRef<Partial<Record<XiaomiRemoteKey, HTMLElement | null>>>({});
+  const rowReferences = useRef<Partial<Record<Key, HTMLElement | null>>>({});
 
   useEffect(() => {
     let mounted = true;
@@ -277,17 +314,41 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
     return () => { mounted = false; };
   }, [referencedApplicationBundleIds]);
 
-  const mappings = useMemo(
-    () => CONTROLS.map((control) => ({ control, mapping: findMapping(selectedGroup, control.input) })),
-    [selectedGroup],
-  );
+  const mappings = useMemo(() => {
+    if (!activeProfile || !selectedGroup) return [];
+    return controls.map((control) => ({
+      control,
+      resolution: resolveProfileMapping(activeProfile, selectedGroup, control.input),
+    }));
+  }, [activeProfile, controls, selectedGroup]);
+  const isApplicationScope = selectedGroup?.scope.kind === "application";
 
-  const saveOutput = async (control: DeviceControl, output: MappingOutput) => {
+  const saveOutput = async (control: DeviceControl<Key>, output: MappingOutput) => {
     if (keyboardType === undefined || !activeProfile || !selectedGroup) return;
     setError(undefined);
     setSavingKey(control.key);
     try {
-      const draft = updateMapping(activeProfile, selectedGroup.id, control, output);
+      const resolution = resolveProfileMapping(activeProfile, selectedGroup, control.input);
+      const draft = setProfileMapping(activeProfile, selectedGroup.id, {
+        from: control.input,
+        id: resolution.override?.id ?? mappingIdFor(selectedGroup.id, control.key, activeProfile),
+        to: output,
+      });
+      setSnapshot(await window.codyboard.profiles.update(keyboardType, activeProfile.id, draft));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSavingKey(undefined);
+      setRecordingKey(undefined);
+    }
+  };
+
+  const resetOutput = async (control: DeviceControl<Key>) => {
+    if (keyboardType === undefined || !activeProfile || !selectedGroup || !isApplicationScope) return;
+    setError(undefined);
+    setSavingKey(control.key);
+    try {
+      const draft = removeProfileMappingOverride(activeProfile, selectedGroup.id, control.input);
       setSnapshot(await window.codyboard.profiles.update(keyboardType, activeProfile.id, draft));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -318,8 +379,7 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
       }
       const draft = structuredClone(activeProfile);
       const groupId = applicationGroupId(info.bundleId, draft);
-      const mappings = inheritGlobalMappings(draft, groupId);
-      draft.groups.push({ id: groupId, mappings, scope: { bundleId: info.bundleId, kind: "application" } });
+      draft.groups.push({ id: groupId, mappings: [], scope: { bundleId: info.bundleId, kind: "application" } });
       setSnapshot(await window.codyboard.profiles.update(keyboardType, activeProfile.id, draft));
       setSelectedScopeId(groupId);
     } catch (cause) {
@@ -329,7 +389,7 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
     }
   };
 
-  const chooseApplicationForControl = async (control: DeviceControl) => {
+  const chooseApplicationForControl = async (control: DeviceControl<Key>) => {
     setError(undefined);
     try {
       const info = await window.codyboard.applications.pick();
@@ -341,11 +401,20 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
     }
   };
 
-  const changeAction = async (control: DeviceControl, mapping: KeyMapping | undefined, action: string) => {
-    if (action === "launch") {
+  const beginKeyRecording = (control: DeviceControl<Key>) => {
+    setRecordingKey(control.key);
+    requestAnimationFrame(() => {
+      rowReferences.current[control.key]?.querySelector<HTMLInputElement>("input")?.focus();
+    });
+  };
+
+  const changeAction = async (control: DeviceControl<Key>, action: string) => {
+    if (action === "unchanged") {
+      await resetOutput(control);
+    } else if (action === "launch") {
       await chooseApplicationForControl(control);
-    } else if (mapping?.to.kind === "launchApplication") {
-      await saveOutput(control, { kind: "suppress" });
+    } else {
+      beginKeyRecording(control);
     }
   };
 
@@ -407,33 +476,56 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
       {error && <PanelNotice tone="error">{error}</PanelNotice>}
 
       <div className="mapping-list">
-        {mappings.map(({ control, mapping }) => {
+        {mappings.map(({ control, resolution }) => {
           const Icon = control.icon;
           const isSelected = selectedKey === control.key;
           const isRecording = recordingKey === control.key;
           const isSaving = savingKey === control.key;
-          const launchOutput = mapping?.to.kind === "launchApplication" ? mapping.to : undefined;
+          const defaultMapping = control.defaultOutput && !resolution.effective
+            ? { from: control.input, id: `default-${control.key.toLowerCase()}`, to: control.defaultOutput }
+            : undefined;
+          const mapping = resolution.effective ?? defaultMapping;
+          const isDefault = Boolean(defaultMapping);
+          const override = resolution.override;
+          const isInherited = Boolean(isApplicationScope && !override);
+          const launchOutput = !isRecording && mapping?.to.kind === "launchApplication" ? mapping.to : undefined;
           const launchApplication = launchOutput ? applicationInfo[launchOutput.bundleId] : undefined;
-          const selectedOutputOption = mapping ? KEY_OUTPUT_OPTIONS_BY_SIGNATURE.get(outputSignature(mapping.to)) : undefined;
+          const selectedOutputOption = mapping ? KEY_OUTPUT_OPTIONS_BY_SIGNATURE.get(mappingOutputSignature(mapping.to)) : undefined;
           const SelectedOutputIcon = selectedOutputOption?.icon;
+          const actionValue = isRecording
+            ? "keystroke"
+            : isInherited
+              ? "unchanged"
+              : launchOutput
+                ? "launch"
+                : "keystroke";
           return (
             <article
-              className={`mapping-row ${isSelected ? "is-selected" : ""} ${isRecording ? "is-recording" : ""}`.trim()}
+              className={`mapping-row ${isSelected ? "is-selected" : ""} ${isRecording ? "is-recording" : ""} ${isInherited ? "is-inherited" : ""}`.trim()}
+              data-mapping-key={control.key}
               key={control.key}
               onPointerDown={() => onSelectKey?.(control.key)}
               ref={(element) => { rowReferences.current[control.key] = element; }}
             >
-              <span className="mapping-button-icon"><Icon aria-hidden="true" /></span>
+              <span className="mapping-button-icon">
+                {control.legend
+                  ? <strong aria-hidden="true">{control.legend}</strong>
+                  : Icon && <Icon aria-hidden="true" />}
+              </span>
               <span className="mapping-button-name">
                 <strong>{control.label}</strong>
-                <small>{mapping ? "Configured" : "Unassigned"}</small>
+                <small>
+                  {isApplicationScope
+                    ? override ? "Overridden" : "Unchanged"
+                    : isDefault ? "Default" : mapping ? "Configured" : "Unassigned"}
+                </small>
               </span>
               <div className="mapping-action-select">
                 <span>Action</span>
                 <Select
                   disabled={!activeProfile || isSaving}
-                  onValueChange={(value) => void changeAction(control, mapping, value)}
-                  value={launchOutput ? "launch" : "keystroke"}
+                  onValueChange={(value) => void changeAction(control, value)}
+                  value={actionValue}
                 >
                   <SelectTrigger
                     aria-label={`${control.label} action`}
@@ -441,6 +533,8 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    {isApplicationScope && <SelectItem value="unchanged">Unchanged</SelectItem>}
+                    {isApplicationScope && <SelectSeparator />}
                     <SelectItem value="keystroke">Key Press</SelectItem>
                     <SelectItem value="launch">Launch Application</SelectItem>
                   </SelectContent>
@@ -537,23 +631,7 @@ function ApplicationIdentity({ bundleId, info }: { bundleId: string; info?: Cody
   );
 }
 
-function findMapping(group: ProfileDraft["groups"][number] | undefined, input: MappingInput): KeyMapping | undefined {
-  if (!group) return undefined;
-  const signature = inputSignature(input);
-  return group.mappings.find(({ from }) => inputSignature(from) === signature);
-}
-
-function updateMapping(profile: ProfileDraft, groupId: string, control: DeviceControl, output: MappingOutput): ProfileDraft {
-  const draft = structuredClone(profile);
-  const group = draft.groups.find(({ id }) => id === groupId);
-  if (!group) throw new Error("The selected mapping scope no longer exists.");
-  const mapping = findMapping(group, control.input);
-  if (mapping) mapping.to = output;
-  else group.mappings.push({ id: mappingIdFor(group.id, control.key, draft), from: control.input, to: output });
-  return draft;
-}
-
-function mappingIdFor(groupId: string, key: XiaomiRemoteKey, profile: ProfileDraft): string {
+function mappingIdFor(groupId: string, key: string, profile: ProfileDraft): string {
   const base = `${groupId}-${key.toLowerCase()}`;
   const ids = new Set(profile.groups.flatMap(({ mappings }) => mappings.map(({ id }) => id)));
   let candidate = base;
@@ -570,17 +648,9 @@ function applicationGroupId(bundleId: string, profile: ProfileDraft): string {
   return candidate;
 }
 
-function inputSignature(input: MappingInput): string {
-  if (input.kind === "system") return `system:${input.key ?? input.systemCode}`;
-  if (input.kind === "hidUsage") return `hidUsage:${input.usage}`;
-  const modifiers = [...(input.modifiers ?? [])].sort().join("+");
-  if (input.kind === "modifier") return `modifier:${input.key}:${modifiers}`;
-  return `keyboard:${input.key ?? input.keyCode}:${modifiers}`;
-}
-
 function describeOutput(output: MappingOutput | undefined): string {
   if (!output) return "";
-  const presetLabel = KEY_OUTPUT_LABELS.get(outputSignature(output));
+  const presetLabel = KEY_OUTPUT_LABELS.get(mappingOutputSignature(output));
   if (presetLabel) return presetLabel;
   if (output.kind === "suppress") return "No action";
   if (output.kind === "passthrough") return "Pass through";
@@ -589,18 +659,6 @@ function describeOutput(output: MappingOutput | undefined): string {
   if (output.kind === "system") return output.key ?? `System ${output.systemCode}`;
   const modifiers = (output.modifiers ?? []).map((modifier) => MODIFIER_GLYPHS[modifier]);
   return [...modifiers, displayKey(output.key ?? `Key ${output.keyCode}`)].join("  ");
-}
-
-function outputSignature(output: MappingOutput): string {
-  if (output.kind === "keyboard") {
-    return `keyboard:${output.key ?? output.keyCode}:${[...(output.modifiers ?? [])].sort().join("+")}`;
-  }
-  if (output.kind === "modifier") {
-    return `modifier:${output.key}:${[...(output.modifiers ?? [])].sort().join("+")}`;
-  }
-  if (output.kind === "system") return `system:${output.key ?? output.systemCode}`;
-  if (output.kind === "launchApplication") return `launchApplication:${output.bundleId}`;
-  return output.kind;
 }
 
 const MODIFIER_GLYPHS: Readonly<Record<HIDModifier, string>> = {

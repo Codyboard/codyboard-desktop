@@ -82,7 +82,7 @@ final class KeyboardController: @unchecked Sendable {
 
     func setDiagnostics(keyboardType: Int?) throws -> ReplaceResult {
         if let keyboardType {
-            guard keyboardType >= 0 else {
+            guard keyboardType >= -1 else {
                 throw NSError(domain: "app.codyboard.diagnostics", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid keyboard type"])
             }
             let rawHIDWasRunning = rawHIDMonitor.isRunning
@@ -162,7 +162,7 @@ final class KeyboardController: @unchecked Sendable {
         let pressed = system?.pressed ?? eventPressed(type: type, keyCode: code, flags: event.flags)
         let activeLaunchTrigger = ActiveLaunchTrigger(trigger: trigger, keyboardType: keyboardType)
         if !pressed, activeLaunchTriggers.remove(activeLaunchTrigger) != nil { return nil }
-        if let keyboardType, keyboardType == diagnosticKeyboardType {
+        if let keyboardType, diagnosticKeyboardType == -1 || keyboardType == diagnosticKeyboardType {
             let eventName = type == .keyDown ? "keydown" : type == .keyUp ? "keyup" : "flagschanged"
             NativeOutput.shared.send(NativeEvent(
                 event: "diagnosticKey",

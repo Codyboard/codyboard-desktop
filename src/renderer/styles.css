@@ -631,6 +631,27 @@
     font-family: "Avenir Next", "Helvetica Neue", sans-serif;
   }
 
+  .mapping-device-identity {
+    display: flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0;
+    padding: 0 26px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(211, 221, 217, 0.48);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .mapping-device-identity code {
+    color: rgba(132, 226, 188, 0.82);
+    font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
   .mapping-console-header {
     display: grid;
     min-height: 112px;
@@ -829,6 +850,13 @@
     box-shadow: 0 0 0 1px rgba(87, 210, 161, 0.055), 0 18px 42px rgba(0, 0, 0, 0.18);
   }
   .mapping-row.is-recording { border-color: rgba(126, 228, 188, 0.5); }
+  .mapping-row.is-inherited .mapping-button-name small { color: rgba(124, 220, 181, 0.58); }
+  .mapping-row.is-inherited .keystroke-recorder input:not(:focus),
+  .mapping-row.is-inherited .launch-application-picker button:not(:focus-visible) {
+    color: rgba(224, 231, 228, 0.52);
+    background: rgba(5, 7, 7, 0.25);
+  }
+  .mapping-row.is-inherited .key-output-current-icon { color: rgba(209, 218, 214, 0.36); }
 
   .mapping-button-icon {
     display: grid;
@@ -843,6 +871,7 @@
   }
 
   .mapping-button-icon svg { width: 20px; height: 20px; stroke-width: 1.65; }
+  .mapping-button-icon > strong { font-size: 16px; font-weight: 650; line-height: 1; }
   .mapping-row.is-selected .mapping-button-icon {
     border-color: rgba(105, 222, 175, 0.35);
     background: rgba(77, 198, 150, 0.12);
@@ -1341,6 +1370,19 @@
     aspect-ratio: 1;
   }
 
+  .sweep-pro-key-legend {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    height: 84%;
+    place-items: center;
+    color: #202322;
+    font-size: calc(var(--remote-height) * 0.038);
+    font-weight: 520;
+    line-height: 1;
+    text-shadow: 0 1px rgba(255, 255, 255, 0.48);
+  }
+
   .sweep-pro-keybed button:nth-child(1) { top: 27.5%; left: 10%; }
   .sweep-pro-keybed button:nth-child(2) { top: 27.2%; left: 31%; }
   .sweep-pro-keybed button:nth-child(3) { top: 27.4%; left: 52%; }
@@ -1359,6 +1401,16 @@
 
   .sweep-pro-keybed button:active {
     transform: translateY(calc(var(--remote-height) * 0.007));
+  }
+
+  .sweep-pro-keybed button.is-pressed {
+    filter: brightness(0.88);
+    transform: translateY(calc(var(--remote-height) * 0.007));
+  }
+
+  .sweep-pro-keybed button.is-selected {
+    outline: calc(var(--remote-height) * 0.004) solid rgba(40, 134, 101, 0.78);
+    outline-offset: calc(var(--remote-height) * 0.003);
   }
 
   .sweep-pro-corner-key {
@@ -1788,6 +1840,8 @@
       background-size: 72px 100%, auto, auto;
     }
     .mapping-console { color: rgba(16, 21, 19, 0.94); }
+    .mapping-device-identity { border-bottom-color: rgba(20, 25, 23, 0.08); color: rgba(25, 31, 29, 0.48); }
+    .mapping-device-identity code { color: rgba(18, 124, 82, 0.84); }
     .mapping-console-header { border-bottom-color: rgba(20, 25, 23, 0.09); background: linear-gradient(90deg, rgba(46, 151, 110, 0.065), transparent 58%), linear-gradient(180deg, rgba(255, 255, 255, 0.25), transparent); }
     .mapping-console-header p { color: rgba(23, 120, 82, 0.7); }
     .mapping-console-guide { border-bottom-color: rgba(20, 25, 23, 0.08); background: rgba(40, 143, 103, 0.045); }
@@ -1798,6 +1852,12 @@
     .mapping-row:hover { border-color: rgba(20, 25, 23, 0.17); background-color: rgba(230, 233, 231, 0.92); }
     .mapping-row.is-selected { border-color: rgba(24, 139, 94, 0.32); background: linear-gradient(100deg, rgba(58, 165, 122, 0.12), transparent 58%), rgba(224, 230, 227, 0.92); box-shadow: 0 16px 38px rgba(51, 65, 59, 0.12); }
     .mapping-row.is-recording { border-color: rgba(25, 143, 96, 0.46); }
+    .mapping-row.is-inherited .mapping-button-name small { color: rgba(20, 126, 84, 0.68); }
+    .mapping-row.is-inherited .keystroke-recorder input:not(:focus),
+    .mapping-row.is-inherited .launch-application-picker button:not(:focus-visible) {
+      color: rgba(24, 31, 28, 0.56);
+      background: rgba(255, 255, 255, 0.32);
+    }
     .mapping-button-icon { border-color: rgba(20, 25, 23, 0.1); background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.22)); color: rgba(21, 27, 25, 0.72); box-shadow: inset 0 1px rgba(255, 255, 255, 0.75), 0 9px 22px rgba(50, 57, 54, 0.1); }
     .mapping-row.is-selected .mapping-button-icon { border-color: rgba(25, 143, 96, 0.3); background: rgba(47, 153, 112, 0.1); color: rgba(18, 124, 82, 0.9); }
     .mapping-button-name small,
