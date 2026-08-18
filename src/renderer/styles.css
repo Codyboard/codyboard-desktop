@@ -286,6 +286,9 @@
   }
 
   .device-card {
+    --device-card-corner-inset: 10px;
+    --device-card-corner-radius: 10px;
+    --device-card-radius: 16px;
     --remote-height: min(39vh, 320px);
     --device-index: 0;
     position: relative;
@@ -296,7 +299,7 @@
     place-items: center;
     border: 1px solid rgba(255, 255, 255, 0.075);
     overflow: hidden;
-    border-radius: 16px;
+    border-radius: var(--device-card-radius);
     background:
       linear-gradient(145deg, rgba(255, 255, 255, 0.036), rgba(255, 255, 255, 0.006) 54%, rgba(0, 0, 0, 0.055)),
       rgba(19, 22, 23, 0.34);
@@ -321,8 +324,20 @@
     transition: border-color 300ms ease;
   }
 
-  .device-card::before { top: 10px; left: 10px; border-top: 1px solid; border-left: 1px solid; }
-  .device-card::after { right: 10px; bottom: 10px; border-right: 1px solid; border-bottom: 1px solid; }
+  .device-card::before {
+    top: var(--device-card-corner-inset);
+    left: var(--device-card-corner-inset);
+    border-top: 1px solid;
+    border-left: 1px solid;
+    border-radius: var(--device-card-corner-radius) 0 0;
+  }
+  .device-card::after {
+    right: var(--device-card-corner-inset);
+    bottom: var(--device-card-corner-inset);
+    border-right: 1px solid;
+    border-bottom: 1px solid;
+    border-radius: 0 0 var(--device-card-corner-radius);
+  }
 
   .device-card:hover,
   .device-card:focus-within {
