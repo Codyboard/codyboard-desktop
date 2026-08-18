@@ -25,7 +25,7 @@
 
 ## Renderer
 
-- The settings window stays 16:9, fits within roughly 67% of the primary display work area, and opens centered. The renderer uses a single `index.html` entry with `HashRouter`: `/permissions` is the permission gate, `/` selects a connected device, and `/devices/:deviceId` shows its details.
+- The settings window opens centered at 16:10 within 75% of the primary display work area, then remains freely resizable without a locked aspect ratio. The renderer uses a single `index.html` entry with `HashRouter`: `/permissions` is the permission gate, `/` selects a connected device, and `/devices/:deviceId` shows its details.
 - Accessibility and Input Monitoring are hard gates for device routes. Read their actual state from Swift, never infer success in React; permission actions register the native request and open the corresponding macOS System Settings pane.
 - Use the macOS `hiddenInset` title-bar style: hide standard window chrome but keep the native traffic lights. The window and page surfaces are translucent. Appearance is an explicit sun/moon Light/Dark choice stored in `localStorage`; do not follow the system appearance and do not force a Tailwind `.dark` class.
 - The selection and detail pages share `AppToolbar`, with page identity on the left and the appearance switch on the right. Detail pages add their back navigation to the same toolbar.
@@ -33,7 +33,7 @@
 - Keep the device-selection header compact like a desktop application, not an oversized marketing hero. Every device card is a strict 1:1 square.
 - When no supported hardware is found, show the designed empty state with supported-model guidance and a working rescan action; do not leave a bare diagnostic message.
 - Supported-device filtering is exact VID/PID matching: Xiaomi Presenter is `0x2717/0x32B8`; Sweep Pro is `0x1D50/0x615E`.
-- `Device` is the TSX boundary for a physical-device view and receives a `keyboardType` prop. It currently displays `Type ID 40`; the next device UI step is selection, so keep the type supplied as data rather than hardcoding it inside the remote renderer.
+- `Device` is the TSX boundary for a physical-device view and receives a `keyboardType` prop for internal device behavior; do not display that implementation identifier in the device UI or hardcode it inside the remote renderer.
 - `XiaomiRemote` exposes `onKeyPress` for both `down` and `up` phases and must provide pressed/released visual feedback for pointer and real type-40 hardware events.
 - `SweepPro` currently uses the Xiaomi remote illustration as an explicit temporary placeholder; keep it as a separately named component so its future design can diverge.
 - The current React + Tailwind + shadcn-style settings UI is disposable and will be rewritten. Keep domain behavior outside visual components.

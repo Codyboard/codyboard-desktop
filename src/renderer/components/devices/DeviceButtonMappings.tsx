@@ -1,19 +1,60 @@
 import {
   AppWindow,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpFromLine,
+  Bell,
+  BetweenHorizontalEnd,
+  BetweenHorizontalStart,
+  CaseUpper,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  CircleHelp,
+  CirclePlay,
+  Command,
   CornerDownLeft,
+  Delete,
+  Dock,
+  FastForward,
+  GalleryVerticalEnd,
+  Globe2,
   Home,
+  Keyboard,
+  KeyboardOff,
+  LockKeyhole,
   Menu,
   Minus,
+  Monitor,
+  Option,
+  PanelTop,
+  PictureInPicture,
   Plus,
+  Redo2,
+  RefreshCw,
+  Rewind,
+  Rocket,
+  ScreenShare,
+  Search,
+  SkipBack,
+  SkipForward,
+  SlidersHorizontal,
+  Smile,
+  SquareFunction,
+  StickyNote,
+  SunDim,
+  SunMedium,
   Tv,
   Undo2,
+  Volume1,
+  Volume2,
+  VolumeX,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import type {
   CodyboardApplicationInfo,
@@ -24,7 +65,18 @@ import type {
   ProfileDraft,
   ProfilesSnapshot,
 } from "../../../shared/hid";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
+import { inheritGlobalMappings } from "./profile-draft";
 import type { XiaomiRemoteKey } from "./XiaomiRemote";
 
 interface DeviceControl {
@@ -36,6 +88,7 @@ interface DeviceControl {
 
 interface KeyOutputOption {
   id: string;
+  icon: LucideIcon;
   label: string;
   output: MappingOutput;
 }
@@ -49,53 +102,55 @@ const KEY_OUTPUT_GROUPS: readonly KeyOutputGroup[] = [
   {
     label: "Media & Volume",
     options: [
-      { id: "volume-up", label: "Volume Up", output: { kind: "system", key: "volumeUp" } },
-      { id: "volume-down", label: "Volume Down", output: { kind: "system", key: "volumeDown" } },
-      { id: "mute", label: "Mute", output: { kind: "system", key: "mute" } },
-      { id: "play-pause", label: "Play / Pause", output: { kind: "system", key: "playPause" } },
-      { id: "next-track", label: "Next Track", output: { kind: "system", key: "nextTrack" } },
-      { id: "previous-track", label: "Previous Track", output: { kind: "system", key: "previousTrack" } },
-      { id: "fast-forward", label: "Fast Forward", output: { kind: "system", key: "fastForward" } },
-      { id: "rewind", label: "Rewind", output: { kind: "system", key: "rewind" } },
-      { id: "brightness-up", label: "Display Brightness Up", output: { kind: "system", key: "brightnessUp" } },
-      { id: "brightness-down", label: "Display Brightness Down", output: { kind: "system", key: "brightnessDown" } },
-      { id: "keyboard-brightness-up", label: "Keyboard Brightness Up", output: { kind: "system", key: "keyboardBrightnessUp" } },
-      { id: "keyboard-brightness-down", label: "Keyboard Brightness Down", output: { kind: "system", key: "keyboardBrightnessDown" } },
-      { id: "keyboard-brightness-toggle", label: "Keyboard Backlight Toggle", output: { kind: "system", key: "keyboardBrightnessToggle" } },
-      { id: "video-mirroring", label: "Video Mirroring", output: { kind: "system", key: "videoMirror" } },
-      { id: "eject", label: "Eject", output: { kind: "system", key: "eject" } },
+      { icon: Volume2, id: "volume-up", label: "Volume Up", output: { kind: "system", key: "volumeUp" } },
+      { icon: Volume1, id: "volume-down", label: "Volume Down", output: { kind: "system", key: "volumeDown" } },
+      { icon: VolumeX, id: "mute", label: "Mute", output: { kind: "system", key: "mute" } },
+      { icon: CirclePlay, id: "play-pause", label: "Play / Pause", output: { kind: "system", key: "playPause" } },
+      { icon: SkipForward, id: "next-track", label: "Next Track", output: { kind: "system", key: "nextTrack" } },
+      { icon: SkipBack, id: "previous-track", label: "Previous Track", output: { kind: "system", key: "previousTrack" } },
+      { icon: FastForward, id: "fast-forward", label: "Fast Forward", output: { kind: "system", key: "fastForward" } },
+      { icon: Rewind, id: "rewind", label: "Rewind", output: { kind: "system", key: "rewind" } },
+      { icon: SunMedium, id: "brightness-up", label: "Display Brightness Up", output: { kind: "system", key: "brightnessUp" } },
+      { icon: SunDim, id: "brightness-down", label: "Display Brightness Down", output: { kind: "system", key: "brightnessDown" } },
+      { icon: Keyboard, id: "keyboard-brightness-up", label: "Keyboard Brightness Up", output: { kind: "system", key: "keyboardBrightnessUp" } },
+      { icon: Keyboard, id: "keyboard-brightness-down", label: "Keyboard Brightness Down", output: { kind: "system", key: "keyboardBrightnessDown" } },
+      { icon: KeyboardOff, id: "keyboard-brightness-toggle", label: "Keyboard Backlight Toggle", output: { kind: "system", key: "keyboardBrightnessToggle" } },
+      { icon: ScreenShare, id: "video-mirroring", label: "Video Mirroring", output: { kind: "system", key: "videoMirror" } },
+      { icon: ArrowUpFromLine, id: "eject", label: "Eject", output: { kind: "system", key: "eject" } },
     ],
   },
   {
     label: "System",
     options: [
-      { id: "lock-screen", label: "Lock Screen", output: { kind: "keyboard", key: "q", modifiers: ["command", "control"] } },
-      { id: "mission-control", label: "Mission Control", output: { kind: "keyboard", key: "arrowUp", modifiers: ["control"] } },
-      { id: "application-windows", label: "Application Windows", output: { kind: "keyboard", key: "arrowDown", modifiers: ["control"] } },
-      { id: "space-left", label: "Move Left a Space", output: { kind: "keyboard", key: "arrowLeft", modifiers: ["control"] } },
-      { id: "space-right", label: "Move Right a Space", output: { kind: "keyboard", key: "arrowRight", modifiers: ["control"] } },
-      { id: "show-desktop", label: "Show Desktop", output: { kind: "keyboard", key: "h", modifiers: ["fn"] } },
-      { id: "launchpad", label: "Launchpad", output: { kind: "keyboard", key: "f4", modifiers: ["fn"] } },
-      { id: "spotlight", label: "Spotlight", output: { kind: "keyboard", key: "space", modifiers: ["command"] } },
-      { id: "notification-center", label: "Notification Center", output: { kind: "keyboard", key: "n", modifiers: ["fn"] } },
-      { id: "control-center", label: "Control Center", output: { kind: "keyboard", key: "c", modifiers: ["fn"] } },
-      { id: "focus-dock", label: "Focus Dock", output: { kind: "keyboard", key: "a", modifiers: ["fn"] } },
-      { id: "focus-menu-bar", label: "Focus Menu Bar", output: { kind: "keyboard", key: "m", modifiers: ["fn"] } },
-      { id: "quick-note", label: "Quick Note", output: { kind: "keyboard", key: "q", modifiers: ["fn"] } },
-      { id: "emoji-symbols", label: "Emoji & Symbols", output: { kind: "keyboard", key: "e", modifiers: ["fn"] } },
-      { id: "app-switcher", label: "Application Switcher", output: { kind: "keyboard", key: "tab", modifiers: ["command"] } },
-      { id: "next-window", label: "Next Window", output: { kind: "keyboard", key: "`", modifiers: ["command"] } },
+      { icon: LockKeyhole, id: "lock-screen", label: "Lock Screen", output: { kind: "keyboard", key: "q", modifiers: ["command", "control"] } },
+      { icon: GalleryVerticalEnd, id: "mission-control", label: "Mission Control", output: { kind: "keyboard", key: "arrowUp", modifiers: ["control"] } },
+      { icon: AppWindow, id: "application-windows", label: "Application Windows", output: { kind: "keyboard", key: "arrowDown", modifiers: ["control"] } },
+      { icon: ArrowLeft, id: "space-left", label: "Move Left a Space", output: { kind: "keyboard", key: "arrowLeft", modifiers: ["control"] } },
+      { icon: ArrowRight, id: "space-right", label: "Move Right a Space", output: { kind: "keyboard", key: "arrowRight", modifiers: ["control"] } },
+      { icon: Monitor, id: "show-desktop", label: "Show Desktop", output: { kind: "keyboard", key: "h", modifiers: ["fn"] } },
+      { icon: Rocket, id: "launchpad", label: "Launchpad", output: { kind: "keyboard", key: "f4", modifiers: ["fn"] } },
+      { icon: Search, id: "spotlight", label: "Spotlight", output: { kind: "keyboard", key: "space", modifiers: ["command"] } },
+      { icon: Bell, id: "notification-center", label: "Notification Center", output: { kind: "keyboard", key: "n", modifiers: ["fn"] } },
+      { icon: SlidersHorizontal, id: "control-center", label: "Control Center", output: { kind: "keyboard", key: "c", modifiers: ["fn"] } },
+      { icon: Dock, id: "focus-dock", label: "Focus Dock", output: { kind: "keyboard", key: "a", modifiers: ["fn"] } },
+      { icon: PanelTop, id: "focus-menu-bar", label: "Focus Menu Bar", output: { kind: "keyboard", key: "m", modifiers: ["fn"] } },
+      { icon: StickyNote, id: "quick-note", label: "Quick Note", output: { kind: "keyboard", key: "q", modifiers: ["fn"] } },
+      { icon: Smile, id: "emoji-symbols", label: "Emoji & Symbols", output: { kind: "keyboard", key: "e", modifiers: ["fn"] } },
+      { icon: RefreshCw, id: "app-switcher", label: "Application Switcher", output: { kind: "keyboard", key: "tab", modifiers: ["command"] } },
+      { icon: PictureInPicture, id: "next-window", label: "Next Window", output: { kind: "keyboard", key: "`", modifiers: ["command"] } },
     ],
   },
   {
     label: "Navigation",
     options: [
       {
+        icon: Undo2,
         id: "browser-back",
         label: "Browser Back",
         output: { kind: "keyboard", key: "[", modifiers: ["command"] },
       },
       {
+        icon: Redo2,
         id: "browser-forward",
         label: "Browser Forward",
         output: { kind: "keyboard", key: "]", modifiers: ["command"] },
@@ -105,24 +160,25 @@ const KEY_OUTPUT_GROUPS: readonly KeyOutputGroup[] = [
   {
     label: "Special Keys",
     options: [
-      { id: "command", label: "Command", output: { kind: "modifier", key: "command", modifiers: [] } },
-      { id: "option", label: "Option", output: { kind: "modifier", key: "option", modifiers: [] } },
-      { id: "control", label: "Control", output: { kind: "modifier", key: "control", modifiers: [] } },
-      { id: "shift", label: "Shift", output: { kind: "modifier", key: "shift", modifiers: [] } },
-      { id: "fn", label: "Fn", output: { kind: "modifier", key: "fn", modifiers: [] } },
-      { id: "caps-lock", label: "Caps Lock", output: { kind: "modifier", key: "capsLock", modifiers: [] } },
-      { id: "escape", label: "Escape", output: { kind: "keyboard", key: "escape", modifiers: [] } },
-      { id: "delete-forward", label: "Forward Delete", output: { kind: "keyboard", key: "deleteForward", modifiers: [] } },
-      { id: "home", label: "Home", output: { kind: "keyboard", key: "home", modifiers: [] } },
-      { id: "end", label: "End", output: { kind: "keyboard", key: "end", modifiers: [] } },
-      { id: "page-up", label: "Page Up", output: { kind: "keyboard", key: "pageUp", modifiers: [] } },
-      { id: "page-down", label: "Page Down", output: { kind: "keyboard", key: "pageDown", modifiers: [] } },
+      { icon: Command, id: "command", label: "Command", output: { kind: "modifier", key: "command", modifiers: [] } },
+      { icon: Option, id: "option", label: "Option", output: { kind: "modifier", key: "option", modifiers: [] } },
+      { icon: ArrowUp, id: "control", label: "Control", output: { kind: "modifier", key: "control", modifiers: [] } },
+      { icon: ChevronUp, id: "shift", label: "Shift", output: { kind: "modifier", key: "shift", modifiers: [] } },
+      { icon: SquareFunction, id: "fn", label: "Fn", output: { kind: "modifier", key: "fn", modifiers: [] } },
+      { icon: CaseUpper, id: "caps-lock", label: "Caps Lock", output: { kind: "modifier", key: "capsLock", modifiers: [] } },
+      { icon: Delete, id: "escape", label: "Escape", output: { kind: "keyboard", key: "escape", modifiers: [] } },
+      { icon: Delete, id: "delete-forward", label: "Forward Delete", output: { kind: "keyboard", key: "deleteForward", modifiers: [] } },
+      { icon: BetweenHorizontalStart, id: "home", label: "Home", output: { kind: "keyboard", key: "home", modifiers: [] } },
+      { icon: BetweenHorizontalEnd, id: "end", label: "End", output: { kind: "keyboard", key: "end", modifiers: [] } },
+      { icon: ArrowUp, id: "page-up", label: "Page Up", output: { kind: "keyboard", key: "pageUp", modifiers: [] } },
+      { icon: ArrowDown, id: "page-down", label: "Page Down", output: { kind: "keyboard", key: "pageDown", modifiers: [] } },
     ],
   },
   {
     label: "Function Keys",
     options: Array.from({ length: 20 }, (_, index): KeyOutputOption => ({
       id: `f${index + 1}`,
+      icon: SquareFunction,
       label: `F${index + 1}`,
       output: { kind: "keyboard", key: `f${index + 1}`, modifiers: [] },
     })),
@@ -130,6 +186,9 @@ const KEY_OUTPUT_GROUPS: readonly KeyOutputGroup[] = [
 ];
 
 const KEY_OUTPUT_OPTIONS = new Map(KEY_OUTPUT_GROUPS.flatMap(({ options }) => options.map((option) => [option.id, option])));
+const KEY_OUTPUT_OPTIONS_BY_SIGNATURE = new Map(
+  KEY_OUTPUT_GROUPS.flatMap(({ options }) => options.map((option) => [outputSignature(option.output), option])),
+);
 const KEY_OUTPUT_LABELS = new Map(
   KEY_OUTPUT_GROUPS.flatMap(({ options }) => options.map((option) => [outputSignature(option.output), option.label])),
 );
@@ -238,8 +297,7 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
     }
   };
 
-  const changeScope = async (event: ChangeEvent<HTMLSelectElement>) => {
-    const scopeId = event.target.value;
+  const changeScope = async (scopeId: string) => {
     if (scopeId !== "__add_application__") {
       setSelectedScopeId(scopeId);
       return;
@@ -260,7 +318,8 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
       }
       const draft = structuredClone(activeProfile);
       const groupId = applicationGroupId(info.bundleId, draft);
-      draft.groups.push({ id: groupId, mappings: [], scope: { bundleId: info.bundleId, kind: "application" } });
+      const mappings = inheritGlobalMappings(draft, groupId);
+      draft.groups.push({ id: groupId, mappings, scope: { bundleId: info.bundleId, kind: "application" } });
       setSnapshot(await window.codyboard.profiles.update(keyboardType, activeProfile.id, draft));
       setSelectedScopeId(groupId);
     } catch (cause) {
@@ -297,29 +356,49 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
           <p>Button map</p>
           <h2>Controls</h2>
         </div>
-        <label className="mapping-scope-select">
+        <div className="mapping-scope-select">
           <span>Configure for</span>
-          <span className="mapping-select-shell">
-            <select
+          <Select
+            disabled={!activeProfile || savingScope}
+            onValueChange={(value) => void changeScope(value)}
+            value={selectedScopeId}
+          >
+            <SelectTrigger
               aria-label="Mapping scope"
-              disabled={!activeProfile || savingScope}
-              onChange={(event) => void changeScope(event)}
-              value={selectedScopeId}
+              className="mapping-scope-trigger"
             >
-              <option value="global">Global</option>
+              {selectedGroup?.scope.kind === "application"
+                ? (
+                    <ApplicationIdentity
+                      bundleId={selectedGroup.scope.bundleId}
+                      info={applicationInfo[selectedGroup.scope.bundleId]}
+                    />
+                  )
+                : <span className="application-select-identity"><Globe2 aria-hidden="true" /><span>Global</span></span>}
+            </SelectTrigger>
+            <SelectContent align="end" className="mapping-scope-menu">
+              <SelectItem value="global">
+                <span className="application-select-identity"><Globe2 aria-hidden="true" /><span>Global</span></span>
+              </SelectItem>
               {applicationGroups.map((group) => {
                 const bundleId = group.scope.kind === "application" ? group.scope.bundleId : "";
-                return <option key={group.id} value={group.id}>{applicationInfo[bundleId]?.name ?? bundleId}</option>;
+                return (
+                  <SelectItem key={group.id} value={group.id}>
+                    <ApplicationIdentity bundleId={bundleId} info={applicationInfo[bundleId]} />
+                  </SelectItem>
+                );
               })}
-              <option value="__add_application__">Add Specific Application…</option>
-            </select>
-            <ChevronDown aria-hidden="true" />
-          </span>
-        </label>
+              <SelectSeparator />
+              <SelectItem className="is-add-application" value="__add_application__">
+                <span className="application-select-identity"><Plus aria-hidden="true" /><span>Add Specific Application…</span></span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </header>
 
       <div className="mapping-console-guide">
-        <span className="mapping-guide-index">01</span>
+        <span className="mapping-guide-index"><CircleHelp aria-hidden="true" /></span>
         <p>Choose an action, then record a shortcut or select an application. Press <strong>Backspace</strong> to block the button safely.</p>
       </div>
 
@@ -328,13 +407,15 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
       {error && <PanelNotice tone="error">{error}</PanelNotice>}
 
       <div className="mapping-list">
-        {mappings.map(({ control, mapping }, index) => {
+        {mappings.map(({ control, mapping }) => {
           const Icon = control.icon;
           const isSelected = selectedKey === control.key;
           const isRecording = recordingKey === control.key;
           const isSaving = savingKey === control.key;
           const launchOutput = mapping?.to.kind === "launchApplication" ? mapping.to : undefined;
           const launchApplication = launchOutput ? applicationInfo[launchOutput.bundleId] : undefined;
+          const selectedOutputOption = mapping ? KEY_OUTPUT_OPTIONS_BY_SIGNATURE.get(outputSignature(mapping.to)) : undefined;
+          const SelectedOutputIcon = selectedOutputOption?.icon;
           return (
             <article
               className={`mapping-row ${isSelected ? "is-selected" : ""} ${isRecording ? "is-recording" : ""}`.trim()}
@@ -342,27 +423,29 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
               onPointerDown={() => onSelectKey?.(control.key)}
               ref={(element) => { rowReferences.current[control.key] = element; }}
             >
-              <span className="mapping-row-number">{String(index + 1).padStart(2, "0")}</span>
               <span className="mapping-button-icon"><Icon aria-hidden="true" /></span>
               <span className="mapping-button-name">
                 <strong>{control.label}</strong>
                 <small>{mapping ? "Configured" : "Unassigned"}</small>
               </span>
-              <label className="mapping-action-select">
+              <div className="mapping-action-select">
                 <span>Action</span>
-                <span className="mapping-select-shell">
-                  <select
+                <Select
+                  disabled={!activeProfile || isSaving}
+                  onValueChange={(value) => void changeAction(control, mapping, value)}
+                  value={launchOutput ? "launch" : "keystroke"}
+                >
+                  <SelectTrigger
                     aria-label={`${control.label} action`}
-                    disabled={!activeProfile || isSaving}
-                    onChange={(event) => void changeAction(control, mapping, event.target.value)}
-                    value={launchOutput ? "launch" : "keystroke"}
                   >
-                    <option value="keystroke">Key Press</option>
-                    <option value="launch">Launch Application</option>
-                  </select>
-                  <ChevronDown aria-hidden="true" />
-                </span>
-              </label>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="keystroke">Key Press</SelectItem>
+                    <SelectItem value="launch">Launch Application</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {launchOutput
                 ? (
                     <div className="launch-application-picker">
@@ -384,6 +467,9 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
                     <label className="keystroke-recorder">
                       <span>Key Press</span>
                       <span className="key-press-combobox">
+                        {SelectedOutputIcon && (
+                          <span className="key-output-current-icon"><SelectedOutputIcon aria-hidden="true" /></span>
+                        )}
                         <input
                           aria-label={`${control.label} key press`}
                           className={mapping?.to.kind === "suppress" ? "is-suppressed" : ""}
@@ -396,25 +482,36 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
                           value={isSaving ? "Saving…" : describeOutput(mapping?.to)}
                         />
                         <span className="key-output-select">
-                          <select
-                            aria-label={`Choose a special key for ${control.label}`}
+                          <Select
                             disabled={!activeProfile || isSaving}
-                            onChange={(event) => {
-                              const option = KEY_OUTPUT_OPTIONS.get(event.target.value);
+                            onValueChange={(value) => {
+                              const option = KEY_OUTPUT_OPTIONS.get(value);
                               if (option) void saveOutput(control, structuredClone(option.output));
                             }}
                             value=""
                           >
-                            <option disabled value="">Choose a special key</option>
+                            <SelectTrigger
+                              aria-label={`Choose a special key for ${control.label}`}
+                              className="key-output-trigger"
+                            >
+                              <span className="sr-only">Choose a special key</span>
+                            </SelectTrigger>
+                            <SelectContent align="end" className="key-output-menu">
                             {KEY_OUTPUT_GROUPS.map((group) => (
-                              <optgroup key={group.label} label={group.label}>
-                                {group.options.map((option) => (
-                                  <option key={option.id} value={option.id}>{option.label}</option>
-                                ))}
-                              </optgroup>
+                              <SelectGroup key={group.label}>
+                                <SelectLabel>{group.label}</SelectLabel>
+                                {group.options.map((option) => {
+                                  const Icon = option.icon;
+                                  return (
+                                    <SelectItem key={option.id} value={option.id}>
+                                      <span className="key-output-option"><Icon aria-hidden="true" /><span>{option.label}</span></span>
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectGroup>
                             ))}
-                          </select>
-                          <ChevronDown aria-hidden="true" />
+                            </SelectContent>
+                          </Select>
                         </span>
                       </span>
                     </label>
@@ -429,6 +526,15 @@ export function DeviceButtonMappings({ keyboardType, onSelectKey, selectedKey }:
 
 function PanelNotice({ children, tone = "neutral" }: { children: string; tone?: "error" | "neutral" }) {
   return <p className={`mapping-notice is-${tone}`}>{children}</p>;
+}
+
+function ApplicationIdentity({ bundleId, info }: { bundleId: string; info?: CodyboardApplicationInfo }) {
+  return (
+    <span className="application-select-identity">
+      {info?.iconDataUrl ? <img alt="" src={info.iconDataUrl} /> : <AppWindow aria-hidden="true" />}
+      <span>{info?.name ?? bundleId}</span>
+    </span>
+  );
 }
 
 function findMapping(group: ProfileDraft["groups"][number] | undefined, input: MappingInput): KeyMapping | undefined {

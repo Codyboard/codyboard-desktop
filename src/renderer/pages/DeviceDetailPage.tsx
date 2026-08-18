@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type PointerEvent } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
+import { getDeviceDefinition } from "../../shared/device-catalog";
 import type { HIDDeviceInfo } from "../../shared/hid";
 import { Device } from "../components/devices/Device";
 import { DeviceButtonMappings } from "../components/devices/DeviceButtonMappings";
@@ -8,7 +9,6 @@ import { SweepPro } from "../components/devices/SweepPro";
 import { XiaomiRemote, type XiaomiRemoteKey, type XiaomiRemoteKeyPressEvent } from "../components/devices/XiaomiRemote";
 import { AppToolbar } from "../components/layout/AppToolbar";
 import { ProfileSwitcher } from "../components/profiles/ProfileSwitcher";
-import { getDeviceDefinition } from "../lib/device-catalog";
 
 export function DeviceDetailPage() {
   const { deviceId = "" } = useParams();
@@ -59,12 +59,16 @@ export function DeviceDetailPage() {
     if (event.phase === "down") setSelectedKey(event.key);
     window.dispatchEvent(new CustomEvent("codyboard:remote-keypress", { detail: event }));
   }, []);
+  const deselectOnOutsidePointerDown = useCallback((event: PointerEvent<HTMLElement>) => {
+    if (event.target instanceof Element && event.target.closest(".mi-remote button, .mapping-row")) return;
+    setSelectedKey(undefined);
+  }, []);
   const remote = useMemo(() => definition?.model === "sweep-pro"
     ? <SweepPro listenToHardware={false} onKeyPress={onKeyPress} />
     : <XiaomiRemote onKeyPress={onKeyPress} selectedKey={selectedKey} />, [definition?.model, onKeyPress, selectedKey]);
 
   return (
-    <main className="device-detail-page">
+    <main className="device-detail-page" onPointerDown={deselectOnOutsidePointerDown}>
       <AppToolbar
         actions={<ProfileSwitcher keyboardType={keyboardType} />}
         backTo="/"

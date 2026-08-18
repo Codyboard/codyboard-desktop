@@ -1,7 +1,7 @@
-import { ChevronDown } from "lucide-react";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState } from "react";
 
 import type { ProfilesSnapshot } from "../../../shared/hid";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 export interface ProfileSwitcherProps {
   keyboardType?: number;
@@ -31,12 +31,12 @@ export function ProfileSwitcher({ keyboardType }: ProfileSwitcherProps) {
     : snapshot?.keyboards[String(keyboardType)]?.activeProfile?.id ?? "";
   const unavailable = keyboardType === undefined || profiles.length === 0;
 
-  const changeProfile = async (event: ChangeEvent<HTMLSelectElement>) => {
+  const changeProfile = async (profileId: string) => {
     if (keyboardType === undefined) return;
     setIsChanging(true);
     try {
-      const nextSnapshot = event.target.value
-        ? await window.codyboard.profiles.activate(keyboardType, event.target.value)
+      const nextSnapshot = profileId !== "__inactive__"
+        ? await window.codyboard.profiles.activate(keyboardType, profileId)
         : await window.codyboard.profiles.deactivate(keyboardType);
       setSnapshot(nextSnapshot);
     } finally {
@@ -45,22 +45,30 @@ export function ProfileSwitcher({ keyboardType }: ProfileSwitcherProps) {
   };
 
   return (
-    <label className="profile-switcher">
-      <span className="profile-select-shell">
-        <select
+    <div className="profile-switcher">
+      <Select
+        disabled={unavailable || isChanging}
+        onValueChange={(value) => void changeProfile(value)}
+        value={unavailable ? "__unavailable__" : activeProfileId || "__inactive__"}
+      >
+        <SelectTrigger
           aria-label="Active device profile"
-          disabled={unavailable || isChanging}
-          onChange={(event) => void changeProfile(event)}
-          value={activeProfileId}
+          className="profile-select-trigger"
         >
-          {unavailable && <option value="">{keyboardType === undefined ? "Type unavailable" : "No profiles"}</option>}
-          {!unavailable && <option value="">Inactive</option>}
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent align="end" className="profile-select-menu">
+          {unavailable && (
+            <SelectItem disabled value="__unavailable__">
+              {keyboardType === undefined ? "Type unavailable" : "No profiles"}
+            </SelectItem>
+          )}
+          {!unavailable && <SelectItem value="__inactive__">Inactive</SelectItem>}
           {profiles.map((profile) => (
-            <option key={profile.id} value={profile.id}>{profile.id === "default" ? "Default" : profile.name}</option>
+            <SelectItem key={profile.id} value={profile.id}>{profile.id === "default" ? "Default" : profile.name}</SelectItem>
           ))}
-        </select>
-        <ChevronDown aria-hidden="true" />
-      </span>
-    </label>
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

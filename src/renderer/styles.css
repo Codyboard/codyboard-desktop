@@ -50,6 +50,8 @@
     view-transition-name: app-toolbar;
   }
 
+  html.cody-select-open .app-toolbar { -webkit-app-region: no-drag; }
+
   .app-toolbar-title {
     display: flex;
     height: 32px;
@@ -592,7 +594,7 @@
     display: grid;
     width: 100%;
     height: auto;
-    grid-template-columns: 45% 55%;
+    grid-template-columns: minmax(0, 38%) minmax(0, 62%);
   }
 
   .device-stage.remote-stage.detail-device-stage {
@@ -603,9 +605,9 @@
     min-height: 0;
   }
 
-  .device-detail-page .device-type { top: 22px; }
-
   .device-detail-panel {
+    container-name: mapping-panel;
+    container-type: inline-size;
     display: block;
     box-sizing: border-box;
     min-width: 0;
@@ -667,7 +669,95 @@
     letter-spacing: 0.14em;
     text-transform: uppercase;
   }
-  .mapping-scope-select .mapping-select-shell select { height: 42px; }
+  .mapping-scope-trigger { height: 42px; font-size: 14px; }
+
+  .cody-select-trigger {
+    display: flex;
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+    height: 42px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 12px 0 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    outline: none;
+    background: rgba(5, 7, 7, 0.42);
+    color: rgba(242, 246, 244, 0.9);
+    cursor: pointer;
+    font: 550 13px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+    text-align: left;
+    transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  }
+
+  .cody-select-trigger:hover { border-color: rgba(115, 224, 180, 0.25); background: rgba(19, 31, 27, 0.58); }
+  .cody-select-trigger:focus-visible,
+  .cody-select-trigger[data-state="open"] {
+    border-color: rgba(115, 224, 180, 0.48);
+    background: rgba(23, 39, 33, 0.68);
+    box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.07);
+  }
+  .cody-select-trigger:disabled { cursor: default; opacity: 0.42; }
+  .cody-select-chevron { width: 15px; height: 15px; flex: 0 0 auto; color: rgba(220, 227, 224, 0.45); stroke-width: 1.8; }
+
+  .cody-select-content {
+    z-index: 1000;
+    min-width: var(--radix-select-trigger-width);
+    max-height: min(460px, var(--radix-select-content-available-height));
+    overflow: hidden;
+    border: 1px solid rgba(180, 195, 189, 0.2);
+    border-radius: 13px;
+    background: rgba(18, 22, 21, 0.97);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.055);
+    color: rgba(239, 243, 241, 0.92);
+    backdrop-filter: blur(24px) saturate(125%);
+    transform-origin: var(--radix-select-content-transform-origin);
+  }
+
+  .cody-select-content[data-state="open"] { animation: cody-select-in 150ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .cody-select-viewport { padding: 6px; }
+  .cody-select-item {
+    position: relative;
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    padding: 0 12px 0 36px;
+    border-radius: 8px;
+    outline: none;
+    cursor: default;
+    font: 550 14px/1.2 "Avenir Next", "Helvetica Neue", sans-serif;
+    user-select: none;
+  }
+  .cody-select-item[data-highlighted] { background: rgba(102, 214, 171, 0.12); color: #f7faf8; }
+  .cody-select-item[data-state="checked"] { color: rgba(137, 230, 192, 0.96); }
+  .cody-select-item[data-disabled] { opacity: 0.36; pointer-events: none; }
+  .cody-select-indicator { position: absolute; left: 11px; display: grid; width: 16px; place-items: center; }
+  .cody-select-indicator svg { width: 15px; height: 15px; stroke-width: 2.3; }
+  .cody-select-label {
+    padding: 13px 12px 7px;
+    color: rgba(204, 213, 209, 0.36);
+    font: 650 9px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .cody-select-separator { height: 1px; margin: 6px; background: rgba(255, 255, 255, 0.075); }
+  .cody-select-scroll-button { display: grid; height: 28px; place-items: center; color: rgba(222, 230, 226, 0.5); }
+  .cody-select-scroll-button svg { width: 15px; height: 15px; }
+
+  .mapping-scope-menu { width: max(var(--radix-select-trigger-width), 280px); }
+  .key-output-menu { width: 310px; }
+  .key-output-option { display: flex; align-items: center; gap: 12px; }
+  .key-output-option svg { width: 18px; height: 18px; flex: 0 0 auto; color: rgba(209, 218, 214, 0.58); stroke-width: 1.75; }
+  .application-select-identity { display: flex; min-width: 0; align-items: center; gap: 10px; }
+  .application-select-identity img,
+  .application-select-identity svg { width: 32px; height: 32px; flex: 0 0 auto; object-fit: contain; }
+  .application-select-identity svg { padding: 3px; color: rgba(212, 222, 218, 0.58); stroke-width: 1.7; }
+  .application-select-identity > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mapping-scope-trigger .application-select-identity img,
+  .mapping-scope-trigger .application-select-identity svg { width: 22px; height: 22px; }
+  .cody-select-item.is-add-application { color: rgba(137, 224, 188, 0.82); }
 
   .mapping-console-guide {
     display: grid;
@@ -688,8 +778,8 @@
     border: 1px solid rgba(108, 224, 178, 0.2);
     border-radius: 50%;
     color: rgba(126, 224, 184, 0.72);
-    font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   }
+  .mapping-guide-index svg { width: 16px; height: 16px; stroke-width: 1.8; }
 
   .mapping-console-guide p {
     max-width: 610px;
@@ -717,7 +807,7 @@
     display: grid;
     min-height: 94px;
     align-items: center;
-    grid-template-columns: 24px 50px minmax(96px, 0.72fr) minmax(122px, 0.8fr) minmax(150px, 1fr);
+    grid-template-columns: 50px minmax(96px, 0.5fr) minmax(122px, 0.85fr) minmax(150px, 1fr);
     gap: clamp(9px, 1vw, 15px);
     padding: 0 clamp(14px, 1.5vw, 20px);
     border: 1px solid rgba(255, 255, 255, 0.065);
@@ -739,12 +829,6 @@
     box-shadow: 0 0 0 1px rgba(87, 210, 161, 0.055), 0 18px 42px rgba(0, 0, 0, 0.18);
   }
   .mapping-row.is-recording { border-color: rgba(126, 228, 188, 0.5); }
-
-  .mapping-row-number {
-    color: rgba(216, 223, 220, 0.2);
-    font: 500 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-    letter-spacing: 0.08em;
-  }
 
   .mapping-button-icon {
     display: grid;
@@ -782,11 +866,10 @@
     text-transform: uppercase;
   }
 
-  .mapping-select-shell { position: relative; display: block; }
-  .mapping-select-shell select,
   .keystroke-recorder input,
   .launch-application-picker button {
     box-sizing: border-box;
+    min-width: 0;
     width: 100%;
     height: 42px;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -796,16 +879,6 @@
     color: rgba(242, 246, 244, 0.9);
     transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
   }
-
-  .mapping-select-shell select {
-    appearance: none;
-    padding: 0 34px 0 14px;
-    cursor: pointer;
-    font: 550 12px/1 "Avenir Next", "Helvetica Neue", sans-serif;
-  }
-
-  .mapping-select-shell svg { position: absolute; top: 50%; right: 12px; width: 14px; color: rgba(220, 227, 224, 0.38); pointer-events: none; transform: translateY(-50%); }
-  .mapping-select-shell select:disabled { cursor: default; opacity: 0.42; }
 
   .keystroke-recorder input {
     padding: 0 48px 0 15px;
@@ -825,6 +898,19 @@
 
   .key-press-combobox { position: relative; display: block; min-width: 0; }
 
+  .key-output-current-icon {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 15px;
+    display: grid;
+    color: rgba(209, 218, 214, 0.62);
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+  .key-output-current-icon svg { width: 18px; height: 18px; stroke-width: 1.75; }
+  .key-output-current-icon + input { padding-left: 45px; }
+
   .key-output-select {
     position: absolute;
     top: 1px;
@@ -838,31 +924,11 @@
   }
 
   .key-output-select:hover { border-left-color: rgba(115, 224, 180, 0.18); background: rgba(101, 208, 167, 0.08); }
-
-  .key-output-select select {
-    position: absolute;
-    z-index: 1;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    appearance: none;
-    border: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-
-  .key-output-select select:disabled { cursor: default; }
-  .key-output-select svg {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 14px;
-    height: 14px;
-    color: rgba(220, 227, 224, 0.42);
-    pointer-events: none;
-    stroke-width: 1.7;
-    transform: translate(-50%, -50%);
-  }
+  .key-output-trigger { height: 100%; padding: 0; border: 0; border-radius: 0 9px 9px 0; background: transparent; box-shadow: none; }
+  .key-output-trigger:hover,
+  .key-output-trigger:focus-visible,
+  .key-output-trigger[data-state="open"] { border: 0; background: rgba(101, 208, 167, 0.08); box-shadow: none; }
+  .key-output-trigger .cody-select-chevron { margin: auto; color: rgba(220, 227, 224, 0.48); }
 
   .key-press-combobox:focus-within input {
     border-color: rgba(115, 224, 180, 0.58);
@@ -907,6 +973,35 @@
   }
   .mapping-notice.is-error { border-color: rgba(232, 130, 107, 0.24); color: rgba(244, 170, 151, 0.8); }
 
+  @container mapping-panel (max-width: 540px) {
+    .mapping-console-header {
+      grid-template-columns: minmax(108px, 0.7fr) minmax(180px, 1fr);
+      gap: 18px;
+      padding-inline: 20px;
+    }
+
+    .mapping-console-guide { padding-inline: 20px; }
+
+    .mapping-row {
+      min-height: 134px;
+      grid-template-columns: 46px minmax(80px, 0.7fr) minmax(120px, 1fr);
+      grid-template-rows: auto auto;
+      gap: 12px 10px;
+      padding: 14px;
+    }
+
+    .mapping-button-icon { grid-row: 1 / 3; }
+
+    .mapping-button-name { grid-column: 2; }
+    .mapping-action-select { grid-column: 3; }
+
+    .keystroke-recorder,
+    .launch-application-picker {
+      grid-column: 2 / -1;
+      grid-row: 2;
+    }
+  }
+
   .mi-remote button.is-selected {
     outline: 2px solid rgba(130, 232, 191, 0.72);
     outline-offset: 3px;
@@ -936,67 +1031,37 @@
     gap: 9px;
   }
 
-  .app-toolbar-actions .profile-select-shell { width: fit-content; }
-  .app-toolbar-actions .profile-select-shell select {
+  .profile-select-trigger {
     width: fit-content;
     height: 32px;
-    field-sizing: content;
-    padding: 0 23px 0 8px;
+    padding: 0 8px 0 10px;
     border-color: transparent;
+    border-radius: 8px;
     background: transparent;
     box-shadow: none;
+    font-size: 11px;
+    font-weight: 550;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
-  .app-toolbar-actions .profile-select-shell select:hover {
+  .profile-select-trigger:hover {
     border-color: transparent;
     background: rgba(255, 255, 255, 0.065);
     color: rgba(255, 255, 255, 1);
   }
 
-  .app-toolbar-actions .profile-select-shell:hover svg { color: rgba(244, 248, 246, 0.78); }
+  .profile-select-trigger:hover .cody-select-chevron { color: rgba(244, 248, 246, 0.78); }
 
-  .app-toolbar-actions .profile-select-shell select:focus-visible {
+  .profile-select-trigger:focus-visible,
+  .profile-select-trigger[data-state="open"] {
     border-color: transparent;
     background: rgba(255, 255, 255, 0.04);
     box-shadow: none;
   }
 
-  .app-toolbar-actions .profile-select-shell svg { right: 8px; width: 10px; height: 10px; }
-
-  .profile-select-shell { position: relative; display: block; }
-
-  .profile-select-shell select {
-    width: 100%;
-    height: 36px;
-    appearance: none;
-    padding: 0 34px 0 12px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 8px;
-    outline: none;
-    background: rgba(255, 255, 255, 0.055);
-    color: rgba(244, 247, 246, 0.9);
-    cursor: pointer;
-    font: 500 12px/1 "Avenir Next", "Helvetica Neue", sans-serif;
-    letter-spacing: 0;
-    text-transform: none;
-    transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
-  }
-
-  .profile-select-shell select:hover { border-color: rgba(255, 255, 255, 0.17); background: rgba(255, 255, 255, 0.075); }
-  .profile-select-shell select:focus-visible { border-color: rgba(148, 225, 195, 0.45); box-shadow: 0 0 0 3px rgba(101, 208, 167, 0.08); }
-  .profile-select-shell select:disabled { cursor: default; opacity: 0.46; }
-
-  .profile-select-shell svg {
-    position: absolute;
-    top: 50%;
-    right: 11px;
-    width: 13px;
-    height: 13px;
-    color: rgba(224, 229, 227, 0.48);
-    pointer-events: none;
-    stroke-width: 1.7;
-    transform: translateY(-50%);
-  }
+  .profile-select-trigger .cody-select-chevron { width: 11px; height: 11px; }
+  .profile-select-menu { min-width: 180px; }
 
   @keyframes selection-header-in {
     from { opacity: 0; transform: translateY(-18px); }
@@ -1016,6 +1081,11 @@
 
   @keyframes toolbar-icon-spin {
     to { transform: rotate(1turn); }
+  }
+
+  @keyframes cody-select-in {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   @keyframes route-view-out {
@@ -1136,26 +1206,6 @@
     content: "";
     opacity: 0.09;
     pointer-events: none;
-  }
-
-  .device-type {
-    position: absolute;
-    top: 24px;
-    left: 28px;
-    display: flex;
-    align-items: baseline;
-    gap: 9px;
-    color: rgba(236, 239, 238, 0.72);
-    font-size: 11px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-  }
-
-  .device-type strong {
-    color: rgba(248, 250, 249, 0.96);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 14px;
-    letter-spacing: 0;
   }
 
   .remote-shadow {
@@ -1728,8 +1778,6 @@
         linear-gradient(145deg, rgba(236, 239, 237, 0.9), rgba(211, 215, 213, 0.86) 56%, rgba(190, 195, 192, 0.92));
     }
 
-    .device-type { color: rgba(24, 29, 27, 0.55); }
-    .device-type strong { color: rgba(14, 18, 17, 0.92); }
     .device-detail-page { background: rgba(223, 226, 224, 0.9); }
     .device-detail-panel {
       border-left-color: rgba(20, 25, 23, 0.08);
@@ -1750,40 +1798,45 @@
     .mapping-row:hover { border-color: rgba(20, 25, 23, 0.17); background-color: rgba(230, 233, 231, 0.92); }
     .mapping-row.is-selected { border-color: rgba(24, 139, 94, 0.32); background: linear-gradient(100deg, rgba(58, 165, 122, 0.12), transparent 58%), rgba(224, 230, 227, 0.92); box-shadow: 0 16px 38px rgba(51, 65, 59, 0.12); }
     .mapping-row.is-recording { border-color: rgba(25, 143, 96, 0.46); }
-    .mapping-row-number { color: rgba(25, 31, 29, 0.28); }
     .mapping-button-icon { border-color: rgba(20, 25, 23, 0.1); background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.22)); color: rgba(21, 27, 25, 0.72); box-shadow: inset 0 1px rgba(255, 255, 255, 0.75), 0 9px 22px rgba(50, 57, 54, 0.1); }
     .mapping-row.is-selected .mapping-button-icon { border-color: rgba(25, 143, 96, 0.3); background: rgba(47, 153, 112, 0.1); color: rgba(18, 124, 82, 0.9); }
     .mapping-button-name small,
     .mapping-action-select > span:first-child,
     .keystroke-recorder > span,
     .launch-application-picker > span { color: rgba(25, 31, 29, 0.42); }
-    .mapping-select-shell select,
+    .cody-select-trigger,
     .keystroke-recorder input,
     .launch-application-picker button { border-color: rgba(20, 25, 23, 0.12); background: rgba(255, 255, 255, 0.52); color: rgba(15, 20, 18, 0.9); }
-    .mapping-select-shell svg { color: rgba(24, 30, 28, 0.45); }
+    .cody-select-trigger:hover { border-color: rgba(26, 143, 97, 0.28); background: rgba(255, 255, 255, 0.72); }
+    .cody-select-trigger:focus-visible,
+    .cody-select-trigger[data-state="open"] { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.88); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
+    .cody-select-chevron { color: rgba(24, 30, 28, 0.48); }
+    .cody-select-content { border-color: rgba(20, 25, 23, 0.16); background: rgba(244, 246, 245, 0.98); box-shadow: 0 24px 70px rgba(46, 56, 52, 0.22), inset 0 1px rgba(255, 255, 255, 0.9); color: rgba(18, 23, 21, 0.92); }
+    .cody-select-item[data-highlighted] { background: rgba(37, 151, 106, 0.1); color: rgba(10, 17, 14, 0.98); }
+    .cody-select-item[data-state="checked"] { color: rgba(19, 126, 84, 0.96); }
+    .cody-select-label { color: rgba(25, 31, 29, 0.38); }
+    .cody-select-separator { background: rgba(20, 25, 23, 0.09); }
+    .cody-select-scroll-button { color: rgba(24, 30, 28, 0.5); }
+    .key-output-option svg { color: rgba(24, 30, 28, 0.56); }
+    .application-select-identity svg { color: rgba(24, 30, 28, 0.56); }
     .keystroke-recorder input::placeholder { color: rgba(25, 31, 29, 0.32); }
     .keystroke-recorder input:focus { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.88); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
     .keystroke-recorder input.is-suppressed { color: rgba(170, 69, 43, 0.88); }
     .key-output-select { border-left-color: rgba(20, 25, 23, 0.09); }
     .key-output-select:hover { border-left-color: rgba(26, 143, 97, 0.2); background: rgba(37, 151, 106, 0.07); }
-    .key-output-select svg { color: rgba(24, 30, 28, 0.48); }
+    .key-output-trigger .cody-select-chevron { color: rgba(24, 30, 28, 0.48); }
+    .key-output-current-icon { color: rgba(24, 30, 28, 0.6); }
     .key-press-combobox:focus-within input { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.88); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
     .launch-application-picker button:hover { border-color: rgba(26, 143, 97, 0.28); background: rgba(255, 255, 255, 0.72); }
     .launch-application-picker button:focus-visible { border-color: rgba(27, 143, 97, 0.48); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
     .launch-application-picker svg { color: rgba(24, 30, 28, 0.52); }
     .mapping-notice { border-color: rgba(20, 25, 23, 0.1); background: rgba(255, 255, 255, 0.36); color: rgba(25, 31, 29, 0.58); }
     .profile-switcher { color: rgba(28, 34, 32, 0.45); }
-    .profile-select-shell select {
-      border-color: rgba(20, 25, 23, 0.11);
-      background: rgba(255, 255, 255, 0.48);
-      color: rgba(17, 22, 20, 0.9);
-    }
-    .profile-select-shell select:hover { border-color: rgba(20, 25, 23, 0.2); background: rgba(255, 255, 255, 0.72); }
-    .profile-select-shell svg { color: rgba(24, 29, 27, 0.5); }
-    .app-toolbar-actions .profile-select-shell select { border-color: transparent; background: transparent; box-shadow: none; }
-    .app-toolbar-actions .profile-select-shell select:hover { border-color: transparent; background: rgba(255, 255, 255, 0.48); color: rgba(10, 15, 13, 1); }
-    .app-toolbar-actions .profile-select-shell:hover svg { color: rgba(18, 24, 21, 0.72); }
-    .app-toolbar-actions .profile-select-shell select:focus-visible { border-color: transparent; background: rgba(255, 255, 255, 0.26); box-shadow: none; }
+    .profile-select-trigger { border-color: transparent; background: transparent; box-shadow: none; color: rgba(17, 22, 20, 0.9); }
+    .profile-select-trigger:hover { border-color: transparent; background: rgba(255, 255, 255, 0.48); color: rgba(10, 15, 13, 1); }
+    .profile-select-trigger:hover .cody-select-chevron { color: rgba(18, 24, 21, 0.72); }
+    .profile-select-trigger:focus-visible,
+    .profile-select-trigger[data-state="open"] { border-color: transparent; background: rgba(255, 255, 255, 0.26); box-shadow: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {

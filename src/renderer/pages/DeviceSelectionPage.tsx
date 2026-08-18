@@ -3,12 +3,12 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Mous
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 
+import { findSupportedDevices, SUPPORTED_DEVICES, type SupportedDevice } from "../../shared/device-catalog";
 import type { HIDDeviceInfo } from "../../shared/hid";
 import { SweepPro } from "../components/devices/SweepPro";
 import { XiaomiRemote } from "../components/devices/XiaomiRemote";
 import { AppToolbar } from "../components/layout/AppToolbar";
 import { ViewTransitionLink } from "../components/navigation/ViewTransitionLink";
-import { findSupportedDevices, SUPPORTED_DEVICES, type SupportedDevice } from "../lib/device-catalog";
 
 type DeviceLoadState =
   | { status: "loading" }
