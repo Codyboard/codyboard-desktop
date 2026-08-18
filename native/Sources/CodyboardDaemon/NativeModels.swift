@@ -23,7 +23,8 @@ struct PermissionStatus: Codable {
 }
 
 struct DiagnosticKeyEvent: Codable {
-    let keyboardType: Int
+    let deviceId: String?
+    let keyboardType: Int?
     let eventType: String
     let source: String
     let code: Int
@@ -111,10 +112,20 @@ struct CompiledProfileSet: Codable {
 }
 
 struct CompiledActiveProfile: Codable {
-    let keyboardType: Int
+    let deviceId: String
     let profileId: String
     let global: [CompiledMapping]
     let applications: [String: [CompiledMapping]]
+
+    init(
+        deviceId: String, profileId: String,
+        global: [CompiledMapping], applications: [String: [CompiledMapping]]
+    ) {
+        self.deviceId = deviceId
+        self.profileId = profileId
+        self.global = global
+        self.applications = applications
+    }
 }
 
 struct CompiledMapping: Codable {

@@ -120,7 +120,9 @@ function sweepProKeyFor(event: KeyboardEvent): SweepProKey | undefined {
 }
 
 function sweepProKeyForDiagnostic(event: HIDDiagnosticEvent): SweepProKey | undefined {
-  return event.source === "keyCode" ? keyCodeToKey[event.code] : undefined;
+  return event.deviceId !== undefined && event.source === "keyCode"
+    ? keyCodeToKey[event.code]
+    : undefined;
 }
 
 function changedSet(current: ReadonlySet<SweepProKey>, key: SweepProKey, isPressed: boolean) {

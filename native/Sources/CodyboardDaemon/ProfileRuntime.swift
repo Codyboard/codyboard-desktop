@@ -13,34 +13,27 @@ private struct RuntimeProfile {
 
 final class ProfileRuntime {
     private(set) var generation = 0
-    private var profiles: [Int: RuntimeProfile] = [:]
+    private var deviceProfiles: [String: RuntimeProfile] = [:]
 
-    var isEmpty: Bool { profiles.isEmpty }
+    var isEmpty: Bool { deviceProfiles.isEmpty }
 
     func replace(_ snapshot: CompiledProfileSet) {
         generation = snapshot.generation
-        profiles = Dictionary(uniqueKeysWithValues: snapshot.profiles.map { profile in
+        deviceProfiles = [:]
+        for profile in snapshot.profiles {
             let global = Dictionary(uniqueKeysWithValues: profile.global.map { ($0.trigger, $0.output) })
             let applications = profile.applications.mapValues { mappings in
                 Dictionary(uniqueKeysWithValues: mappings.map { ($0.trigger, $0.output) })
             }
-            return (profile.keyboardType, RuntimeProfile(global: global, applications: applications))
-        })
+            let runtimeProfile = RuntimeProfile(global: global, applications: applications)
+            deviceProfiles[profile.deviceId] = runtimeProfile
+        }
     }
 
-    func resolve(trigger: CompiledTrigger, keyboardType: Int?, bundleIdentifier: String?) -> MappingResolution {
-        if let keyboardType {
-            guard let profile = profiles[keyboardType] else { return .none }
-            return output(in: profile, trigger: trigger, bundleIdentifier: bundleIdentifier).map(MappingResolution.output) ?? .none
-        }
-
-        var match: CompiledOutput?
-        for profile in profiles.values {
-            guard let output = output(in: profile, trigger: trigger, bundleIdentifier: bundleIdentifier) else { continue }
-            if match != nil { return .ambiguous }
-            match = output
-        }
-        return match.map(MappingResolution.output) ?? .none
+    func resolve(trigger: CompiledTrigger, deviceId: String, bundleIdentifier: String?) -> MappingResolution {
+        guard let profile = deviceProfiles[deviceId] else { return .none }
+        return output(in: profile, trigger: trigger, bundleIdentifier: bundleIdentifier)
+            .map(MappingResolution.output) ?? .none
     }
 
     private func output(in profile: RuntimeProfile, trigger: CompiledTrigger, bundleIdentifier: String?) -> CompiledOutput? {

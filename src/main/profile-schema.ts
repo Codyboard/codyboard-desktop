@@ -8,9 +8,11 @@ import type {
   MappingInput,
   MappingOutput,
   ProfileDocument,
+  ProfileDomain,
   ProfileDraft,
   ProfileStateDocument
 } from "../shared/hid.js";
+import { profileDomainKey } from "../shared/hid.js";
 import { mappingInputSignature } from "../shared/profile-mappings.js";
 
 import { KEY_CODES, MODIFIER_KEY_CODES, SYSTEM_KEY_CODES, normalizeModifiers } from "./key-codes.js";
@@ -72,9 +74,10 @@ const scopeSchema = z.union([
 ]);
 const groupSchema = z.object({ id: idSchema, scope: scopeSchema, mappings: z.array(mappingSchema) }).strict();
 export const profileDraftSchema = z.object({ id: idSchema, name: z.string().min(1), groups: z.array(groupSchema).min(1) }).strict();
+const profileCollectionSchema = z.object({ deviceId: idSchema, profiles: z.array(profileDraftSchema) }).strict();
 const profileDocumentSchema = z.object({
   version: z.literal(1),
-  keyboards: z.array(z.object({ type: z.number().int().nonnegative(), profiles: z.array(profileDraftSchema) }).strict())
+  keyboards: z.array(profileCollectionSchema)
 }).strict();
 const stateDocumentSchema = z.object({ version: z.literal(1), activeProfiles: z.record(z.string(), idSchema) }).strict();
 
@@ -105,9 +108,9 @@ function validateProfile(profile: ProfileDraft): void {
 
 export function parseProfileDocument(value: unknown): ProfileDocument {
   const document = profileDocumentSchema.parse(value);
-  ensureUnique(document.keyboards.map(({ type }) => String(type)), "keyboard type");
+  ensureUnique(document.keyboards.map((keyboard) => profileDomainKey(profileDomain(keyboard))), "profile domain");
   for (const keyboard of document.keyboards) {
-    ensureUnique(keyboard.profiles.map(({ id }) => id), `profile id for keyboard type ${keyboard.type}`);
+    ensureUnique(keyboard.profiles.map(({ id }) => id), `profile id for ${profileDomainKey(profileDomain(keyboard))}`);
     keyboard.profiles.forEach(validateProfile);
   }
   return document;
@@ -115,8 +118,10 @@ export function parseProfileDocument(value: unknown): ProfileDocument {
 
 export function parseStateDocument(value: unknown): ProfileStateDocument {
   const state = stateDocumentSchema.parse(value);
-  for (const type of Object.keys(state.activeProfiles)) {
-    if (!/^\d+$/.test(type)) throw new Error(`Invalid keyboard type in activeProfiles: ${type}`);
+  for (const domain of Object.keys(state.activeProfiles)) {
+    if (!/^device:[a-z0-9][a-z0-9_-]*$/.test(domain)) {
+      throw new Error(`Invalid profile domain in activeProfiles: ${domain}`);
+    }
   }
   return state;
 }
@@ -170,7 +175,8 @@ function compileMapping(mapping: KeyMapping): CompiledMapping {
 export function compileProfiles(document: ProfileDocument, state: ProfileStateDocument, generation: number): CompiledProfileSet {
   const profiles: CompiledActiveProfile[] = [];
   for (const keyboard of document.keyboards) {
-    const activeId = state.activeProfiles[String(keyboard.type)];
+    const domain = profileDomain(keyboard);
+    const activeId = state.activeProfiles[profileDomainKey(domain)];
     if (!activeId) continue;
     const profile = keyboard.profiles.find(({ id }) => id === activeId);
     if (!profile) continue;
@@ -180,7 +186,7 @@ export function compileProfiles(document: ProfileDocument, state: ProfileStateDo
       if (group.scope.kind === "application") applications[group.scope.bundleId] = group.mappings.map(compileMapping);
     }
     profiles.push({
-      keyboardType: keyboard.type,
+      deviceId: domain,
       profileId: profile.id,
       global: global.mappings.map(compileMapping),
       applications
@@ -191,9 +197,15 @@ export function compileProfiles(document: ProfileDocument, state: ProfileStateDo
 
 export function validateActiveProfiles(document: ProfileDocument, state: ProfileStateDocument): string[] {
   const errors: string[] = [];
-  for (const [type, profileId] of Object.entries(state.activeProfiles)) {
-    const keyboard = document.keyboards.find((entry) => entry.type === Number(type));
-    if (!keyboard?.profiles.some(({ id }) => id === profileId)) errors.push(`Active profile ${profileId} does not exist for keyboard type ${type}`);
+  for (const [key, profileId] of Object.entries(state.activeProfiles)) {
+    const keyboard = document.keyboards.find((entry) => profileDomainKey(profileDomain(entry)) === key);
+    if (!keyboard?.profiles.some(({ id }) => id === profileId)) {
+      errors.push(`Active profile ${profileId} does not exist for profile domain ${key}`);
+    }
   }
   return errors;
+}
+
+function profileDomain(keyboard: ProfileDocument["keyboards"][number]): ProfileDomain {
+  return keyboard.deviceId;
 }

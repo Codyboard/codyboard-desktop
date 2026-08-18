@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { cp, mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -12,9 +12,11 @@ import type {
   ProfileDocument,
   ProfileDraft,
   ProfileEvent,
+  ProfileDomain,
   ProfilesSnapshot,
   ProfileStateDocument,
 } from "../shared/hid.js";
+import { profileDomainKey } from "../shared/hid.js";
 import { normalizeApplicationMappings } from "../shared/profile-mappings.js";
 
 import { compileProfiles, parseProfileDocument, parseStateDocument, profileDraftSchema, validateActiveProfiles } from "./profile-schema.js";
@@ -28,7 +30,7 @@ export interface ProfileRuntimeClient {
 
 const EMPTY_PROFILES: ProfileDocument = { version: 1, keyboards: [] };
 const EMPTY_STATE: ProfileStateDocument = { version: 1, activeProfiles: {} };
-const TYPE_DIRECTORY = /^hid-(\d+)$/;
+const DEVICE_DIRECTORY = /^device-([a-z0-9][a-z0-9_-]*)$/;
 const PROFILE_FILE = /^([a-z0-9][a-z0-9_-]*)\.yaml$/;
 const settingsSchema = z.object({
   version: z.literal(1),
@@ -57,67 +59,68 @@ export class ProfileCoordinator extends EventEmitter {
   snapshot(): ProfilesSnapshot {
     const keyboards: ProfilesSnapshot["keyboards"] = {};
     for (const keyboard of this.document.keyboards) {
+      const domain = profileDomain(keyboard);
       const profiles = clone(keyboard.profiles);
-      const activeId = this.state.activeProfiles[String(keyboard.type)];
-      keyboards[String(keyboard.type)] = { profiles, activeProfile: profiles.find(({ id }) => id === activeId) };
+      const activeId = this.state.activeProfiles[profileDomainKey(domain)];
+      keyboards[profileDomainKey(domain)] = { profiles, activeProfile: profiles.find(({ id }) => id === activeId) };
     }
     return { generation: this.generation, keyboards };
   }
 
-  create(keyboardType: number, draft: ProfileDraft): Promise<ProfilesSnapshot> {
+  create(domain: ProfileDomain, draft: ProfileDraft): Promise<ProfilesSnapshot> {
     return this.mutate((document, state) => {
-      this.assertKeyboardType(keyboardType);
+      this.assertDomain(domain);
       const profile = normalizeApplicationMappings(profileDraftSchema.parse(draft));
-      let keyboard = document.keyboards.find(({ type }) => type === keyboardType);
+      let keyboard = document.keyboards.find((entry) => sameDomain(entry, domain));
       if (!keyboard) {
-        keyboard = { type: keyboardType, profiles: [] };
+        keyboard = { deviceId: domain, profiles: [] };
         document.keyboards.push(keyboard);
       }
       if (keyboard.profiles.some(({ id }) => id === profile.id)) throw new Error(`Profile already exists: ${profile.id}`);
       const first = keyboard.profiles.length === 0;
       keyboard.profiles.push(profile);
-      if (first) state.activeProfiles[String(keyboardType)] = profile.id;
+      if (first) state.activeProfiles[profileDomainKey(domain)] = profile.id;
     });
   }
 
-  update(keyboardType: number, profileId: string, draft: ProfileDraft): Promise<ProfilesSnapshot> {
+  update(domain: ProfileDomain, profileId: string, draft: ProfileDraft): Promise<ProfilesSnapshot> {
     return this.mutate((document) => {
-      this.assertKeyboardType(keyboardType);
+      this.assertDomain(domain);
       if (draft.id !== profileId) throw new Error("Profile id cannot be changed by update");
       const profile = normalizeApplicationMappings(profileDraftSchema.parse(draft));
-      const keyboard = document.keyboards.find(({ type }) => type === keyboardType);
+      const keyboard = document.keyboards.find((entry) => sameDomain(entry, domain));
       const index = keyboard?.profiles.findIndex(({ id }) => id === profileId) ?? -1;
       if (!keyboard || index < 0) throw new Error(`Profile not found: ${profileId}`);
       keyboard.profiles[index] = profile;
     });
   }
 
-  remove(keyboardType: number, profileId: string): Promise<ProfilesSnapshot> {
+  remove(domain: ProfileDomain, profileId: string): Promise<ProfilesSnapshot> {
     return this.mutate((document, state) => {
-      this.assertKeyboardType(keyboardType);
-      const keyboard = document.keyboards.find(({ type }) => type === keyboardType);
-      if (!keyboard) throw new Error(`Keyboard type not found: ${keyboardType}`);
+      this.assertDomain(domain);
+      const keyboard = document.keyboards.find((entry) => sameDomain(entry, domain));
+      if (!keyboard) throw new Error(`Profile domain not found: ${domain}`);
       const index = keyboard.profiles.findIndex(({ id }) => id === profileId);
       if (index < 0) throw new Error(`Profile not found: ${profileId}`);
       keyboard.profiles.splice(index, 1);
-      if (state.activeProfiles[String(keyboardType)] === profileId) delete state.activeProfiles[String(keyboardType)];
+      if (state.activeProfiles[profileDomainKey(domain)] === profileId) delete state.activeProfiles[profileDomainKey(domain)];
     });
   }
 
-  activate(keyboardType: number, profileId: string): Promise<ProfilesSnapshot> {
+  activate(domain: ProfileDomain, profileId: string): Promise<ProfilesSnapshot> {
     return this.mutate((document, state) => {
-      this.assertKeyboardType(keyboardType);
-      const keyboard = document.keyboards.find(({ type }) => type === keyboardType);
+      this.assertDomain(domain);
+      const keyboard = document.keyboards.find((entry) => sameDomain(entry, domain));
       if (!keyboard?.profiles.some(({ id }) => id === profileId)) throw new Error(`Profile not found: ${profileId}`);
       // One scalar per type makes multiple active profiles unrepresentable.
-      state.activeProfiles[String(keyboardType)] = profileId;
+      state.activeProfiles[profileDomainKey(domain)] = profileId;
     });
   }
 
-  deactivate(keyboardType: number): Promise<ProfilesSnapshot> {
+  deactivate(domain: ProfileDomain): Promise<ProfilesSnapshot> {
     return this.mutate((_document, state) => {
-      this.assertKeyboardType(keyboardType);
-      delete state.activeProfiles[String(keyboardType)];
+      this.assertDomain(domain);
+      delete state.activeProfiles[profileDomainKey(domain)];
     });
   }
 
@@ -146,9 +149,9 @@ export class ProfileCoordinator extends EventEmitter {
       }
 
       for (const entry of entries) {
-        const match = entry.isDirectory() ? (TYPE_DIRECTORY.exec(entry.name)) : null;
-        if (!match) continue;
-        const keyboardType = Number(match[1]);
+        const deviceMatch = entry.isDirectory() ? DEVICE_DIRECTORY.exec(entry.name) : null;
+        if (!deviceMatch) continue;
+        const domain: ProfileDomain = deviceMatch[1];
         const directory = path.join(this.rootDirectory, entry.name);
         const files = await readdir(directory, { withFileTypes: true });
         const profiles: ProfileDraft[] = [];
@@ -165,17 +168,18 @@ export class ProfileCoordinator extends EventEmitter {
           }
           profiles.push(profile);
         }
-        document.keyboards.push({ type: keyboardType, profiles });
-        const activeProfile = settings.keyboards[String(keyboardType)]?.activeProfile;
-        if (activeProfile) state.activeProfiles[String(keyboardType)] = activeProfile;
+        document.keyboards.push({ deviceId: domain, profiles });
+        const activeProfile = settings.keyboards[profileDomainKey(domain)]?.activeProfile;
+        if (activeProfile) state.activeProfiles[profileDomainKey(domain)] = activeProfile;
       }
 
       const parsedDocument = parseProfileDocument(document);
       const parsedState = parseStateDocument(state);
-      for (const message of validateActiveProfiles(parsedDocument, parsedState)) {
-        const match = /keyboard type (\d+)$/.exec(message);
-        if (match) delete parsedState.activeProfiles[match[1]];
-        this.emitConfigurationError(message);
+      for (const [key, profileId] of Object.entries(parsedState.activeProfiles)) {
+        const keyboard = parsedDocument.keyboards.find((entry) => profileDomainKey(profileDomain(entry)) === key);
+        if (keyboard?.profiles.some(({ id }) => id === profileId)) continue;
+        delete parsedState.activeProfiles[key];
+        this.emitConfigurationError(`Active profile ${profileId} does not exist for profile domain ${key}`);
       }
       await this.persistProfileMigrations(migrations);
       return await this.commit(parsedDocument, parsedState, false);
@@ -196,27 +200,28 @@ export class ProfileCoordinator extends EventEmitter {
     await this.runtime.replaceProfiles(nextCompiled);
 
     if (persist) {
-      const affectedTypes = new Set([...this.document.keyboards, ...document.keyboards].map(({ type }) => type));
+      const affectedDomains = new Set([...this.document.keyboards, ...document.keyboards].map(profileDomain));
       const originals = new Map<string, string | undefined>();
       try {
         const previousSettingsText = await this.readOptional(this.settingsPath);
         originals.set(this.settingsPath, previousSettingsText);
         const settings = settingsSchema.parse(previousSettingsText ? parse(previousSettingsText) : { version: 1, keyboards: {} });
-        for (const type of affectedTypes) {
-          const oldProfiles = this.document.keyboards.find((entry) => entry.type === type)?.profiles ?? [];
-          const newProfiles = document.keyboards.find((entry) => entry.type === type)?.profiles ?? [];
+        for (const domain of affectedDomains) {
+          const oldProfiles = this.document.keyboards.find((entry) => sameDomain(entry, domain))?.profiles ?? [];
+          const newProfiles = document.keyboards.find((entry) => sameDomain(entry, domain))?.profiles ?? [];
           const ids = new Set([...oldProfiles, ...newProfiles].map(({ id }) => id));
           for (const id of ids) {
-            const file = path.join(this.directoryFor(type), `${id}.yaml`);
+            const file = path.join(this.directoryFor(domain), `${id}.yaml`);
             originals.set(file, await this.readOptional(file));
             const profile = newProfiles.find((entry) => entry.id === id);
             if (profile) await this.writeAtomic(file, stringify(profile));
             else await unlink(file).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
           }
-          const activeProfile = state.activeProfiles[String(type)];
-          const current = settings.keyboards[String(type)] ?? {};
-          settings.keyboards[String(type)] = { ...current, ...(activeProfile ? { activeProfile } : {}) };
-          if (!activeProfile) delete settings.keyboards[String(type)].activeProfile;
+          const key = profileDomainKey(domain);
+          const activeProfile = state.activeProfiles[key];
+          const current = settings.keyboards[key] ?? {};
+          settings.keyboards[key] = { ...current, ...(activeProfile ? { activeProfile } : {}) };
+          if (!activeProfile) delete settings.keyboards[key].activeProfile;
         }
         await this.writeAtomic(this.settingsPath, stringify(settings));
       } catch (error) {
@@ -240,7 +245,9 @@ export class ProfileCoordinator extends EventEmitter {
     return next;
   }
 
-  private directoryFor(type: number): string { return path.join(this.rootDirectory, `hid-${type}`); }
+  private directoryFor(domain: ProfileDomain): string {
+    return path.join(this.rootDirectory, `device-${domain}`);
+  }
   private async installDefaultsIfFresh(): Promise<void> {
     if (!this.defaultConfigDirectory) return;
     const [settings, profiles] = await Promise.all([
@@ -253,12 +260,12 @@ export class ProfileCoordinator extends EventEmitter {
     // Never recreate defaults after the user has established either settings or
     // a profiles directory, including an intentionally empty one.
     if (settings !== undefined || profiles !== undefined) return;
-    await cp(path.join(this.defaultConfigDirectory, "profiles"), this.rootDirectory, { recursive: true });
+    await mkdir(this.rootDirectory, { recursive: true });
     const defaultSettings = await readFile(path.join(this.defaultConfigDirectory, "settings.yaml"), "utf8");
     await this.writeAtomic(this.settingsPath, defaultSettings);
   }
-  private assertKeyboardType(type: number): void {
-    if (!Number.isInteger(type) || type < 0) throw new Error(`Invalid keyboard type: ${type}`);
+  private assertDomain(domain: ProfileDomain): void {
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(domain)) throw new Error(`Invalid device id: ${domain}`);
   }
   private async readOptional(file: string): Promise<string | undefined> {
     try { return await readFile(file, "utf8"); }
@@ -298,4 +305,12 @@ export class ProfileCoordinator extends EventEmitter {
 
 function profilesEqual(left: ProfileDraft, right: ProfileDraft): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function profileDomain(keyboard: ProfileDocument["keyboards"][number]): ProfileDomain {
+  return keyboard.deviceId;
+}
+
+function sameDomain(keyboard: ProfileDocument["keyboards"][number], domain: ProfileDomain): boolean {
+  return profileDomain(keyboard) === domain;
 }

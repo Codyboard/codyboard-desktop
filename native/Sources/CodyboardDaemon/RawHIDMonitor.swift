@@ -16,6 +16,14 @@ private func rawHIDInputReport(
     monitor.receive(reportID: reportID, data: Data(bytes: report, count: reportLength))
 }
 
+private func rawHIDInputValue(
+    context: UnsafeMutableRawPointer?, result: IOReturn,
+    sender: UnsafeMutableRawPointer?, value: IOHIDValue
+) {
+    guard let context, result == kIOReturnSuccess else { return }
+    Unmanaged<RawHIDMonitor>.fromOpaque(context).takeUnretainedValue().receive(value: value)
+}
+
 /// Raw report bridge for the Xiaomi RC003/Codyboard Presenter. Most buttons
 /// become CGEvents; vendor usage 0xF1 (Back) exists only in report ID 1.
 final class RawHIDMonitor {
@@ -24,8 +32,10 @@ final class RawHIDMonitor {
     private static let productID = 0x32B8
 
     private var manager: IOHIDManager?
+    private var deviceId: String?
     private var activeUsages = Set<UInt16>()
-    var onUsage: ((UInt16, Bool) -> Void)?
+    var onUsage: ((String, UInt16, Bool) -> Void)?
+    var onInput: ((String, String, Int, UInt32, Bool) -> Void)?
     var isRunning: Bool { manager != nil }
 
     static var hasInputMonitoringAccess: Bool {
@@ -56,6 +66,9 @@ final class RawHIDMonitor {
         IOHIDManagerRegisterInputReportCallback(
             manager, rawHIDInputReport, Unmanaged.passUnretained(self).toOpaque()
         )
+        IOHIDManagerRegisterInputValueCallback(
+            manager, rawHIDInputValue, Unmanaged.passUnretained(self).toOpaque()
+        )
         IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
         let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         guard result == kIOReturnSuccess else {
@@ -65,11 +78,18 @@ final class RawHIDMonitor {
                 userInfo: [NSLocalizedDescriptionKey: "无法打开 Codyboard Presenter 原始 HID 报告（错误 \(result)）"]
             )
         }
+        if let device = (IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>)?.first {
+            var registryID: UInt64 = 0
+            if IORegistryEntryGetRegistryEntryID(IOHIDDeviceGetService(device), &registryID) == kIOReturnSuccess {
+                deviceId = String(format: "0x%llx", registryID)
+            }
+        }
         self.manager = manager
     }
 
     func stop() {
         activeUsages.removeAll()
+        deviceId = nil
         guard let manager else { return }
         IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
         IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
@@ -89,9 +109,32 @@ final class RawHIDMonitor {
         let pressed = usages.subtracting(activeUsages)
         let released = activeUsages.subtracting(usages)
         activeUsages = usages
-        for usage in pressed.sorted() { onUsage?(usage, true) }
-        for usage in released.sorted() { onUsage?(usage, false) }
+        guard let deviceId else { return }
+        for usage in pressed.sorted() { onUsage?(deviceId, usage, true) }
+        for usage in released.sorted() { onUsage?(deviceId, usage, false) }
+    }
+
+    fileprivate func receive(value: IOHIDValue) {
+        guard manager != nil, let deviceId else { return }
+        let element = IOHIDValueGetElement(value)
+        let usagePage = IOHIDElementGetUsagePage(element)
+        let usage = IOHIDElementGetUsage(element)
+        let pressed = IOHIDValueGetIntegerValue(value) != 0
+        if usagePage == UInt32(kHIDPage_KeyboardOrKeypad), let keyCode = Self.keyCodes[usage] {
+            onInput?(deviceId, "keyboard", keyCode, usage, pressed)
+        } else if usagePage == UInt32(kHIDPage_Consumer), let systemCode = Self.systemCodes[usage] {
+            onInput?(deviceId, "system", systemCode, usage, pressed)
+        }
     }
 
     deinit { stop() }
+
+    private static let keyCodes: [UInt32: Int] = [
+        0x28: 36, 0x35: 50, 0x3E: 96, 0x4A: 115,
+        0x4F: 124, 0x50: 123, 0x51: 125, 0x52: 126, 0x65: 110,
+    ]
+
+    private static let systemCodes: [UInt32: Int] = [
+        0xE2: 7, 0xE9: 0, 0xEA: 1,
+    ]
 }

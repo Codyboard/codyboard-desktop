@@ -7,7 +7,7 @@ import { compileProfiles, parseProfileDocument } from "./profile-schema.js";
 const validDocument: ProfileDocument = {
   version: 1,
   keyboards: [{
-    type: 40,
+    deviceId: "0x100004baa",
     profiles: [{
       id: "presenter",
       name: "Presenter",
@@ -26,7 +26,7 @@ const validDocument: ProfileDocument = {
 
 describe("profile schema", () => {
   it("compiles symbolic mappings into a daemon snapshot", () => {
-    const state: ProfileStateDocument = { version: 1, activeProfiles: { "40": "presenter" } };
+    const state: ProfileStateDocument = { version: 1, activeProfiles: { "device:0x100004baa": "presenter" } };
     const compiled = compileProfiles(parseProfileDocument(validDocument), state, 7);
     expect(compiled.generation).toBe(7);
     expect(compiled.profiles[0].global[0].trigger.code).toBe(123);
@@ -47,7 +47,7 @@ describe("profile schema", () => {
       kind: "launchApplication",
       bundleId: "com.apple.Keynote",
     };
-    const compiled = compileProfiles(document, { version: 1, activeProfiles: { "40": "presenter" } }, 8);
+    const compiled = compileProfiles(document, { version: 1, activeProfiles: { "device:0x100004baa": "presenter" } }, 8);
     expect(compiled.profiles[0].global[0].output).toEqual({
       bundleId: "com.apple.Keynote",
       kind: "launchApplication",
@@ -71,7 +71,7 @@ describe("profile schema", () => {
       key: "fn",
       modifiers: [],
     };
-    const compiled = compileProfiles(document, { version: 1, activeProfiles: { "40": "presenter" } }, 9);
+    const compiled = compileProfiles(document, { version: 1, activeProfiles: { "device:0x100004baa": "presenter" } }, 9);
     expect(compiled.profiles[0].global[0].output).toEqual({
       code: 63,
       kind: "modifier",

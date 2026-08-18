@@ -1,4 +1,4 @@
-import type { HIDDeviceInfo, HIDListOptions, ProfileDraft, ProfileEvent, ProfilesSnapshot, RawProfilesAPI } from "../../shared/hid";
+import { profileDomainKey, type HIDDeviceInfo, type HIDListOptions, type ProfileDraft, type ProfileEvent, type ProfilesSnapshot, type RawProfilesAPI } from "../../shared/hid";
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -18,31 +18,31 @@ export class Profile {
   toDraft(): ProfileDraft { return clone({ id: this.id, name: this.name, groups: this.groups }); }
 }
 
-export class KeyboardProfileCollection {
-  constructor(private readonly manager: ProfileManager, readonly type: number) {}
+export class DeviceProfileCollection {
+  constructor(private readonly manager: ProfileManager, readonly deviceId: string) {}
 
-  get profiles(): readonly Profile[] { return this.manager.snapshotFor(this.type).profiles.map((draft) => new Profile(draft)); }
+  get profiles(): readonly Profile[] { return this.manager.snapshotFor(this.deviceId).profiles.map((draft) => new Profile(draft)); }
   get activeProfile(): Profile | undefined {
-    const draft = this.manager.snapshotFor(this.type).activeProfile;
+    const draft = this.manager.snapshotFor(this.deviceId).activeProfile;
     return draft ? new Profile(draft) : undefined;
   }
 
   async create(draft: ProfileDraft): Promise<Profile> {
-    await this.manager.apply(this.manager.raw.create(this.type, clone(draft)));
+    await this.manager.apply(this.manager.raw.create(this.deviceId, clone(draft)));
     return this.profiles.find(({ id }) => id === draft.id)!;
   }
   async update(id: string, draft: ProfileDraft): Promise<Profile> {
-    await this.manager.apply(this.manager.raw.update(this.type, id, clone(draft)));
+    await this.manager.apply(this.manager.raw.update(this.deviceId, id, clone(draft)));
     return this.profiles.find((profile) => profile.id === id)!;
   }
-  async remove(id: string): Promise<void> { await this.manager.apply(this.manager.raw.remove(this.type, id)); }
-  async activate(id: string): Promise<void> { await this.manager.apply(this.manager.raw.activate(this.type, id)); }
-  async deactivate(): Promise<void> { await this.manager.apply(this.manager.raw.deactivate(this.type)); }
+  async remove(id: string): Promise<void> { await this.manager.apply(this.manager.raw.remove(this.deviceId, id)); }
+  async activate(id: string): Promise<void> { await this.manager.apply(this.manager.raw.activate(this.deviceId, id)); }
+  async deactivate(): Promise<void> { await this.manager.apply(this.manager.raw.deactivate(this.deviceId)); }
 }
 
 export class ProfileManager {
   private snapshot: ProfilesSnapshot = { generation: 0, keyboards: {} };
-  private readonly collections = new Map<number, KeyboardProfileCollection>();
+  private readonly collections = new Map<string, DeviceProfileCollection>();
   private readonly listeners = new Set<(event: ProfileEvent) => void>();
 
   constructor(readonly raw: RawProfilesAPI) {
@@ -54,12 +54,12 @@ export class ProfileManager {
 
   async load(): Promise<void> { await this.apply(this.raw.load()); }
   async reload(): Promise<void> { await this.apply(this.raw.reload()); }
-  forKeyboardType(type: number): KeyboardProfileCollection {
-    if (!Number.isInteger(type) || type < 0) throw new Error(`Invalid keyboard type: ${type}`);
-    let collection = this.collections.get(type);
+  forDevice(deviceId: string): DeviceProfileCollection {
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(deviceId)) throw new Error(`Invalid device id: ${deviceId}`);
+    let collection = this.collections.get(deviceId);
     if (!collection) {
-      collection = new KeyboardProfileCollection(this, type);
-      this.collections.set(type, collection);
+      collection = new DeviceProfileCollection(this, deviceId);
+      this.collections.set(deviceId, collection);
     }
     return collection;
   }
@@ -67,7 +67,7 @@ export class ProfileManager {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
-  snapshotFor(type: number) { return this.snapshot.keyboards[String(type)] ?? { profiles: [] }; }
+  snapshotFor(deviceId: string) { return this.snapshot.keyboards[profileDomainKey(deviceId)] ?? { profiles: [] }; }
   async apply(operation: Promise<ProfilesSnapshot>): Promise<void> { this.snapshot = clone(await operation); }
 }
 

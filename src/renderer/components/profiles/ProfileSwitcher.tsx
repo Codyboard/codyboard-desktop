@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 
-import type { ProfilesSnapshot } from "../../../shared/hid";
+import { profileDomainKey, type ProfileDomain, type ProfilesSnapshot } from "../../../shared/hid";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 export interface ProfileSwitcherProps {
-  keyboardType?: number;
+  profileDomain?: ProfileDomain;
 }
 
-export function ProfileSwitcher({ keyboardType }: ProfileSwitcherProps) {
+export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
   const [snapshot, setSnapshot] = useState<ProfilesSnapshot>();
   const [isChanging, setIsChanging] = useState(false);
 
@@ -25,19 +25,19 @@ export function ProfileSwitcher({ keyboardType }: ProfileSwitcherProps) {
     };
   }, []);
 
-  const profiles = keyboardType === undefined ? [] : snapshot?.keyboards[String(keyboardType)]?.profiles ?? [];
-  const activeProfileId = keyboardType === undefined
+  const profiles = profileDomain === undefined ? [] : snapshot?.keyboards[profileDomainKey(profileDomain)]?.profiles ?? [];
+  const activeProfileId = profileDomain === undefined
     ? ""
-    : snapshot?.keyboards[String(keyboardType)]?.activeProfile?.id ?? "";
-  const unavailable = keyboardType === undefined || profiles.length === 0;
+    : snapshot?.keyboards[profileDomainKey(profileDomain)]?.activeProfile?.id ?? "";
+  const unavailable = profileDomain === undefined || profiles.length === 0;
 
   const changeProfile = async (profileId: string) => {
-    if (keyboardType === undefined) return;
+    if (profileDomain === undefined) return;
     setIsChanging(true);
     try {
       const nextSnapshot = profileId !== "__inactive__"
-        ? await window.codyboard.profiles.activate(keyboardType, profileId)
-        : await window.codyboard.profiles.deactivate(keyboardType);
+        ? await window.codyboard.profiles.activate(profileDomain, profileId)
+        : await window.codyboard.profiles.deactivate(profileDomain);
       setSnapshot(nextSnapshot);
     } finally {
       setIsChanging(false);
@@ -60,7 +60,7 @@ export function ProfileSwitcher({ keyboardType }: ProfileSwitcherProps) {
         <SelectContent align="end" className="profile-select-menu">
           {unavailable && (
             <SelectItem disabled value="__unavailable__">
-              {keyboardType === undefined ? "Type unavailable" : "No profiles"}
+              {profileDomain === undefined ? "Device unavailable" : "No profiles"}
             </SelectItem>
           )}
           {!unavailable && <SelectItem value="__inactive__">Inactive</SelectItem>}

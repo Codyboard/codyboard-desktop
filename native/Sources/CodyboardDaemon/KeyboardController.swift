@@ -14,10 +14,25 @@ final class KeyboardController: @unchecked Sendable {
     private var diagnosticKeyboardType: Int?
     private var activeLaunchTriggers = Set<ActiveLaunchTrigger>()
     private var profilesNeedRawHID = false
+    private var pendingPhysicalEvents: [PendingDeviceInputEvent] = []
     private lazy var rawHIDMonitor: RawHIDMonitor = {
         let monitor = RawHIDMonitor()
-        monitor.onUsage = { [weak self] usage, pressed in
-            self?.receiveRawHIDUsage(usage, pressed: pressed)
+        monitor.onUsage = { [weak self] deviceId, usage, pressed in
+            self?.receiveRawHIDUsage(deviceId: deviceId, usage: usage, pressed: pressed)
+        }
+        monitor.onInput = { [weak self] deviceId, kind, code, usage, pressed in
+            self?.receivePhysicalInput(
+                deviceId: deviceId, kind: kind, code: code, usage: usage, pressed: pressed
+            )
+        }
+        return monitor
+    }()
+    private lazy var physicalHIDMonitor: PhysicalKeyboardHIDMonitor = {
+        let monitor = PhysicalKeyboardHIDMonitor()
+        monitor.onInput = { [weak self] deviceId, kind, code, usage, pressed in
+            self?.receivePhysicalInput(
+                deviceId: deviceId, kind: kind, code: code, usage: usage, pressed: pressed
+            )
         }
         return monitor
     }()
@@ -38,23 +53,31 @@ final class KeyboardController: @unchecked Sendable {
         if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
     }
 
-    var isListening: Bool { tap != nil }
+    var isListening: Bool { tap != nil || physicalHIDMonitor.isRunning }
 
     func replaceProfiles(_ snapshot: CompiledProfileSet, promptForPermission: Bool) throws -> ReplaceResult {
-        let needsRawHID = snapshot.profiles.contains { profile in
-            profile.keyboardType == RawHIDMonitor.keyboardType &&
-                (profile.global.contains { $0.trigger.kind == "hidUsage" } ||
-                 profile.applications.values.joined().contains { $0.trigger.kind == "hidUsage" })
-        }
+        let needsRawHID = !snapshot.profiles.isEmpty
+        let needsPhysicalHID = !snapshot.profiles.isEmpty
         let rawHIDWasRunning = rawHIDMonitor.isRunning
+        let physicalHIDWasRunning = physicalHIDMonitor.isRunning
         if needsRawHID { try rawHIDMonitor.start() }
+        if needsPhysicalHID {
+            do { try physicalHIDMonitor.start() }
+            catch {
+                NativeOutput.shared.error(
+                    id: nil, code: "physicalHIDUnavailable", message: error.localizedDescription
+                )
+            }
+        }
         if snapshot.profiles.isEmpty {
             runtime.replace(snapshot)
             profilesNeedRawHID = false
             if diagnosticKeyboardType != RawHIDMonitor.keyboardType { rawHIDMonitor.stop() }
+            physicalHIDMonitor.stop()
             if diagnosticKeyboardType == nil { stop() }
         } else if !start(promptForPermission: promptForPermission) {
             if !rawHIDWasRunning { rawHIDMonitor.stop() }
+            if !physicalHIDWasRunning { physicalHIDMonitor.stop() }
             throw NSError(
                 domain: "app.codyboard.permissions", code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "需要辅助功能权限。请在系统设置 → 隐私与安全性 → 辅助功能中允许 Codyboard。"]
@@ -65,6 +88,7 @@ final class KeyboardController: @unchecked Sendable {
             runtime.replace(snapshot)
             profilesNeedRawHID = needsRawHID
             if !needsRawHID && diagnosticKeyboardType != RawHIDMonitor.keyboardType { rawHIDMonitor.stop() }
+            if !needsPhysicalHID { physicalHIDMonitor.stop() }
         }
         return ReplaceResult(generation: snapshot.generation, listening: isListening)
     }
@@ -82,7 +106,7 @@ final class KeyboardController: @unchecked Sendable {
 
     func setDiagnostics(keyboardType: Int?) throws -> ReplaceResult {
         if let keyboardType {
-            guard keyboardType >= -1 else {
+            guard keyboardType >= 0 else {
                 throw NSError(domain: "app.codyboard.diagnostics", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid keyboard type"])
             }
             let rawHIDWasRunning = rawHIDMonitor.isRunning
@@ -158,16 +182,25 @@ final class KeyboardController: @unchecked Sendable {
         if kind == "modifier", let ownModifier = modifierName(for: code) { modifiers.removeAll(where: { $0 == ownModifier }) }
         let trigger = CompiledTrigger(kind: kind, code: code, modifiers: modifiers.sorted())
         let keyboardType = type == systemDefined ? nil : Int(event.getIntegerValueField(.keyboardEventKeyboardType))
-        let bundleIdentifier = frontmostBundleIdentifier
         let pressed = system?.pressed ?? eventPressed(type: type, keyCode: code, flags: event.flags)
-        let activeLaunchTrigger = ActiveLaunchTrigger(trigger: trigger, keyboardType: keyboardType)
+        let activeLaunchTrigger = ActiveLaunchTrigger(
+            trigger: trigger, source: keyboardType.map { "keyboard-type:\($0)" }
+        )
         if !pressed, activeLaunchTriggers.remove(activeLaunchTrigger) != nil { return nil }
-        if let keyboardType, diagnosticKeyboardType == -1 || keyboardType == diagnosticKeyboardType {
+        if let deviceId = consumePhysicalDeviceId(kind: kind, code: code, pressed: pressed) {
+            return resolveDeviceEvent(
+                deviceId: deviceId, trigger: trigger, event: event,
+                pressed: pressed, activeLaunchTrigger: ActiveLaunchTrigger(
+                    trigger: trigger, source: "device:\(deviceId)"
+                )
+            )
+        }
+        if let keyboardType, keyboardType == diagnosticKeyboardType {
             let eventName = type == .keyDown ? "keydown" : type == .keyUp ? "keyup" : "flagschanged"
             NativeOutput.shared.send(NativeEvent(
                 event: "diagnosticKey",
                 data: DiagnosticKeyEvent(
-                    keyboardType: keyboardType, eventType: eventName, source: "keyCode",
+                    deviceId: nil, keyboardType: keyboardType, eventType: eventName, source: "keyCode",
                     code: code, keyCode: code,
                     flags: event.flags.rawValue, timestamp: event.timestamp
                 )
@@ -175,44 +208,15 @@ final class KeyboardController: @unchecked Sendable {
             return nil
         }
 
-        switch runtime.resolve(trigger: trigger, keyboardType: keyboardType, bundleIdentifier: bundleIdentifier) {
-        case .none:
-            return Unmanaged.passUnretained(event)
-        case .ambiguous:
-            NativeOutput.shared.error(
-                id: nil, code: "ambiguousSource",
-                message: "A system-defined event matched more than one active keyboard profile",
-                details: ["code": String(code)]
-            )
-            return Unmanaged.passUnretained(event)
-        case .output(let output):
-            if output.kind == "passthrough" { return Unmanaged.passUnretained(event) }
-            if output.kind == "suppress" { return nil }
-            if output.kind == "launchApplication" {
-                if pressed && event.getIntegerValueField(.keyboardEventAutorepeat) == 0,
-                   let bundleIdentifier = output.bundleId {
-                    activeLaunchTriggers.insert(activeLaunchTrigger)
-                    applicationLauncher.launch(bundleIdentifier: bundleIdentifier)
-                }
-                return nil
-            }
-            do {
-                let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-                try simulator.post(output, pressed: pressed, autorepeat: autorepeat)
-                return nil
-            } catch {
-                NativeOutput.shared.error(id: nil, code: "simulationFailed", message: error.localizedDescription)
-                return Unmanaged.passUnretained(event)
-            }
-        }
+        return Unmanaged.passUnretained(event)
     }
 
-    private func receiveRawHIDUsage(_ usage: UInt16, pressed: Bool) {
+    private func receiveRawHIDUsage(deviceId: String, usage: UInt16, pressed: Bool) {
         if diagnosticKeyboardType == RawHIDMonitor.keyboardType {
             NativeOutput.shared.send(NativeEvent(
                 event: "diagnosticKey",
                 data: DiagnosticKeyEvent(
-                    keyboardType: RawHIDMonitor.keyboardType,
+                    deviceId: deviceId, keyboardType: nil,
                     eventType: pressed ? "keydown" : "keyup",
                     source: "hidUsage", code: Int(usage), keyCode: nil,
                     flags: 0, timestamp: 0
@@ -221,11 +225,11 @@ final class KeyboardController: @unchecked Sendable {
             return
         }
         let trigger = CompiledTrigger(kind: "hidUsage", code: Int(usage), modifiers: [])
-        let activeLaunchTrigger = ActiveLaunchTrigger(trigger: trigger, keyboardType: RawHIDMonitor.keyboardType)
+        let activeLaunchTrigger = ActiveLaunchTrigger(trigger: trigger, source: "device:\(deviceId)")
         if !pressed, activeLaunchTriggers.remove(activeLaunchTrigger) != nil { return }
         switch runtime.resolve(
             trigger: trigger,
-            keyboardType: RawHIDMonitor.keyboardType,
+            deviceId: deviceId,
             bundleIdentifier: frontmostBundleIdentifier
         ) {
         case .none, .ambiguous:
@@ -248,11 +252,96 @@ final class KeyboardController: @unchecked Sendable {
             }
         }
     }
+
+    private func receivePhysicalInput(
+        deviceId: String, kind: String, code: Int, usage: UInt32, pressed: Bool
+    ) {
+        let now = DispatchTime.now().uptimeNanoseconds
+        pendingPhysicalEvents.removeAll { now - $0.timestamp > 250_000_000 }
+        pendingPhysicalEvents.append(PendingDeviceInputEvent(
+            deviceId: deviceId, kind: kind, code: code, pressed: pressed, timestamp: now
+        ))
+        NativeOutput.shared.send(NativeEvent(
+            event: "diagnosticKey",
+            data: DiagnosticKeyEvent(
+                deviceId: deviceId, keyboardType: nil,
+                eventType: pressed ? "keydown" : "keyup",
+                source: kind == "keyboard" ? "keyCode" : "hidUsage",
+                code: kind == "keyboard" ? code : Int(usage),
+                keyCode: kind == "keyboard" ? code : nil,
+                flags: 0, timestamp: 0
+            )
+        ))
+    }
+
+    private func consumePhysicalDeviceId(kind: String, code: Int, pressed: Bool) -> String? {
+        let now = DispatchTime.now().uptimeNanoseconds
+        pendingPhysicalEvents.removeAll { now - $0.timestamp > 250_000_000 }
+        guard let index = pendingPhysicalEvents.firstIndex(where: {
+            $0.kind == kind && $0.code == code && $0.pressed == pressed
+        }) else { return nil }
+        return pendingPhysicalEvents.remove(at: index).deviceId
+    }
+
+    private func resolveDeviceEvent(
+        deviceId: String, trigger: CompiledTrigger, event: CGEvent, pressed: Bool,
+        activeLaunchTrigger: ActiveLaunchTrigger
+    ) -> Unmanaged<CGEvent>? {
+        if !pressed, activeLaunchTriggers.remove(activeLaunchTrigger) != nil { return nil }
+        let resolution = runtime.resolve(
+            trigger: trigger,
+            deviceId: deviceId,
+            bundleIdentifier: frontmostBundleIdentifier
+        )
+        let output: CompiledOutput
+        switch resolution {
+        case .none:
+            return Unmanaged.passUnretained(event)
+        case .ambiguous:
+            return Unmanaged.passUnretained(event)
+        case .output(let mapped):
+            if mapped.kind == "suppress" { return nil }
+            if mapped.kind == "passthrough" {
+                return Unmanaged.passUnretained(event)
+            } else if mapped.kind == "launchApplication" {
+                if pressed && event.getIntegerValueField(.keyboardEventAutorepeat) == 0,
+                   let bundleIdentifier = mapped.bundleId {
+                    activeLaunchTriggers.insert(activeLaunchTrigger)
+                    applicationLauncher.launch(bundleIdentifier: bundleIdentifier)
+                }
+                return nil
+            } else {
+                output = mapped
+            }
+        }
+        do {
+            try simulator.post(
+                output, pressed: pressed,
+                autorepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+            )
+            return nil
+        }
+        catch {
+            NativeOutput.shared.error(
+                id: nil, code: "simulationFailed", message: error.localizedDescription,
+                details: ["deviceId": deviceId, "keyCode": String(trigger.code)]
+            )
+            return Unmanaged.passUnretained(event)
+        }
+    }
+}
+
+private struct PendingDeviceInputEvent {
+    let deviceId: String
+    let kind: String
+    let code: Int
+    let pressed: Bool
+    let timestamp: UInt64
 }
 
 private struct ActiveLaunchTrigger: Hashable {
     let trigger: CompiledTrigger
-    let keyboardType: Int?
+    let source: String?
 }
 
 private let keyboardEventTapCallback: CGEventTapCallBack = { _, type, event, context in

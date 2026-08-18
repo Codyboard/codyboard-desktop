@@ -24,30 +24,48 @@ const draft: ProfileDraft = {
 };
 
 describe("ProfileCoordinator", () => {
+  it("stores a physical device profile under its device id", async () => {
+    const temporary = await mkdtemp(path.join(tmpdir(), "codyboard-device-profile-test-"));
+    const root = path.join(temporary, ".codyboard", "profiles");
+    const daemon = new FakeDaemon();
+    const service = new ProfileCoordinator(daemon, root);
+    await service.load();
+
+    const created = await service.create("vid-1d50-pid-615e", { ...draft, id: "default" });
+
+    expect(created.keyboards["device:vid-1d50-pid-615e"].activeProfile?.id).toBe("default");
+    expect(await readFile(path.join(root, "device-vid-1d50-pid-615e", "default.yaml"), "utf8"))
+      .toContain("id: default");
+    expect(daemon.snapshots.at(-1)?.profiles[0]).toMatchObject({
+      deviceId: "vid-1d50-pid-615e",
+      profileId: "default",
+    });
+  });
+
   it("stores one file per profile and one shared active setting", async () => {
     const temporary = await mkdtemp(path.join(tmpdir(), "codyboard-profile-test-"));
     const root = path.join(temporary, ".codyboard", "profiles");
     const daemon = new FakeDaemon();
     const service = new ProfileCoordinator(daemon, root);
     await service.load();
-    const created = await service.create(40, draft);
-    expect(created.keyboards["40"].activeProfile?.id).toBe("presenter");
-    expect(await readFile(path.join(root, "hid-40", "presenter.yaml"), "utf8")).toContain("id: presenter");
+    const created = await service.create("0x100004baa", draft);
+    expect(created.keyboards["device:0x100004baa"].activeProfile?.id).toBe("presenter");
+    expect(await readFile(path.join(root, "device-0x100004baa", "presenter.yaml"), "utf8")).toContain("id: presenter");
     expect(await readFile(path.join(temporary, ".codyboard", "settings.yaml"), "utf8")).toContain("activeProfile: presenter");
 
-    await service.create(40, { ...draft, id: "second", name: "Second" });
-    expect(service.snapshot().keyboards["40"].activeProfile?.id).toBe("presenter");
-    await service.activate(40, "second");
-    expect(service.snapshot().keyboards["40"].activeProfile?.id).toBe("second");
-    await service.remove(40, "second");
-    expect(service.snapshot().keyboards["40"].activeProfile).toBeUndefined();
+    await service.create("0x100004baa", { ...draft, id: "second", name: "Second" });
+    expect(service.snapshot().keyboards["device:0x100004baa"].activeProfile?.id).toBe("presenter");
+    await service.activate("0x100004baa", "second");
+    expect(service.snapshot().keyboards["device:0x100004baa"].activeProfile?.id).toBe("second");
+    await service.remove("0x100004baa", "second");
+    expect(service.snapshot().keyboards["device:0x100004baa"].activeProfile).toBeUndefined();
     expect(daemon.snapshots.at(-1)?.profiles).toHaveLength(0);
   });
 
   it("migrates redundant application mappings while loading", async () => {
     const temporary = await mkdtemp(path.join(tmpdir(), "codyboard-profile-migration-test-"));
     const root = path.join(temporary, ".codyboard", "profiles");
-    const profilePath = path.join(root, "hid-40", "presenter.yaml");
+    const profilePath = path.join(root, "device-0x100004baa", "presenter.yaml");
     const redundant: ProfileDraft = {
       ...draft,
       groups: [
@@ -83,7 +101,7 @@ describe("ProfileCoordinator", () => {
 
     const service = new ProfileCoordinator(new FakeDaemon(), root);
     const snapshot = await service.load();
-    const application = snapshot.keyboards["40"].profiles[0].groups[1];
+    const application = snapshot.keyboards["device:0x100004baa"].profiles[0].groups[1];
     expect(application.mappings.map(({ id }) => id)).toEqual(["codex-right"]);
 
     const persisted = parse(await readFile(profilePath, "utf8")) as ProfileDraft;

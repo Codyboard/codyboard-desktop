@@ -47,7 +47,8 @@ export interface HIDKeyEvent {
 }
 
 export interface HIDDiagnosticEvent {
-  keyboardType: number;
+  deviceId?: string;
+  keyboardType?: number;
   eventType: "keydown" | "keyup" | "flagschanged";
   source: "keyCode" | "hidUsage";
   code: number;
@@ -128,9 +129,15 @@ export interface ProfileDraft {
   groups: KeyMappingGroup[];
 }
 
+export type ProfileDomain = string;
+export interface ProfileCollection {
+  deviceId: string;
+  profiles: ProfileDraft[];
+}
+
 export interface ProfileDocument {
   version: 1;
-  keyboards: { type: number; profiles: ProfileDraft[] }[];
+  keyboards: ProfileCollection[];
 }
 
 export interface ProfileStateDocument {
@@ -146,6 +153,10 @@ export interface ProfileSnapshot {
 export interface ProfilesSnapshot {
   generation: number;
   keyboards: Record<string, ProfileSnapshot>;
+}
+
+export function profileDomainKey(domain: ProfileDomain): string {
+  return `device:${domain}`;
 }
 
 export interface CompiledTrigger {
@@ -169,7 +180,7 @@ export interface CompiledMapping {
 }
 
 export interface CompiledActiveProfile {
-  keyboardType: number;
+  deviceId: string;
   profileId: string;
   global: CompiledMapping[];
   applications: Record<string, CompiledMapping[]>;
@@ -195,11 +206,11 @@ export interface RawProfilesAPI {
   load(): Promise<ProfilesSnapshot>;
   reload(): Promise<ProfilesSnapshot>;
   snapshot(): Promise<ProfilesSnapshot>;
-  create(keyboardType: number, draft: ProfileDraft): Promise<ProfilesSnapshot>;
-  update(keyboardType: number, profileId: string, draft: ProfileDraft): Promise<ProfilesSnapshot>;
-  remove(keyboardType: number, profileId: string): Promise<ProfilesSnapshot>;
-  activate(keyboardType: number, profileId: string): Promise<ProfilesSnapshot>;
-  deactivate(keyboardType: number): Promise<ProfilesSnapshot>;
+  create(domain: ProfileDomain, draft: ProfileDraft): Promise<ProfilesSnapshot>;
+  update(domain: ProfileDomain, profileId: string, draft: ProfileDraft): Promise<ProfilesSnapshot>;
+  remove(domain: ProfileDomain, profileId: string): Promise<ProfilesSnapshot>;
+  activate(domain: ProfileDomain, profileId: string): Promise<ProfilesSnapshot>;
+  deactivate(domain: ProfileDomain): Promise<ProfilesSnapshot>;
   onEvent(handler: (event: ProfileEvent) => void): () => void;
 }
 

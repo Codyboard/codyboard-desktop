@@ -26,9 +26,11 @@ import type {
   CodyboardPermission,
   CompiledOutput,
   HIDListOptions,
+  ProfileDomain,
   ProfileDraft,
   ProfileEvent,
 } from '../shared/hid.js';
+import { profileDomainKey } from '../shared/hid.js';
 
 import { CodyboardDaemonClient } from './codyboard-daemon-client.js';
 import { ProfileCoordinator } from './profile-coordinator.js';
@@ -231,8 +233,8 @@ function showSettings(route = '/'): void {
   settingsWindow.focus();
 }
 
-function deviceKeyboardType(device: SupportedDevice): number | undefined {
-  return device.hid.type ?? device.keyboardType;
+function deviceProfileDomain(device: SupportedDevice): ProfileDomain {
+  return device.hid.id;
 }
 
 function deviceSettingsRoute(device: SupportedDevice): string {
@@ -243,11 +245,10 @@ async function setDeviceProfile(
   device: SupportedDevice,
   profileId?: string,
 ): Promise<void> {
-  const keyboardType = deviceKeyboardType(device);
-  if (keyboardType === undefined) return;
+  const domain = deviceProfileDomain(device);
   try {
-    if (profileId) await profiles.activate(keyboardType, profileId);
-    else await profiles.deactivate(keyboardType);
+    if (profileId) await profiles.activate(domain, profileId);
+    else await profiles.deactivate(domain);
   } catch (error) {
     console.error('Unable to change device profile from the tray', error);
   }
@@ -264,10 +265,8 @@ async function buildTrayMenu(): Promise<Menu> {
   const snapshot = profiles.snapshot();
   const deviceItems: Electron.MenuItemConstructorOptions[] = connectedDevices.map(
     (device) => {
-      const keyboardType = deviceKeyboardType(device);
-      const keyboard = keyboardType === undefined
-        ? undefined
-        : snapshot.keyboards[String(keyboardType)];
+      const domain = deviceProfileDomain(device);
+      const keyboard = snapshot.keyboards[profileDomainKey(domain)];
       const profileItems: Electron.MenuItemConstructorOptions[] =
         keyboard?.profiles.map((profile) => ({
           label: profile.id === 'default' ? 'Default' : profile.name,
@@ -286,7 +285,7 @@ async function buildTrayMenu(): Promise<Menu> {
             label: 'Inactivated',
             type: 'checkbox',
             checked: !keyboard?.activeProfile,
-            enabled: keyboardType !== undefined,
+            enabled: true,
             click: () => void setDeviceProfile(device),
           },
           { type: 'separator' },
@@ -357,7 +356,7 @@ ipcMain.handle('keyboard:send', (_event, output: CompiledOutput) =>
 ipcMain.handle('diagnostics:set', async (_event, keyboardType?: number) => {
   if (
     keyboardType !== undefined &&
-    (!Number.isInteger(keyboardType) || keyboardType < -1)
+    (!Number.isInteger(keyboardType) || keyboardType < 0)
   ) {
     throw new Error('Invalid keyboard type');
   }
@@ -385,22 +384,22 @@ ipcMain.handle(
 ipcMain.handle('profiles:load', () => profiles.load());
 ipcMain.handle('profiles:reload', () => profiles.reload());
 ipcMain.handle('profiles:snapshot', () => profiles.snapshot());
-ipcMain.handle('profiles:create', (_event, type: number, draft: ProfileDraft) =>
-  profiles.create(type, draft),
+ipcMain.handle('profiles:create', (_event, domain: ProfileDomain, draft: ProfileDraft) =>
+  profiles.create(domain, draft),
 );
 ipcMain.handle(
   'profiles:update',
-  (_event, type: number, id: string, draft: ProfileDraft) =>
-    profiles.update(type, id, draft),
+  (_event, domain: ProfileDomain, id: string, draft: ProfileDraft) =>
+    profiles.update(domain, id, draft),
 );
-ipcMain.handle('profiles:remove', (_event, type: number, id: string) =>
-  profiles.remove(type, id),
+ipcMain.handle('profiles:remove', (_event, domain: ProfileDomain, id: string) =>
+  profiles.remove(domain, id),
 );
-ipcMain.handle('profiles:activate', (_event, type: number, id: string) =>
-  profiles.activate(type, id),
+ipcMain.handle('profiles:activate', (_event, domain: ProfileDomain, id: string) =>
+  profiles.activate(domain, id),
 );
-ipcMain.handle('profiles:deactivate', (_event, type: number) =>
-  profiles.deactivate(type),
+ipcMain.handle('profiles:deactivate', (_event, domain: ProfileDomain) =>
+  profiles.deactivate(domain),
 );
 
 profiles.on('event', publishProfileEvent);

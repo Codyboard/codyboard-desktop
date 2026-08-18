@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useState, type PointerEvent } from "re
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { getDeviceDefinition } from "../../shared/device-catalog";
-import type { HIDDeviceInfo } from "../../shared/hid";
+import { profileDomainKey, type HIDDeviceInfo } from "../../shared/hid";
 import { Device } from "../components/devices/Device";
 import {
   DeviceButtonMappings,
   SWEEP_PRO_CONTROLS,
   SWEEP_PRO_DEFAULT_PROFILE,
   XIAOMI_REMOTE_CONTROLS,
+  XIAOMI_REMOTE_DEFAULT_PROFILE,
 } from "../components/devices/DeviceButtonMappings";
 import { SweepPro, type SweepProKey, type SweepProKeyPressEvent } from "../components/devices/SweepPro";
 import { XiaomiRemote, type XiaomiRemoteKey, type XiaomiRemoteKeyPressEvent } from "../components/devices/XiaomiRemote";
@@ -20,8 +21,6 @@ export function DeviceDetailPage() {
   const [searchParameters] = useSearchParams();
   const definition = getDeviceDefinition(searchParameters.get("model"));
   const [hid, setHid] = useState<HIDDeviceInfo>();
-  const [detectedKeyCode, setDetectedKeyCode] = useState<number>();
-  const [detectedKeyboardType, setDetectedKeyboardType] = useState<number>();
   const [selectedSweepProKey, setSelectedSweepProKey] = useState<SweepProKey>();
   const [selectedXiaomiKey, setSelectedXiaomiKey] = useState<XiaomiRemoteKey>();
 
@@ -37,51 +36,18 @@ export function DeviceDetailPage() {
 
   const deviceName = hid?.product?.trim() || definition?.name || "Device";
   const isSweepPro = definition?.model === "sweep-pro";
-  const keyboardType = hid?.type ?? detectedKeyboardType ?? definition?.keyboardType;
-  const diagnosticKeyboardType = isSweepPro && keyboardType === undefined ? -1 : keyboardType;
+  const profileDomain = hid?.id ?? deviceId;
+  const keyboardType = hid?.type ?? definition?.keyboardType;
 
   useEffect(() => {
-    if (diagnosticKeyboardType === undefined) return;
-
-    const enterSettingMode = () => {
-      void window.codyboard.diagnostics.setKeyboardType(diagnosticKeyboardType).catch((error: unknown) => {
-        console.error("Unable to enter device setting mode", error);
-      });
-    };
-    const leaveSettingMode = () => {
-      void window.codyboard.diagnostics.setKeyboardType().catch((error: unknown) => {
-        console.error("Unable to leave device setting mode", error);
-      });
-    };
-
-    window.addEventListener("focus", enterSettingMode);
-    window.addEventListener("blur", leaveSettingMode);
-    if (document.hasFocus()) enterSettingMode();
-
-    return () => {
-      window.removeEventListener("focus", enterSettingMode);
-      window.removeEventListener("blur", leaveSettingMode);
-      leaveSettingMode();
-    };
-  }, [diagnosticKeyboardType]);
-
-  useEffect(() => {
-    if (!isSweepPro || keyboardType === undefined) return;
     void window.codyboard.profiles.snapshot().then(async (snapshot) => {
-      if (snapshot.keyboards[String(keyboardType)]?.profiles.length) return;
-      await window.codyboard.profiles.create(keyboardType, SWEEP_PRO_DEFAULT_PROFILE);
+      if (snapshot.keyboards[profileDomainKey(profileDomain)]?.profiles.length) return;
+      await window.codyboard.profiles.create(
+        profileDomain,
+        isSweepPro ? SWEEP_PRO_DEFAULT_PROFILE : XIAOMI_REMOTE_DEFAULT_PROFILE,
+      );
     }).catch((error: unknown) => console.error("Unable to create Sweep Pro profile", error));
-  }, [isSweepPro, keyboardType]);
-
-  useEffect(() => {
-    if (!isSweepPro) return;
-    return window.codyboard.diagnostics.onKey((event) => {
-      if (event.source !== "keyCode") return;
-      if (![0, 1, 2, 3, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 17].includes(event.code)) return;
-      setDetectedKeyCode(event.code);
-      setDetectedKeyboardType(event.keyboardType);
-    });
-  }, [isSweepPro]);
+  }, [isSweepPro, profileDomain]);
 
   const onKeyPress = useCallback((event: XiaomiRemoteKeyPressEvent) => {
     if (event.phase === "down") setSelectedXiaomiKey(event.key);
@@ -104,7 +70,7 @@ export function DeviceDetailPage() {
   return (
     <main className="device-detail-page" onPointerDown={deselectOnOutsidePointerDown}>
       <AppToolbar
-        actions={<ProfileSwitcher keyboardType={keyboardType} />}
+        actions={<ProfileSwitcher profileDomain={profileDomain} />}
         backTo="/"
         className="detail-toolbar"
         title={deviceName}
@@ -116,15 +82,15 @@ export function DeviceDetailPage() {
         <aside className="device-detail-panel" aria-label={`${deviceName} settings`}>
           {isSweepPro && (
             <p className="mapping-device-identity">
-              <span>Detected input</span>
-              <code>type {detectedKeyboardType ?? "waiting"} · keyCode {detectedKeyCode ?? "—"}</code>
+              <span>Physical HID</span>
+              <code>{hid?.id ?? deviceId}</code>
             </p>
           )}
           {definition?.model === "sweep-pro"
             ? (
                 <DeviceButtonMappings
                   controls={SWEEP_PRO_CONTROLS}
-                  keyboardType={keyboardType}
+                  profileDomain={profileDomain}
                   onSelectKey={setSelectedSweepProKey}
                   selectedKey={selectedSweepProKey}
                 />
@@ -132,7 +98,7 @@ export function DeviceDetailPage() {
             : (
                 <DeviceButtonMappings
                   controls={XIAOMI_REMOTE_CONTROLS}
-                  keyboardType={keyboardType}
+                  profileDomain={profileDomain}
                   onSelectKey={setSelectedXiaomiKey}
                   selectedKey={selectedXiaomiKey}
                 />

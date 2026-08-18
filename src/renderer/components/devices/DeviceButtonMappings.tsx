@@ -63,7 +63,9 @@ import type {
   MappingOutput,
   ProfileDraft,
   ProfilesSnapshot,
+  ProfileDomain,
 } from "../../../shared/hid";
+import { profileDomainKey } from "../../../shared/hid";
 import {
   mappingOutputSignature,
   removeProfileMappingOverride,
@@ -234,20 +236,34 @@ export const SWEEP_PRO_DEFAULT_PROFILE: ProfileDraft = {
     })),
     scope: { kind: "global" },
   }],
-  id: "sweep-pro",
+  id: "default",
   name: "Sweep Pro Default",
+};
+
+export const XIAOMI_REMOTE_DEFAULT_PROFILE: ProfileDraft = {
+  groups: [{
+    id: "global",
+    mappings: XIAOMI_REMOTE_CONTROLS.map((control) => ({
+      from: control.input,
+      id: `global-${control.key.toLowerCase()}`,
+      to: { kind: "passthrough" },
+    })),
+    scope: { kind: "global" },
+  }],
+  id: "default",
+  name: "Xiaomi Presenter Default",
 };
 
 interface DeviceButtonMappingsProps<Key extends string> {
   controls: readonly DeviceControl<Key>[];
-  keyboardType?: number;
+  profileDomain?: ProfileDomain;
   onSelectKey?: (key: Key) => void;
   selectedKey?: Key;
 }
 
 export function DeviceButtonMappings<Key extends string>({
   controls,
-  keyboardType,
+  profileDomain,
   onSelectKey,
   selectedKey,
 }: DeviceButtonMappingsProps<Key>) {
@@ -279,9 +295,9 @@ export function DeviceButtonMappings<Key extends string>({
     rowReferences.current[selectedKey]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [selectedKey]);
 
-  const activeProfile = keyboardType === undefined
+  const activeProfile = profileDomain === undefined
     ? undefined
-    : snapshot?.keyboards[String(keyboardType)]?.activeProfile;
+    : snapshot?.keyboards[profileDomainKey(profileDomain)]?.activeProfile;
   const applicationGroups = useMemo(
     () => activeProfile?.groups.filter(({ scope }) => scope.kind === "application") ?? [],
     [activeProfile],
@@ -301,7 +317,7 @@ export function DeviceButtonMappings<Key extends string>({
 
   useEffect(() => {
     setSelectedScopeId("global");
-  }, [activeProfile?.id, keyboardType]);
+  }, [activeProfile?.id, profileDomain]);
 
   useEffect(() => {
     let mounted = true;
@@ -324,7 +340,7 @@ export function DeviceButtonMappings<Key extends string>({
   const isApplicationScope = selectedGroup?.scope.kind === "application";
 
   const saveOutput = async (control: DeviceControl<Key>, output: MappingOutput) => {
-    if (keyboardType === undefined || !activeProfile || !selectedGroup) return;
+    if (profileDomain === undefined || !activeProfile || !selectedGroup) return;
     setError(undefined);
     setSavingKey(control.key);
     try {
@@ -334,7 +350,7 @@ export function DeviceButtonMappings<Key extends string>({
         id: resolution.override?.id ?? mappingIdFor(selectedGroup.id, control.key, activeProfile),
         to: output,
       });
-      setSnapshot(await window.codyboard.profiles.update(keyboardType, activeProfile.id, draft));
+      setSnapshot(await window.codyboard.profiles.update(profileDomain, activeProfile.id, draft));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -344,12 +360,12 @@ export function DeviceButtonMappings<Key extends string>({
   };
 
   const resetOutput = async (control: DeviceControl<Key>) => {
-    if (keyboardType === undefined || !activeProfile || !selectedGroup || !isApplicationScope) return;
+    if (profileDomain === undefined || !activeProfile || !selectedGroup || !isApplicationScope) return;
     setError(undefined);
     setSavingKey(control.key);
     try {
       const draft = removeProfileMappingOverride(activeProfile, selectedGroup.id, control.input);
-      setSnapshot(await window.codyboard.profiles.update(keyboardType, activeProfile.id, draft));
+      setSnapshot(await window.codyboard.profiles.update(profileDomain, activeProfile.id, draft));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -363,7 +379,7 @@ export function DeviceButtonMappings<Key extends string>({
       setSelectedScopeId(scopeId);
       return;
     }
-    if (keyboardType === undefined || !activeProfile) return;
+    if (profileDomain === undefined || !activeProfile) return;
     setError(undefined);
     setSavingScope(true);
     try {
@@ -380,7 +396,7 @@ export function DeviceButtonMappings<Key extends string>({
       const draft = structuredClone(activeProfile);
       const groupId = applicationGroupId(info.bundleId, draft);
       draft.groups.push({ id: groupId, mappings: [], scope: { bundleId: info.bundleId, kind: "application" } });
-      setSnapshot(await window.codyboard.profiles.update(keyboardType, activeProfile.id, draft));
+      setSnapshot(await window.codyboard.profiles.update(profileDomain, activeProfile.id, draft));
       setSelectedScopeId(groupId);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -471,8 +487,8 @@ export function DeviceButtonMappings<Key extends string>({
         <p>Choose an action, then record a shortcut or select an application. Press <strong>Backspace</strong> to block the button safely.</p>
       </div>
 
-      {keyboardType === undefined && <PanelNotice>Keyboard Type is unavailable for this device.</PanelNotice>}
-      {keyboardType !== undefined && snapshot && !activeProfile && <PanelNotice>Activate a profile to edit its buttons.</PanelNotice>}
+      {profileDomain === undefined && <PanelNotice>Profile identity is unavailable for this device.</PanelNotice>}
+      {profileDomain !== undefined && snapshot && !activeProfile && <PanelNotice>Activate a profile to edit its buttons.</PanelNotice>}
       {error && <PanelNotice tone="error">{error}</PanelNotice>}
 
       <div className="mapping-list">

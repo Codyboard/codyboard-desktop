@@ -6,11 +6,20 @@ final class ProfileRuntimeTests: XCTestCase {
     private let globalOutput = CompiledOutput(kind: "keyboard", code: 37, modifiers: [])
     private let appOutput = CompiledOutput(kind: "keyboard", code: 11, modifiers: ["command"])
 
+    func testSweepProLetterUsagesCoverAllVisibleKeys() {
+        let usages: [UInt32] = [
+            0x17, 0x0A, 0x05, 0x15, 0x09, 0x19, 0x08, 0x07,
+            0x06, 0x1A, 0x16, 0x1B, 0x14, 0x04, 0x1D,
+        ]
+        XCTAssertTrue(usages.allSatisfy { PhysicalKeyboardHIDMonitor.keyCodes[$0] != nil })
+        XCTAssertEqual(PhysicalKeyboardHIDMonitor.keyCodes[0x14], 12)
+    }
+
     func testApplicationMappingOverridesGlobal() {
         let runtime = ProfileRuntime()
-        runtime.replace(CompiledProfileSet(generation: 1, profiles: [profile(type: 40)]))
+        runtime.replace(CompiledProfileSet(generation: 1, profiles: [profile(deviceId: "0x100004baa")]))
         guard case .output(let output) = runtime.resolve(
-            trigger: left, keyboardType: 40, bundleIdentifier: "com.openai.codex"
+            trigger: left, deviceId: "0x100004baa", bundleIdentifier: "com.openai.codex"
         ) else { return XCTFail("Expected an application mapping") }
         XCTAssertEqual(output.code, 11)
         XCTAssertEqual(output.modifiers, ["command"])
@@ -18,22 +27,26 @@ final class ProfileRuntimeTests: XCTestCase {
 
     func testGlobalFallback() {
         let runtime = ProfileRuntime()
-        runtime.replace(CompiledProfileSet(generation: 1, profiles: [profile(type: 40)]))
+        runtime.replace(CompiledProfileSet(generation: 1, profiles: [profile(deviceId: "0x100004baa")]))
         guard case .output(let output) = runtime.resolve(
-            trigger: left, keyboardType: 40, bundleIdentifier: "com.apple.TextEdit"
+            trigger: left, deviceId: "0x100004baa", bundleIdentifier: "com.apple.TextEdit"
         ) else { return XCTFail("Expected a global mapping") }
         XCTAssertEqual(output.code, 37)
     }
 
-    func testUntypedSystemEventIsAmbiguousAcrossProfiles() {
+    func testDeviceProfileResolvesByDeviceId() {
         let runtime = ProfileRuntime()
-        let trigger = CompiledTrigger(kind: "system", code: 0, modifiers: [])
-        let mapping = CompiledMapping(id: "volume", trigger: trigger, output: globalOutput)
-        let first = CompiledActiveProfile(keyboardType: 40, profileId: "one", global: [mapping], applications: [:])
-        let second = CompiledActiveProfile(keyboardType: 41, profileId: "two", global: [mapping], applications: [:])
-        runtime.replace(CompiledProfileSet(generation: 1, profiles: [first, second]))
-        guard case .ambiguous = runtime.resolve(trigger: trigger, keyboardType: nil, bundleIdentifier: nil)
-        else { return XCTFail("Expected ambiguity") }
+        runtime.replace(CompiledProfileSet(generation: 1, profiles: [
+            CompiledActiveProfile(
+                deviceId: "vid-1d50-pid-615e", profileId: "default",
+                global: [CompiledMapping(id: "global", trigger: left, output: globalOutput)],
+                applications: [:]
+            )
+        ]))
+        guard case .output(let output) = runtime.resolve(
+            trigger: left, deviceId: "vid-1d50-pid-615e", bundleIdentifier: nil
+        ) else { return XCTFail("Expected a device mapping") }
+        XCTAssertEqual(output.code, 37)
     }
 
     func testLaunchApplicationOutputDecodesBundleIdentifier() throws {
@@ -59,9 +72,9 @@ final class ProfileRuntimeTests: XCTestCase {
         XCTAssertEqual(output.code, 63)
     }
 
-    private func profile(type: Int) -> CompiledActiveProfile {
+    private func profile(deviceId: String) -> CompiledActiveProfile {
         CompiledActiveProfile(
-            keyboardType: type,
+            deviceId: deviceId,
             profileId: "presenter",
             global: [CompiledMapping(id: "global", trigger: left, output: globalOutput)],
             applications: ["com.openai.codex": [CompiledMapping(id: "app", trigger: left, output: appOutput)]]
