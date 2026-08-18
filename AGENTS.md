@@ -8,6 +8,14 @@
 - The Husky pre-commit hook runs `lint-staged`; keep staged JavaScript and TypeScript files auto-fixable by ESLint.
 - Before handing off implementation changes, run `pnpm lint`, `pnpm test`, `pnpm test:native`, and `pnpm build` unless the change clearly cannot affect that layer.
 
+## Documentation
+
+- Keep `README.md` user-facing and accurate for the latest released behavior. Do not expose internal implementation identifiers unless they help users build or diagnose the app.
+- Store repository screenshots under `docs/screenshots/` with descriptive kebab-case names. Never reference clipboard, `/tmp`, or other machine-local paths from committed Markdown.
+- Verify screenshot dimensions and visible content before committing. Do not add blank, corrupted, secret-bearing, or user-identifying screenshots.
+- Use repository-relative image paths so screenshots render on GitHub and in local Markdown viewers.
+- When commands, permissions, supported hardware, or profile storage change, update the corresponding README section in the same change.
+
 ## Architecture
 
 - The desktop shell is Electron + React + TypeScript. It normally runs headless with a system tray; the tray menu contains Settings and Quit.
@@ -46,3 +54,12 @@
 - On a genuinely fresh installation, seed the bundled active type 40 default profile once. Never recreate it after the user has established settings or a profiles directory.
 - With no active profiles, the Swift daemon must not create an Event Tap or request Accessibility permission.
 - Keep default mappings in `resources/default-config`; do not hardcode experiment mappings in Swift or React.
+
+## Releases
+
+- Use semantic versioning from the `version` field in `package.json`. New backward-compatible actions or substantial capabilities increment the minor version; fixes increment the patch version.
+- `pnpm package:mac` produces the Apple Silicon application at `release/Codyboard.app`. The entire `release/` directory is generated and ignored; never commit packaged applications or archives.
+- The current package script performs ad-hoc signing, not Apple notarization. Do not describe a build as notarized unless a notarization workflow is added and verified.
+- Before tagging a release, run `pnpm lint`, `pnpm test`, `pnpm test:native`, and `pnpm package:mac`.
+- Verify `CFBundleShortVersionString`, `CFBundleVersion`, and `codesign --verify --deep --strict` on the packaged application before publishing it.
+- Create annotated tags named `v{version}` and attach a versioned arm64 ZIP to the GitHub Release. Record the archive SHA-256 in the release handoff.
