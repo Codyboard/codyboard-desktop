@@ -20,10 +20,10 @@ import {
   Dock,
   FastForward,
   GalleryVerticalEnd,
-  Globe2,
   Home,
   Keyboard,
   KeyboardOff,
+  Link2,
   LockKeyhole,
   Menu,
   Minus,
@@ -46,6 +46,7 @@ import {
   StickyNote,
   SunDim,
   SunMedium,
+  Trash2,
   Tv,
   Undo2,
   Volume1,
@@ -55,6 +56,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 
 import type {
   CodyboardApplicationInfo,
@@ -68,6 +70,7 @@ import type {
 import { profileDomainKey } from "../../../shared/hid";
 import {
   mappingOutputSignature,
+  removeApplicationMappingGroup,
   removeProfileMappingOverride,
   resolveProfileMapping,
   setProfileMapping,
@@ -309,8 +312,12 @@ export function DeviceButtonMappings<Key extends string>({
   const [applicationInfo, setApplicationInfo] = useState<Record<string, CodyboardApplicationInfo>>({});
   const [snapshot, setSnapshot] = useState<ProfilesSnapshot>();
   const [recordingKey, setRecordingKey] = useState<Key>();
+  const [editingURLKey, setEditingURLKey] = useState<Key>();
+  const [urlDraft, setURLDraft] = useState("");
   const [savingKey, setSavingKey] = useState<Key>();
   const [savingScope, setSavingScope] = useState(false);
+  const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
+  const [scopePendingRemovalId, setScopePendingRemovalId] = useState<string>();
   const [selectedScopeId, setSelectedScopeId] = useState("global");
   const [error, setError] = useState<string>();
   const rowReferences = useRef<Partial<Record<Key, HTMLElement | null>>>({});
@@ -353,10 +360,24 @@ export function DeviceButtonMappings<Key extends string>({
   }, [activeProfile]);
   const selectedGroup = activeProfile?.groups.find(({ id }) => id === selectedScopeId)
     ?? activeProfile?.groups.find(({ scope }) => scope.kind === "global");
+  const scopePendingRemoval = activeProfile?.groups.find(({ id }) => id === scopePendingRemovalId);
+  const scopePendingRemovalName = scopePendingRemoval?.scope.kind === "application"
+    ? applicationInfo[scopePendingRemoval.scope.bundleId]?.name ?? scopePendingRemoval.scope.bundleId
+    : undefined;
 
   useEffect(() => {
     setSelectedScopeId("global");
+    setScopePendingRemovalId(undefined);
   }, [activeProfile?.id, profileDomain]);
+
+  useEffect(() => {
+    if (!scopePendingRemovalId) return;
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape" && !savingScope) setScopePendingRemovalId(undefined);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [savingScope, scopePendingRemovalId]);
 
   useEffect(() => {
     let mounted = true;
@@ -452,6 +473,28 @@ export function DeviceButtonMappings<Key extends string>({
     }
   };
 
+  const requestApplicationScopeRemoval = (groupId: string) => {
+    setError(undefined);
+    setScopeMenuOpen(false);
+    setScopePendingRemovalId(groupId);
+  };
+
+  const removeApplicationScope = async () => {
+    if (profileDomain === undefined || !activeProfile || scopePendingRemoval?.scope.kind !== "application") return;
+    setError(undefined);
+    setSavingScope(true);
+    try {
+      const draft = removeApplicationMappingGroup(activeProfile, scopePendingRemoval.id);
+      setSnapshot(await window.codyboard.profiles.update(profileDomain, activeProfile.id, draft));
+      if (selectedScopeId === scopePendingRemoval.id) setSelectedScopeId("global");
+      setScopePendingRemovalId(undefined);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSavingScope(false);
+    }
+  };
+
   const chooseApplicationForControl = async (control: DeviceControl<Key>) => {
     setError(undefined);
     try {
@@ -465,17 +508,51 @@ export function DeviceButtonMappings<Key extends string>({
   };
 
   const beginKeyRecording = (control: DeviceControl<Key>) => {
+    setEditingURLKey(undefined);
+    setURLDraft("");
     setRecordingKey(control.key);
     requestAnimationFrame(() => {
       rowReferences.current[control.key]?.querySelector<HTMLInputElement>("input")?.focus();
     });
   };
 
+  const beginURLEditing = (control: DeviceControl<Key>) => {
+    const output = activeProfile && selectedGroup
+      ? resolveProfileMapping(activeProfile, selectedGroup, control.input).effective?.to
+      : undefined;
+    setRecordingKey(undefined);
+    setURLDraft(output?.kind === "openURL" ? output.url : "");
+    setEditingURLKey(control.key);
+    requestAnimationFrame(() => {
+      rowReferences.current[control.key]?.querySelector<HTMLInputElement>(".open-url-value")?.focus();
+    });
+  };
+
+  const commitURL = async (control: DeviceControl<Key>) => {
+    if (editingURLKey !== control.key) return;
+    const url = urlDraft.trim();
+    if (!url) return;
+    try {
+      if (!new URL(url).protocol) throw new Error();
+    } catch {
+      setError("Enter an absolute URL including its scheme, such as https:// or file://.");
+      return;
+    }
+    setEditingURLKey(undefined);
+    await saveOutput(control, { kind: "openURL", url });
+  };
+
   const changeAction = async (control: DeviceControl<Key>, action: string) => {
     if (action === "unchanged") {
+      setEditingURLKey(undefined);
+      setURLDraft("");
       await resetOutput(control);
     } else if (action === "launch") {
+      setEditingURLKey(undefined);
+      setURLDraft("");
       await chooseApplicationForControl(control);
+    } else if (action === "open-url") {
+      beginURLEditing(control);
     } else {
       beginKeyRecording(control);
     }
@@ -492,7 +569,9 @@ export function DeviceButtonMappings<Key extends string>({
           <span>Configure for</span>
           <Select
             disabled={!activeProfile || savingScope}
+            onOpenChange={setScopeMenuOpen}
             onValueChange={(value) => void changeScope(value)}
+            open={scopeMenuOpen}
             value={selectedScopeId}
           >
             <SelectTrigger
@@ -506,23 +585,43 @@ export function DeviceButtonMappings<Key extends string>({
                       info={applicationInfo[selectedGroup.scope.bundleId]}
                     />
                   )
-                : <span className="application-select-identity"><Globe2 aria-hidden="true" /><span>Global</span></span>}
+                : <span>Global</span>}
             </SelectTrigger>
             <SelectContent align="end" className="mapping-scope-menu">
               <SelectItem value="global">
-                <span className="application-select-identity"><Globe2 aria-hidden="true" /><span>Global</span></span>
+                <span>Global</span>
               </SelectItem>
               {applicationGroups.map((group) => {
                 const bundleId = group.scope.kind === "application" ? group.scope.bundleId : "";
+                const applicationName = applicationInfo[bundleId]?.name ?? bundleId;
                 return (
-                  <SelectItem key={group.id} value={group.id}>
-                    <ApplicationIdentity bundleId={bundleId} info={applicationInfo[bundleId]} />
-                  </SelectItem>
+                  <div className="mapping-scope-application-option" key={group.id}>
+                    <SelectItem value={group.id}>
+                      <ApplicationIdentity bundleId={bundleId} info={applicationInfo[bundleId]} />
+                    </SelectItem>
+                    <button
+                      aria-label={`Remove ${applicationName} specification`}
+                      className="select-row-remove"
+                      disabled={savingScope}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        requestApplicationScopeRemoval(group.id);
+                      }}
+                      onPointerDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      type="button"
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </button>
+                  </div>
                 );
               })}
               <SelectSeparator />
-              <SelectItem className="is-add-application" value="__add_application__">
-                <span className="application-select-identity"><Plus aria-hidden="true" /><span>Add Specific Application…</span></span>
+              <SelectItem className="is-add-application mapping-scope-action" value="__add_application__">
+                <Plus aria-hidden="true" />
+                <span>Add Specific Application…</span>
               </SelectItem>
             </SelectContent>
           </Select>
@@ -547,15 +646,21 @@ export function DeviceButtonMappings<Key extends string>({
           const override = resolution.override;
           const isInherited = Boolean(isApplicationScope && !override);
           const launchOutput = !isRecording && mapping?.to.kind === "launchApplication" ? mapping.to : undefined;
+          const openURLOutput = !isRecording && mapping?.to.kind === "openURL" ? mapping.to : undefined;
+          const isEditingURL = editingURLKey === control.key;
           const launchApplication = launchOutput ? applicationInfo[launchOutput.bundleId] : undefined;
           const selectedOutputOption = mapping ? KEY_OUTPUT_OPTIONS_BY_SIGNATURE.get(mappingOutputSignature(mapping.to)) : undefined;
           const SelectedOutputIcon = selectedOutputOption?.icon;
           const actionValue = isRecording
             ? "keystroke"
+            : isEditingURL
+              ? "open-url"
             : isInherited
               ? "unchanged"
               : launchOutput
                 ? "launch"
+                : openURLOutput || isEditingURL
+                  ? "open-url"
                 : "keystroke";
           return (
             <article
@@ -594,10 +699,11 @@ export function DeviceButtonMappings<Key extends string>({
                     {isApplicationScope && <SelectSeparator />}
                     <SelectItem value="keystroke">Key Press</SelectItem>
                     <SelectItem value="launch">Launch Application</SelectItem>
+                    <SelectItem value="open-url">Open URL</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {launchOutput
+              {launchOutput && !isEditingURL
                 ? (
                     <div className="launch-application-picker">
                       <button
@@ -623,7 +729,58 @@ export function DeviceButtonMappings<Key extends string>({
                       </button>
                     </div>
                   )
-                : (
+                : openURLOutput || isEditingURL
+                  ? (
+                      <div className="open-url-picker">
+                        <Link2 aria-hidden="true" className="open-url-icon" />
+                        <input
+                          aria-label={`${control.label} URL`}
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          className="open-url-value"
+                          disabled={!activeProfile || isSaving}
+                          onBlur={() => void commitURL(control)}
+                          onChange={(event) => {
+                            if (!isEditingURL) setEditingURLKey(control.key);
+                            setURLDraft(event.target.value);
+                          }}
+                          onFocus={() => {
+                            if (!isEditingURL) {
+                              setURLDraft(openURLOutput?.url ?? "");
+                              setEditingURLKey(control.key);
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") event.currentTarget.blur();
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setEditingURLKey(undefined);
+                              setURLDraft("");
+                            }
+                          }}
+                          placeholder="https://, file://, or another URL"
+                          spellCheck={false}
+                          value={isEditingURL ? urlDraft : openURLOutput?.url ?? ""}
+                        />
+                        {(openURLOutput || urlDraft) && (
+                          <button
+                            aria-label={`Clear ${control.label} URL`}
+                            className="mapping-value-clear"
+                            disabled={!activeProfile || isSaving}
+                            onClick={() => {
+                              setEditingURLKey(undefined);
+                              setURLDraft("");
+                              void saveOutput(control, { kind: "suppress" });
+                            }}
+                            onPointerDown={(event) => event.preventDefault()}
+                            type="button"
+                          >
+                            <X aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
+                    )
+                  : (
                     <label className="keystroke-recorder">
                       <span className="key-press-combobox">
                         {SelectedOutputIcon && (
@@ -685,11 +842,50 @@ export function DeviceButtonMappings<Key extends string>({
                         </span>
                       </span>
                     </label>
-                  )}
+                    )}
             </article>
           );
         })}
       </div>
+      {scopePendingRemoval?.scope.kind === "application" && createPortal(
+        <div
+          className="profile-dialog-backdrop"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target && !savingScope) setScopePendingRemovalId(undefined);
+          }}
+        >
+          <section aria-labelledby="remove-scope-dialog-title" aria-modal="true" className="profile-dialog" role="dialog">
+            <button
+              aria-label="Close"
+              className="profile-dialog-close"
+              disabled={savingScope}
+              onClick={() => setScopePendingRemovalId(undefined)}
+              type="button"
+            >
+              <X aria-hidden="true" />
+            </button>
+            <div>
+              <span className="profile-dialog-eyebrow">Application specification</span>
+              <h2 id="remove-scope-dialog-title">Remove {scopePendingRemovalName}?</h2>
+              <p>This removes every button override for this application. Your Global mappings will remain unchanged.</p>
+              {error && <p className="profile-dialog-error" role="alert">{error}</p>}
+              <div className="profile-dialog-actions">
+                <button disabled={savingScope} onClick={() => setScopePendingRemovalId(undefined)} type="button">Cancel</button>
+                <button
+                  autoFocus
+                  className="is-destructive"
+                  disabled={savingScope}
+                  onClick={() => void removeApplicationScope()}
+                  type="button"
+                >
+                  {savingScope ? "Removing…" : "Remove Specification"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>,
+        document.body,
+      )}
     </section>
   );
 }
@@ -731,6 +927,7 @@ function describeOutput(output: MappingOutput | undefined): string {
   if (output.kind === "suppress") return "No action";
   if (output.kind === "passthrough") return "Pass through";
   if (output.kind === "launchApplication") return output.bundleId;
+  if (output.kind === "openURL") return output.url;
   if (output.kind === "modifier") return output.key === "capsLock" ? "Caps Lock" : MODIFIER_GLYPHS[output.key];
   if (output.kind === "system") return output.key ?? `System ${output.systemCode}`;
   const modifiers = (output.modifiers ?? []).map((modifier) => MODIFIER_GLYPHS[modifier]);
@@ -752,6 +949,9 @@ export function mappingPreviewForControl<Key extends string>(
       label: application?.name ?? output.bundleId,
     };
   }
+  if (output.kind === "openURL") {
+    return { icon: Link2, kind: "key", label: output.url };
+  }
   if (output.kind === "passthrough") {
     const input = control.input;
     if (input.kind === "hidUsage") return undefined;
@@ -760,7 +960,7 @@ export function mappingPreviewForControl<Key extends string>(
   return keyPreview(output);
 }
 
-function keyPreview(output: Exclude<MappingOutput, { kind: "launchApplication" | "passthrough" | "suppress" }>): DeviceMappingPreview {
+function keyPreview(output: Exclude<MappingOutput, { kind: "launchApplication" | "openURL" | "passthrough" | "suppress" }>): DeviceMappingPreview {
   const option = KEY_OUTPUT_OPTIONS_BY_SIGNATURE.get(mappingOutputSignature(output));
   const compact = "modifiers" in output && (output.modifiers?.length ?? 0) > 0;
   return {

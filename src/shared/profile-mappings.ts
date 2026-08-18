@@ -29,6 +29,7 @@ export function mappingOutputSignature(output: MappingOutput): string {
   }
   if (output.kind === "system") return `system:${output.key ?? output.systemCode}`;
   if (output.kind === "launchApplication") return `launchApplication:${output.bundleId}`;
+  if (output.kind === "openURL") return `openURL:${output.url}`;
   return output.kind;
 }
 
@@ -95,6 +96,19 @@ export function removeProfileMappingOverride(
   group.mappings = group.mappings.filter(
     ({ from }) => mappingInputSignature(from) !== signature,
   );
+  return draft;
+}
+
+export function removeApplicationMappingGroup(
+  profile: ProfileDraft,
+  groupId: string,
+): ProfileDraft {
+  const draft = structuredClone(profile);
+  const groupIndex = draft.groups.findIndex(({ id }) => id === groupId);
+  if (groupIndex < 0 || draft.groups[groupIndex].scope.kind !== "application") {
+    throw new Error("Only application specifications can be removed.");
+  }
+  draft.groups.splice(groupIndex, 1);
   return draft;
 }
 

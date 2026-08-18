@@ -62,10 +62,21 @@ const launchApplicationOutputSchema = z.object({
   kind: z.literal("launchApplication"),
   bundleId: z.string().trim().min(1),
 }).strict();
+const openURLOutputSchema = z.object({
+  kind: z.literal("openURL"),
+  url: z.string().trim().min(1).refine((value) => {
+    try {
+      return Boolean(new URL(value).protocol);
+    } catch {
+      return false;
+    }
+  }, "must be an absolute URL with a scheme"),
+}).strict();
 const outputSchema = z.union([
   keyboardOutputSchema,
   launchApplicationOutputSchema,
   modifierOutputSchema,
+  openURLOutputSchema,
   systemOutputSchema,
   z.object({ kind: z.literal("passthrough") }).strict(),
   z.object({ kind: z.literal("suppress") }).strict()
@@ -147,6 +158,7 @@ function resolveSystem(input: { key?: string; systemCode?: number }): number {
 function compileOutput(output: MappingOutput): CompiledMapping["output"] {
   if (output.kind === "passthrough" || output.kind === "suppress") return { kind: output.kind, modifiers: [] };
   if (output.kind === "launchApplication") return { kind: "launchApplication", bundleId: output.bundleId, modifiers: [] };
+  if (output.kind === "openURL") return { kind: "openURL", modifiers: [], url: output.url };
   if (output.kind === "modifier") {
     return {
       kind: "modifier",

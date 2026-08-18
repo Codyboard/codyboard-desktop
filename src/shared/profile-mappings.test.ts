@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { MappingInput, ProfileDraft } from "./hid";
 import {
+  removeApplicationMappingGroup,
   removeProfileMappingOverride,
   resolveProfileMapping,
   setProfileMapping,
@@ -65,6 +66,17 @@ describe("sparse application mappings", () => {
       to: { key: "b", kind: "keyboard", modifiers: ["command"] },
     });
     expect(removeProfileMappingOverride(overridden, "codex", input).groups[1].mappings).toEqual([]);
+  });
+
+  it("removes an application specification without changing global mappings", () => {
+    const updated = removeApplicationMappingGroup(profile, "codex");
+    expect(updated.groups).toEqual([profile.groups[0]]);
+    expect(profile.groups).toHaveLength(2);
+  });
+
+  it("does not remove the global mapping group", () => {
+    expect(() => removeApplicationMappingGroup(profile, "global"))
+      .toThrow("Only application specifications can be removed.");
   });
 
   it("prunes overrides made redundant by a global change", () => {

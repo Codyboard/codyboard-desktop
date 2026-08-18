@@ -74,6 +74,14 @@ final class ProfileRuntimeTests: XCTestCase {
         XCTAssertNil(output.code)
     }
 
+    func testOpenURLOutputDecodesURL() throws {
+        let data = Data(#"{"kind":"openURL","url":"file:///tmp/demo.pdf","modifiers":[]}"#.utf8)
+        let output = try JSONDecoder().decode(CompiledOutput.self, from: data)
+        XCTAssertEqual(output.kind, "openURL")
+        XCTAssertEqual(output.url, "file:///tmp/demo.pdf")
+        XCTAssertNil(output.code)
+    }
+
     func testLegacyKeyboardOutputDecodesWithoutBundleIdentifier() throws {
         let data = Data(#"{"kind":"keyboard","code":37,"modifiers":[]}"#.utf8)
         let output = try JSONDecoder().decode(CompiledOutput.self, from: data)

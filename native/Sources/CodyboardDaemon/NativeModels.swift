@@ -146,12 +146,17 @@ struct CompiledOutput: Codable {
     let bundleId: String?
     let modifier: String?
     let modifiers: [String]
+    let url: String?
 
-    init(kind: String, code: Int?, modifiers: [String], bundleId: String? = nil, modifier: String? = nil) {
+    init(
+        kind: String, code: Int?, modifiers: [String], bundleId: String? = nil,
+        modifier: String? = nil, url: String? = nil
+    ) {
         self.kind = kind
         self.code = code
         self.bundleId = bundleId
         self.modifier = modifier
         self.modifiers = modifiers
+        self.url = url
     }
 }

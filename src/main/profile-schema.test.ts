@@ -64,6 +64,23 @@ describe("profile schema", () => {
     expect(() => parseProfileDocument(document)).toThrow();
   });
 
+  it.each([
+    "https://codyboard.app/docs",
+    "file:///Users/example/Presentation.pdf",
+    "obsidian://open?vault=notes",
+  ])("compiles an open-URL output for %s", (url) => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0].to = { kind: "openURL", url };
+    const compiled = compileProfiles(document, { version: 1, activeProfiles: { "device:0x100004baa": "presenter" } }, 9);
+    expect(compiled.profiles[0].global[0].output).toEqual({ kind: "openURL", modifiers: [], url });
+  });
+
+  it("rejects a URL without a scheme", () => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0].to = { kind: "openURL", url: "example.com/docs" };
+    expect(() => parseProfileDocument(document)).toThrow(/absolute URL/);
+  });
+
   it("compiles an Fn modifier stroke", () => {
     const document = structuredClone(validDocument);
     document.keyboards[0].profiles[0].groups[0].mappings[0].to = {

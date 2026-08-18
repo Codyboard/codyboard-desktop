@@ -99,6 +99,10 @@ final class KeyboardController: @unchecked Sendable {
             applicationLauncher.launch(bundleIdentifier: bundleIdentifier)
             return
         }
+        if output.kind == "openURL", let url = output.url {
+            applicationLauncher.open(urlString: url)
+            return
+        }
         guard requestPermission(prompt: true) else {
             throw NSError(domain: "app.codyboard.permissions", code: 1, userInfo: [NSLocalizedDescriptionKey: "Accessibility permission is required"])
         }
@@ -321,6 +325,9 @@ final class KeyboardController: @unchecked Sendable {
             if output.kind == "launchApplication" {
                 return output.bundleId.map(ActiveDeviceAction.launchApplication) ?? .suppress
             }
+            if output.kind == "openURL" {
+                return output.url.map(ActiveDeviceAction.openURL) ?? .suppress
+            }
             return .output(output)
         }
     }
@@ -336,6 +343,9 @@ final class KeyboardController: @unchecked Sendable {
             return nil
         case .launchApplication(let bundleIdentifier):
             if pressed && !autorepeat { applicationLauncher.launch(bundleIdentifier: bundleIdentifier) }
+            return nil
+        case .openURL(let url):
+            if pressed && !autorepeat { applicationLauncher.open(urlString: url) }
             return nil
         case .output(let output):
             do {
@@ -360,6 +370,8 @@ final class KeyboardController: @unchecked Sendable {
             return
         case .launchApplication(let bundleIdentifier):
             if pressed && !autorepeat { applicationLauncher.launch(bundleIdentifier: bundleIdentifier) }
+        case .openURL(let url):
+            if pressed && !autorepeat { applicationLauncher.open(urlString: url) }
         case .output(let output):
             do { try simulator.post(output, pressed: pressed, autorepeat: autorepeat) }
             catch {
@@ -395,6 +407,7 @@ enum ActiveDeviceAction {
     case passthrough
     case suppress
     case launchApplication(String)
+    case openURL(String)
     case output(CompiledOutput)
 }
 

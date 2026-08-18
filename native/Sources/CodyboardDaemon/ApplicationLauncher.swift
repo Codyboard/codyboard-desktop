@@ -31,4 +31,28 @@ final class ApplicationLauncher: @unchecked Sendable {
             }
         }
     }
+
+    func open(urlString: String) {
+        queue.async {
+            guard let url = URL(string: urlString), url.scheme != nil else {
+                NativeOutput.shared.error(
+                    id: nil,
+                    code: "invalidURL",
+                    message: "Unable to parse URL \(urlString)",
+                    details: ["url": urlString]
+                )
+                return
+            }
+
+            guard NSWorkspace.shared.open(url) else {
+                NativeOutput.shared.error(
+                    id: nil,
+                    code: "urlOpenFailed",
+                    message: "Unable to open URL \(urlString)",
+                    details: ["url": urlString]
+                )
+                return
+            }
+        }
+    }
 }

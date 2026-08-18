@@ -89,4 +89,10 @@ describe("device mapping previews", () => {
       label: "Codex",
     });
   });
+
+  it("shows an open URL as a link action", () => {
+    const preview = mappingPreviewForControl(control, { kind: "openURL", url: "file:///tmp/demo.pdf" }, {});
+    expect(preview).toMatchObject({ kind: "key", label: "file:///tmp/demo.pdf" });
+    expect(preview?.kind === "key" && preview.icon).toBeDefined();
+  });
 });

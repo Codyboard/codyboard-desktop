@@ -10,7 +10,6 @@ export interface ProfileSwitcherProps {
 }
 
 const ADD_PROFILE = "__add_profile__";
-const DELETE_PROFILE = "__delete_profile__";
 const INACTIVE_PROFILE = "__inactive__";
 
 function nextProfileId(name: string, profiles: readonly ProfileDraft[]): string {
@@ -30,7 +29,9 @@ function nextProfileId(name: string, profiles: readonly ProfileDraft[]): string 
 export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
   const [snapshot, setSnapshot] = useState<ProfilesSnapshot>();
   const [isChanging, setIsChanging] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<"create" | "delete">();
+  const [profilePendingDeletionId, setProfilePendingDeletionId] = useState<string>();
   const [newProfileName, setNewProfileName] = useState("");
   const [error, setError] = useState<string>();
   const nameInput = useRef<HTMLInputElement>(null);
@@ -52,7 +53,10 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
   useEffect(() => {
     if (dialog === undefined) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isChanging) setDialog(undefined);
+      if (event.key === "Escape" && !isChanging) {
+        setDialog(undefined);
+        setProfilePendingDeletionId(undefined);
+      }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
@@ -63,6 +67,7 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
     ? ""
     : snapshot?.keyboards[profileDomainKey(profileDomain)]?.activeProfile?.id ?? "";
   const activeProfile = profiles.find(({ id }) => id === activeProfileId);
+  const profilePendingDeletion = profiles.find(({ id }) => id === profilePendingDeletionId);
   const unavailable = profileDomain === undefined || profiles.length === 0;
 
   const changeProfile = async (profileId: string) => {
@@ -70,13 +75,9 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
     if (profileId === ADD_PROFILE) {
       setError(undefined);
       setNewProfileName("");
+      setProfilePendingDeletionId(undefined);
       setDialog("create");
       window.setTimeout(() => nameInput.current?.focus(), 0);
-      return;
-    }
-    if (profileId === DELETE_PROFILE && activeProfile?.id !== "default") {
-      setError(undefined);
-      setDialog("delete");
       return;
     }
     setIsChanging(true);
@@ -88,6 +89,13 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
     } finally {
       setIsChanging(false);
     }
+  };
+
+  const requestProfileDeletion = (profileId: string) => {
+    setError(undefined);
+    setMenuOpen(false);
+    setProfilePendingDeletionId(profileId);
+    setDialog("delete");
   };
 
   const createProfile = async (event: FormEvent) => {
@@ -116,14 +124,17 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
   };
 
   const deleteProfile = async () => {
-    if (profileDomain === undefined || !activeProfile || activeProfile.id === "default") return;
+    if (profileDomain === undefined || !profilePendingDeletion || profilePendingDeletion.id === "default") return;
     setIsChanging(true);
     setError(undefined);
     try {
-      let nextSnapshot = await window.codyboard.profiles.remove(profileDomain, activeProfile.id);
-      const defaultProfile = profiles.find(({ id }) => id === "default");
-      if (defaultProfile) nextSnapshot = await window.codyboard.profiles.activate(profileDomain, defaultProfile.id);
+      let nextSnapshot = await window.codyboard.profiles.remove(profileDomain, profilePendingDeletion.id);
+      if (activeProfileId === profilePendingDeletion.id) {
+        const defaultProfile = profiles.find(({ id }) => id === "default");
+        if (defaultProfile) nextSnapshot = await window.codyboard.profiles.activate(profileDomain, defaultProfile.id);
+      }
       setSnapshot(nextSnapshot);
+      setProfilePendingDeletionId(undefined);
       setDialog(undefined);
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : "Unable to delete profile");
@@ -132,11 +143,18 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
     }
   };
 
+  const closeDialog = () => {
+    setDialog(undefined);
+    setProfilePendingDeletionId(undefined);
+  };
+
   return (
     <div className="profile-switcher">
       <Select
         disabled={unavailable || isChanging}
+        onOpenChange={setMenuOpen}
         onValueChange={(value) => void changeProfile(value)}
+        open={menuOpen}
         value={unavailable ? "__unavailable__" : activeProfileId || INACTIVE_PROFILE}
       >
         <SelectTrigger
@@ -151,21 +169,39 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
               {profileDomain === undefined ? "Device unavailable" : "No profiles"}
             </SelectItem>
           )}
-          {profiles.map((profile) => (
-            <SelectItem key={profile.id} value={profile.id}>{profile.id === "default" ? "Default" : profile.name}</SelectItem>
-          ))}
+          {profiles.map((profile) => profile.id === "default"
+            ? <SelectItem key={profile.id} value={profile.id}>Default</SelectItem>
+            : (
+                <div className="profile-menu-option" key={profile.id}>
+                  <SelectItem value={profile.id}>{profile.name}</SelectItem>
+                  <button
+                    aria-label={`Delete ${profile.name} profile`}
+                    className="select-row-remove"
+                    disabled={isChanging}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      requestProfileDeletion(profile.id);
+                    }}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
           {!unavailable && (
             <>
               <SelectItem value={INACTIVE_PROFILE}>Inactive</SelectItem>
               <SelectSeparator />
               <SelectItem className="profile-menu-action" value={ADD_PROFILE}>
-                <span><Plus aria-hidden="true" />Add New Profile</span>
+                <span className="profile-menu-action-content">
+                  <Plus aria-hidden="true" />
+                  <span>Add New Profile</span>
+                </span>
               </SelectItem>
-              {activeProfile?.id !== undefined && activeProfile.id !== "default" && (
-                <SelectItem className="profile-menu-action is-destructive" value={DELETE_PROFILE}>
-                  <span><Trash2 aria-hidden="true" />Delete {activeProfile.name}</span>
-                </SelectItem>
-              )}
             </>
           )}
         </SelectContent>
@@ -174,7 +210,7 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
         <div
           className="profile-dialog-backdrop"
           onMouseDown={(event) => {
-            if (event.currentTarget === event.target && !isChanging) setDialog(undefined);
+            if (event.currentTarget === event.target && !isChanging) closeDialog();
           }}
         >
           <section aria-labelledby="profile-dialog-title" aria-modal="true" className="profile-dialog" role="dialog">
@@ -182,7 +218,7 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
               aria-label="Close"
               className="profile-dialog-close"
               disabled={isChanging}
-              onClick={() => setDialog(undefined)}
+              onClick={closeDialog}
               type="button"
             >
               <X aria-hidden="true" />
@@ -204,7 +240,7 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
                 />
                 {error && <p className="profile-dialog-error" role="alert">{error}</p>}
                 <div className="profile-dialog-actions">
-                  <button disabled={isChanging} onClick={() => setDialog(undefined)} type="button">Cancel</button>
+                  <button disabled={isChanging} onClick={closeDialog} type="button">Cancel</button>
                   <button className="is-primary" disabled={isChanging || !newProfileName.trim()} type="submit">
                     {isChanging ? "Creating…" : "Create Profile"}
                   </button>
@@ -213,11 +249,11 @@ export function ProfileSwitcher({ profileDomain }: ProfileSwitcherProps) {
             ) : (
               <div>
                 <span className="profile-dialog-eyebrow">Profiles</span>
-                <h2 id="profile-dialog-title">Delete {activeProfile?.name}?</h2>
+                <h2 id="profile-dialog-title">Delete {profilePendingDeletion?.name}?</h2>
                 <p>This permanently removes the profile and its custom mappings. Default will remain available.</p>
                 {error && <p className="profile-dialog-error" role="alert">{error}</p>}
                 <div className="profile-dialog-actions">
-                  <button disabled={isChanging} onClick={() => setDialog(undefined)} type="button">Cancel</button>
+                  <button disabled={isChanging} onClick={closeDialog} type="button">Cancel</button>
                   <button className="is-destructive" disabled={isChanging} onClick={() => void deleteProfile()} type="button">
                     {isChanging ? "Deleting…" : "Delete Profile"}
                   </button>

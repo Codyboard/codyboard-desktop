@@ -648,7 +648,7 @@
     position: relative;
     min-height: 100vh;
     overflow: hidden;
-    background: transparent;
+    background: rgba(30, 34, 33, 0.95);
   }
 
   .detail-toolbar { position: absolute; inset: 0 0 auto; }
@@ -746,10 +746,10 @@
     justify-content: space-between;
     gap: 10px;
     padding: 0 12px 0 14px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.075);
     border-radius: 10px;
     outline: none;
-    background: rgba(18, 22, 21, 0.16);
+    background: rgba(18, 22, 21, 0.1);
     backdrop-filter: blur(18px) saturate(115%);
     color: rgba(242, 246, 244, 0.9);
     cursor: pointer;
@@ -758,29 +758,41 @@
     transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
   }
 
-  .cody-select-trigger:hover { border-color: rgba(115, 224, 180, 0.25); background: rgba(23, 31, 28, 0.24); }
+  .cody-select-trigger:hover { border-color: rgba(115, 224, 180, 0.22); background: rgba(23, 31, 28, 0.17); }
   .cody-select-trigger:focus-visible,
   .cody-select-trigger[data-state="open"] {
     border-color: rgba(115, 224, 180, 0.48);
-    background: rgba(26, 43, 36, 0.3);
+    background: rgba(26, 43, 36, 0.23);
     box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.07);
   }
   .cody-select-trigger:disabled { cursor: default; opacity: 0.42; }
   .cody-select-chevron { width: 15px; height: 15px; flex: 0 0 auto; color: rgba(220, 227, 224, 0.45); stroke-width: 1.8; }
 
   .cody-select-content {
+    position: relative;
     z-index: 1000;
     min-width: var(--radix-select-trigger-width);
     max-height: min(460px, var(--radix-select-content-available-height));
     overflow: hidden;
     border: 1px solid rgba(180, 195, 189, 0.2);
     border-radius: 13px;
-    background: rgba(30, 34, 33, 0.74);
+    background: transparent;
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.055);
     color: rgba(239, 243, 241, 0.92);
-    backdrop-filter: blur(4px) saturate(110%);
     transform-origin: var(--radix-select-content-transform-origin);
   }
+
+  .cody-select-content::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    -webkit-backdrop-filter: blur(16px) saturate(110%);
+    backdrop-filter: blur(16px) saturate(110%);
+    content: "";
+    pointer-events: none;
+  }
+
+  .cody-select-content > * { position: relative; z-index: 1; }
 
   .cody-select-content[data-state="open"] { animation: cody-select-in 150ms cubic-bezier(0.2, 0.8, 0.2, 1); }
   .cody-select-viewport { padding: 6px; }
@@ -812,7 +824,7 @@
   .cody-select-scroll-button { display: grid; height: 28px; place-items: center; color: rgba(222, 230, 226, 0.5); }
   .cody-select-scroll-button svg { width: 15px; height: 15px; }
 
-  .mapping-scope-menu { width: max(var(--radix-select-trigger-width), 280px); }
+  .mapping-scope-menu { width: max(var(--radix-select-trigger-width), 300px); }
   .key-output-menu { width: 310px; }
   .key-output-option { display: flex; align-items: center; gap: 12px; }
   .key-output-option svg { width: 18px; height: 18px; flex: 0 0 auto; color: rgba(209, 218, 214, 0.58); stroke-width: 1.75; }
@@ -823,7 +835,40 @@
   .application-select-identity > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mapping-scope-trigger .application-select-identity img,
   .mapping-scope-trigger .application-select-identity svg { width: 22px; height: 22px; }
+  .mapping-scope-application-option { position: relative; }
+  .mapping-scope-application-option .cody-select-item { padding-right: 46px; }
+  .select-row-remove {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    right: 6px;
+    display: grid;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 7px;
+    outline: none;
+    background: transparent;
+    color: rgba(220, 227, 224, 0.36);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: color 140ms ease, background 140ms ease;
+  }
+  .select-row-remove:hover { background: rgba(222, 81, 81, 0.12); color: rgb(255, 171, 171); }
+  .select-row-remove:focus-visible { background: rgba(222, 81, 81, 0.12); color: rgb(255, 171, 171); }
+  .select-row-remove:disabled { cursor: default; opacity: 0.35; }
+  .select-row-remove svg { width: 14px; height: 14px; stroke-width: 1.8; }
   .cody-select-item.is-add-application { color: rgba(137, 224, 188, 0.82); }
+  .mapping-scope-action { white-space: nowrap; }
+  .mapping-scope-action svg {
+    position: absolute;
+    left: 11px;
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.9;
+  }
 
   .mapping-list {
     flex: 1 1 auto;
@@ -845,31 +890,31 @@
     grid-template-columns: 50px minmax(96px, 0.5fr) minmax(122px, 0.85fr) minmax(150px, 1fr);
     gap: clamp(9px, 1vw, 15px);
     padding: 0 clamp(14px, 1.5vw, 20px);
-    border: 1px solid rgba(255, 255, 255, 0.065);
+    border: 1px solid rgba(255, 255, 255, 0.045);
     border-radius: 12px;
     background:
-      linear-gradient(108deg, rgba(255, 255, 255, 0.035), transparent 48%),
-      rgba(21, 24, 23, 0.34);
+      linear-gradient(108deg, rgba(255, 255, 255, 0.024), transparent 48%),
+      rgba(21, 24, 23, 0.24);
     backdrop-filter: blur(16px) saturate(110%);
-    box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.018);
     transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .mapping-row + .mapping-row { margin-top: 9px; }
-  .mapping-row:hover { border-color: rgba(255, 255, 255, 0.13); background-color: rgba(27, 31, 30, 0.44); }
+  .mapping-row:hover { border-color: rgba(255, 255, 255, 0.1); background-color: rgba(27, 31, 30, 0.32); }
   .mapping-row.is-selected {
-    border-color: rgba(105, 222, 175, 0.36);
+    border-color: rgba(105, 222, 175, 0.28);
     background:
-      linear-gradient(100deg, rgba(75, 196, 148, 0.12), transparent 58%),
-      rgba(22, 29, 26, 0.48);
-    box-shadow: 0 0 0 1px rgba(87, 210, 161, 0.055), 0 18px 42px rgba(0, 0, 0, 0.18);
+      linear-gradient(100deg, rgba(75, 196, 148, 0.085), transparent 58%),
+      rgba(22, 29, 26, 0.34);
+    box-shadow: 0 0 0 1px rgba(87, 210, 161, 0.04), 0 18px 42px rgba(0, 0, 0, 0.13);
   }
   .mapping-row.is-recording { border-color: rgba(126, 228, 188, 0.5); }
   .mapping-row.is-inherited .mapping-button-name small { color: rgba(124, 220, 181, 0.58); }
   .mapping-row.is-inherited .keystroke-recorder input:not(:focus),
   .mapping-row.is-inherited .launch-application-value:not(:focus-visible) {
     color: rgba(224, 231, 228, 0.52);
-    background: rgba(5, 7, 7, 0.25);
+    background: rgba(5, 7, 7, 0.14);
   }
   .mapping-row.is-inherited .key-output-current-icon { color: rgba(209, 218, 214, 0.36); }
 
@@ -899,18 +944,20 @@
 
   .mapping-action-select,
   .keystroke-recorder,
-  .launch-application-picker { display: grid; min-width: 0; }
+  .launch-application-picker,
+  .open-url-picker { display: grid; min-width: 0; }
 
   .keystroke-recorder input,
-  .launch-application-picker .launch-application-value {
+  .launch-application-picker .launch-application-value,
+  .open-url-value {
     box-sizing: border-box;
     min-width: 0;
     width: 100%;
     height: 42px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.075);
     border-radius: 10px;
     outline: none;
-    background: rgba(18, 22, 21, 0.16);
+    background: rgba(18, 22, 21, 0.1);
     backdrop-filter: blur(18px) saturate(115%);
     color: rgba(242, 246, 244, 0.9);
     transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
@@ -926,14 +973,39 @@
   .keystroke-recorder input::placeholder { color: rgba(215, 222, 219, 0.25); font-weight: 450; }
   .keystroke-recorder input:focus {
     border-color: rgba(115, 224, 180, 0.58);
-    background: rgba(31, 53, 44, 0.28);
+    background: rgba(31, 53, 44, 0.23);
     box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.075), inset 0 1px rgba(255, 255, 255, 0.035);
   }
   .keystroke-recorder input.is-suppressed { color: rgba(239, 177, 156, 0.9); }
   .keystroke-recorder input:disabled { cursor: default; opacity: 0.44; }
 
   .key-press-combobox,
-  .launch-application-picker { position: relative; min-width: 0; }
+  .launch-application-picker,
+  .open-url-picker { position: relative; min-width: 0; }
+
+  .open-url-value {
+    padding: 0 44px 0 42px;
+    font: 550 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .open-url-value::placeholder { color: rgba(215, 222, 219, 0.25); }
+  .open-url-value:focus {
+    border-color: rgba(115, 224, 180, 0.58);
+    background: rgba(31, 53, 44, 0.23);
+    box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.075);
+  }
+  .open-url-value:disabled { cursor: default; opacity: 0.44; }
+  .open-url-icon {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 14px;
+    width: 17px;
+    height: 17px;
+    color: rgba(209, 218, 214, 0.56);
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+  .open-url-picker .mapping-value-clear { right: 7px; }
 
   .key-output-current-icon {
     position: absolute;
@@ -993,7 +1065,7 @@
 
   .key-press-combobox:focus-within input {
     border-color: rgba(115, 224, 180, 0.58);
-    background: rgba(31, 53, 44, 0.28);
+    background: rgba(31, 53, 44, 0.23);
     box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.075), inset 0 1px rgba(255, 255, 255, 0.035);
   }
 
@@ -1009,7 +1081,7 @@
 
   .launch-application-picker .launch-application-value:hover {
     border-color: rgba(115, 224, 180, 0.34);
-    background: rgba(31, 53, 44, 0.34);
+    background: rgba(31, 53, 44, 0.23);
   }
 
   .launch-application-picker .launch-application-value:focus-visible {
@@ -1095,9 +1167,9 @@
     width: fit-content;
     height: 32px;
     padding: 0 8px 0 10px;
-    border-color: rgba(255, 255, 255, 0.07);
+    border-color: transparent;
     border-radius: 8px;
-    background: rgba(24, 28, 27, 0.14);
+    background: transparent;
     box-shadow: none;
     font-size: 11px;
     font-weight: 550;
@@ -1122,14 +1194,20 @@
 
   .profile-select-trigger .cody-select-chevron { width: 11px; height: 11px; }
   .profile-select-menu { min-width: 180px; }
-  .profile-menu-action > span {
-    display: flex;
+  .profile-menu-option { position: relative; }
+  .profile-menu-option .cody-select-item { padding-right: 46px; }
+  .profile-menu-action-content {
+    display: inline-flex;
     align-items: center;
-    gap: 9px;
+    white-space: nowrap;
   }
-  .profile-menu-action svg { width: 14px; height: 14px; stroke-width: 1.9; }
-  .profile-menu-action.is-destructive { color: rgba(244, 143, 143, 0.82); }
-  .profile-menu-action.is-destructive[data-highlighted] { background: rgba(222, 81, 81, 0.12); color: rgb(255, 171, 171); }
+  .profile-menu-action-content > svg {
+    position: absolute;
+    left: 11px;
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.9;
+  }
 
   .profile-dialog-backdrop {
     position: fixed;
@@ -1471,9 +1549,12 @@
   .sweep-pro-side-key-legend img {
     width: 42%;
     height: 42%;
-    border-radius: 22%;
-    object-fit: cover;
-    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.24));
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    filter: none;
+    object-fit: contain;
+    transform: scale(2);
   }
 
   .sweep-pro-key-legend svg,
@@ -1584,7 +1665,7 @@
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.75);
     transform-origin: 50% 185%;
     transform: translateX(-50%) rotate(var(--sweep-pro-knob-rotation, 0deg));
-    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 110ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .sweep-pro-knob-legend {
@@ -1608,8 +1689,12 @@
   .sweep-pro-knob-legend img {
     width: 100%;
     height: 100%;
-    border-radius: 24%;
-    object-fit: cover;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    filter: none;
+    object-fit: contain;
+    transform: scale(2);
   }
 
   .sweep-pro-knob-legend svg {
@@ -2022,34 +2107,35 @@
     .cody-tooltip-arrow { fill: rgba(244, 246, 245, 0.84); }
     .mapping-console-header { border-bottom-color: rgba(20, 25, 23, 0.09); background: linear-gradient(90deg, rgba(46, 151, 110, 0.065), transparent 58%), linear-gradient(180deg, rgba(255, 255, 255, 0.25), transparent); }
     .mapping-console-header p { color: rgba(23, 120, 82, 0.7); }
-    .mapping-row { border-color: rgba(20, 25, 23, 0.09); background: linear-gradient(108deg, rgba(255, 255, 255, 0.28), transparent 48%), rgba(221, 225, 223, 0.38); box-shadow: inset 0 1px rgba(255, 255, 255, 0.48); }
-    .mapping-row:hover { border-color: rgba(20, 25, 23, 0.17); background-color: rgba(230, 233, 231, 0.5); }
-    .mapping-row.is-selected { border-color: rgba(24, 139, 94, 0.32); background: linear-gradient(100deg, rgba(58, 165, 122, 0.12), transparent 58%), rgba(224, 230, 227, 0.52); box-shadow: 0 16px 38px rgba(51, 65, 59, 0.12); }
+    .mapping-row { border-color: rgba(20, 25, 23, 0.065); background: linear-gradient(108deg, rgba(255, 255, 255, 0.2), transparent 48%), rgba(221, 225, 223, 0.26); box-shadow: inset 0 1px rgba(255, 255, 255, 0.34); }
+    .mapping-row:hover { border-color: rgba(20, 25, 23, 0.13); background-color: rgba(230, 233, 231, 0.36); }
+    .mapping-row.is-selected { border-color: rgba(24, 139, 94, 0.25); background: linear-gradient(100deg, rgba(58, 165, 122, 0.085), transparent 58%), rgba(224, 230, 227, 0.36); box-shadow: 0 16px 38px rgba(51, 65, 59, 0.08); }
     .mapping-row.is-recording { border-color: rgba(25, 143, 96, 0.46); }
     .mapping-row.is-inherited .mapping-button-name small { color: rgba(20, 126, 84, 0.68); }
     .mapping-row.is-inherited .keystroke-recorder input:not(:focus),
     .mapping-row.is-inherited .launch-application-picker button:not(:focus-visible) {
       color: rgba(24, 31, 28, 0.56);
-      background: rgba(255, 255, 255, 0.32);
+      background: rgba(255, 255, 255, 0.22);
     }
     .mapping-button-icon { border-color: rgba(20, 25, 23, 0.1); background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.22)); color: rgba(21, 27, 25, 0.72); box-shadow: inset 0 1px rgba(255, 255, 255, 0.75), 0 9px 22px rgba(50, 57, 54, 0.1); }
     .mapping-row.is-selected .mapping-button-icon { border-color: rgba(25, 143, 96, 0.3); background: rgba(47, 153, 112, 0.1); color: rgba(18, 124, 82, 0.9); }
     .mapping-button-name small { color: rgba(25, 31, 29, 0.42); }
     .cody-select-trigger,
     .keystroke-recorder input,
-    .launch-application-picker button { border-color: rgba(20, 25, 23, 0.12); background: rgba(255, 255, 255, 0.24); color: rgba(15, 20, 18, 0.9); }
-    .cody-select-trigger:hover { border-color: rgba(26, 143, 97, 0.28); background: rgba(255, 255, 255, 0.34); }
+    .launch-application-picker button { border-color: rgba(20, 25, 23, 0.09); background: rgba(255, 255, 255, 0.16); color: rgba(15, 20, 18, 0.9); }
+    .cody-select-trigger:hover { border-color: rgba(26, 143, 97, 0.24); background: rgba(255, 255, 255, 0.24); }
     .cody-select-trigger:focus-visible,
-    .cody-select-trigger[data-state="open"] { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.44); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
+    .cody-select-trigger[data-state="open"] { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.32); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
     .cody-select-chevron { color: rgba(24, 30, 28, 0.48); }
-    .cody-select-content { border-color: rgba(20, 25, 23, 0.16); background: rgba(246, 248, 247, 0.78); box-shadow: 0 24px 70px rgba(46, 56, 52, 0.22), inset 0 1px rgba(255, 255, 255, 0.9); color: rgba(18, 23, 21, 0.92); }
+    .cody-select-content { border-color: rgba(20, 25, 23, 0.16); background: rgba(246, 248, 247, 0.95); box-shadow: 0 24px 70px rgba(46, 56, 52, 0.22), inset 0 1px rgba(255, 255, 255, 0.9); color: rgba(18, 23, 21, 0.92); }
     .cody-select-item[data-highlighted] { background: rgba(37, 151, 106, 0.1); color: rgba(10, 17, 14, 0.98); }
     .cody-select-item[data-state="checked"] { color: rgba(19, 126, 84, 0.96); }
     .cody-select-label { color: rgba(25, 31, 29, 0.38); }
     .cody-select-separator { background: rgba(20, 25, 23, 0.09); }
     .cody-select-scroll-button { color: rgba(24, 30, 28, 0.5); }
-    .profile-menu-action.is-destructive { color: rgba(176, 56, 56, 0.84); }
-    .profile-menu-action.is-destructive[data-highlighted] { background: rgba(199, 56, 56, 0.09); color: rgba(153, 38, 38, 0.96); }
+    .select-row-remove { color: rgba(25, 31, 29, 0.36); }
+    .select-row-remove:hover,
+    .select-row-remove:focus-visible { background: rgba(199, 56, 56, 0.09); color: rgba(153, 38, 38, 0.96); }
     .profile-dialog-backdrop { background: rgba(43, 49, 46, 0.24); }
     .profile-dialog {
       border-color: rgba(20, 25, 23, 0.14);
@@ -2073,14 +2159,14 @@
     .key-output-option svg { color: rgba(24, 30, 28, 0.56); }
     .application-select-identity svg { color: rgba(24, 30, 28, 0.56); }
     .keystroke-recorder input::placeholder { color: rgba(25, 31, 29, 0.32); }
-    .keystroke-recorder input:focus { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.44); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
+    .keystroke-recorder input:focus { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.32); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
     .keystroke-recorder input.is-suppressed { color: rgba(170, 69, 43, 0.88); }
     .key-output-select { border-left-color: rgba(20, 25, 23, 0.09); }
     .key-output-select:hover { border-left-color: rgba(26, 143, 97, 0.2); background: rgba(37, 151, 106, 0.07); }
     .key-output-trigger .cody-select-chevron { color: rgba(24, 30, 28, 0.48); }
     .key-output-current-icon { color: rgba(24, 30, 28, 0.6); }
-    .key-press-combobox:focus-within input { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.44); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
-    .launch-application-picker button:hover { border-color: rgba(26, 143, 97, 0.28); background: rgba(255, 255, 255, 0.34); }
+    .key-press-combobox:focus-within input { border-color: rgba(27, 143, 97, 0.48); background: rgba(247, 250, 248, 0.32); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
+    .launch-application-picker button:hover { border-color: rgba(26, 143, 97, 0.24); background: rgba(255, 255, 255, 0.24); }
     .launch-application-picker button:focus-visible { border-color: rgba(27, 143, 97, 0.48); box-shadow: 0 0 0 4px rgba(37, 151, 106, 0.075); }
     .launch-application-picker svg { color: rgba(24, 30, 28, 0.52); }
     .mapping-notice { border-color: rgba(20, 25, 23, 0.1); background: rgba(255, 255, 255, 0.36); color: rgba(25, 31, 29, 0.58); }
