@@ -3,5 +3,6 @@ dist/
 dist-electron/
 resources/bin/
 native/.build/
+release/
 .DS_Store
 npm-debug.log*
