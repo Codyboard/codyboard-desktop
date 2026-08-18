@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type PointerEvent } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { getDeviceDefinition } from "../../shared/device-catalog";
 import { profileDomainKey, type HIDDeviceInfo } from "../../shared/hid";
@@ -16,8 +16,7 @@ import { XiaomiRemote, type XiaomiRemoteKey, type XiaomiRemoteKeyPressEvent } fr
 import { AppToolbar } from "../components/layout/AppToolbar";
 import { ProfileSwitcher } from "../components/profiles/ProfileSwitcher";
 
-export function DeviceDetailPage() {
-  const { deviceId = "" } = useParams();
+export function DeviceDetailPage({ deviceId }: { deviceId: string }) {
   const [searchParameters] = useSearchParams();
   const definition = getDeviceDefinition(searchParameters.get("model"));
   const [hid, setHid] = useState<HIDDeviceInfo>();
@@ -74,18 +73,13 @@ export function DeviceDetailPage() {
         backTo="/"
         className="detail-toolbar"
         title={deviceName}
+        titleTooltip={<><span>Physical HID</span><code>{hid?.id ?? deviceId}</code></>}
       />
       <div className="device-detail-layout">
         <Device keyboardType={keyboardType} className="remote-stage detail-device-stage">
           {remote}
         </Device>
         <aside className="device-detail-panel" aria-label={`${deviceName} settings`}>
-          {isSweepPro && (
-            <p className="mapping-device-identity">
-              <span>Physical HID</span>
-              <code>{hid?.id ?? deviceId}</code>
-            </p>
-          )}
           {definition?.model === "sweep-pro"
             ? (
                 <DeviceButtonMappings

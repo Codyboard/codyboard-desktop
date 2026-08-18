@@ -6,13 +6,15 @@ final class ProfileRuntimeTests: XCTestCase {
     private let globalOutput = CompiledOutput(kind: "keyboard", code: 37, modifiers: [])
     private let appOutput = CompiledOutput(kind: "keyboard", code: 11, modifiers: ["command"])
 
-    func testSweepProLetterUsagesCoverAllVisibleKeys() {
+    func testSweepProUsagesCoverAllVisibleKeys() {
         let usages: [UInt32] = [
             0x17, 0x0A, 0x05, 0x15, 0x09, 0x19, 0x08, 0x07,
             0x06, 0x1A, 0x16, 0x1B, 0x14, 0x04, 0x1D,
         ]
         XCTAssertTrue(usages.allSatisfy { PhysicalKeyboardHIDMonitor.keyCodes[$0] != nil })
         XCTAssertEqual(PhysicalKeyboardHIDMonitor.keyCodes[0x14], 12)
+        XCTAssertEqual(PhysicalKeyboardHIDMonitor.keyCodes[0x2B], 48)
+        XCTAssertEqual(PhysicalKeyboardHIDMonitor.keyCodes[0xE1], 56)
     }
 
     func testApplicationMappingOverridesGlobal() {

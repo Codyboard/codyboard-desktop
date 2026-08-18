@@ -1,4 +1,5 @@
 export type HIDModifier = "command" | "control" | "option" | "shift" | "fn";
+export type CodyboardTheme = "dark" | "light";
 
 export interface HIDDeviceInfo {
   id: string;
@@ -215,6 +216,7 @@ export interface RawProfilesAPI {
 }
 
 export interface CodyboardAPI {
+  appearance: { set(theme: CodyboardTheme): Promise<void> };
   applications: {
     pick(): Promise<CodyboardApplicationInfo | undefined>;
     resolve(bundleId: string): Promise<CodyboardApplicationInfo | undefined>;

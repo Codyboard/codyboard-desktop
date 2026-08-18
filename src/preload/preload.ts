@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { CodyboardAPI, ProfileEvent } from "../shared/hid.js";
 
 const api: CodyboardAPI = {
+  appearance: { set: (theme) => ipcRenderer.invoke("appearance:set", theme) },
   applications: {
     pick: () => ipcRenderer.invoke("applications:pick"),
     resolve: (bundleId) => ipcRenderer.invoke("applications:resolve", bundleId),

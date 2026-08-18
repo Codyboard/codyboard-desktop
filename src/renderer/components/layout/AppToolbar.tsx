@@ -2,6 +2,7 @@ import { ArrowLeft, Moon, Sun } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { ViewTransitionLink } from "../navigation/ViewTransitionLink";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 
 type Theme = "dark" | "light";
 
@@ -10,19 +11,33 @@ export interface AppToolbarProps {
   backTo?: string;
   className?: string;
   title: string;
+  titleTooltip?: ReactNode;
 }
 
-export function AppToolbar({ actions, backTo, className = "", title }: AppToolbarProps) {
+export function AppToolbar({ actions, backTo, className = "", title, titleTooltip }: AppToolbarProps) {
   return (
     <header className={`app-toolbar ${className}`.trim()}>
       <div className="app-toolbar-title">
         {backTo && (
-          <ViewTransitionLink className="toolbar-back" to={backTo} aria-label="Back to devices">
+          <ViewTransitionLink className="toolbar-back" direction="back" to={backTo} aria-label="Back to devices">
             <ArrowLeft />
           </ViewTransitionLink>
         )}
-        <strong>Codyboard</strong>
-        <p>{title}</p>
+        <ViewTransitionLink aria-label="Go to devices" className="app-toolbar-home" direction="back" to="/">
+          <strong>Codyboard</strong>
+        </ViewTransitionLink>
+        {titleTooltip
+          ? (
+              <TooltipProvider delayDuration={250}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="app-toolbar-device-title" tabIndex={0}>{title}</p>
+                  </TooltipTrigger>
+                  <TooltipContent align="start" side="bottom">{titleTooltip}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
+          : <p>{title}</p>}
       </div>
       <div className="app-toolbar-actions">
         {actions}
@@ -39,6 +54,7 @@ function ThemeToggle() {
     const nextTheme: Theme = theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = nextTheme;
     localStorage.setItem("codyboard-theme", nextTheme);
+    void window.codyboard.appearance.set(nextTheme);
     setTheme(nextTheme);
   };
 

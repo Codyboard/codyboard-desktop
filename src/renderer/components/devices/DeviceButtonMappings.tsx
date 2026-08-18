@@ -52,6 +52,7 @@ import {
   Volume1,
   Volume2,
   VolumeX,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -217,14 +218,30 @@ export const XIAOMI_REMOTE_CONTROLS: readonly DeviceControl<XiaomiRemoteKey>[] =
 ];
 
 export const SWEEP_PRO_CONTROLS: readonly DeviceControl<SweepProKey>[] = [
-  "T", "G", "B", "R", "F", "V", "E", "D", "C", "W", "S", "X", "Q", "A", "Z",
-].map((key) => ({
-  defaultOutput: { kind: "keyboard", key: key.toLowerCase(), modifiers: [] },
-  input: { kind: "keyboard", key: key.toLowerCase(), modifiers: [] },
-  key: key as SweepProKey,
-  label: key,
-  legend: key,
-}));
+  {
+    defaultOutput: { key: "shift", kind: "modifier", modifiers: [] },
+    input: { key: "shift", kind: "modifier", modifiers: [] },
+    key: "leftShift",
+    label: "Left Shift",
+    legend: "⇧",
+  },
+  {
+    defaultOutput: { key: "tab", kind: "keyboard", modifiers: [] },
+    input: { key: "tab", kind: "keyboard", modifiers: [] },
+    key: "tab",
+    label: "Tab",
+    legend: "⇥",
+  },
+  ...[
+    "T", "G", "B", "R", "F", "V", "E", "D", "C", "W", "S", "X", "Q", "A", "Z",
+  ].map((key) => ({
+    defaultOutput: { kind: "keyboard" as const, key: key.toLowerCase(), modifiers: [] },
+    input: { kind: "keyboard" as const, key: key.toLowerCase(), modifiers: [] },
+    key: key as SweepProKey,
+    label: key,
+    legend: key,
+  })),
+];
 
 export const SWEEP_PRO_DEFAULT_PROFILE: ProfileDraft = {
   groups: [{
@@ -537,7 +554,6 @@ export function DeviceButtonMappings<Key extends string>({
                 </small>
               </span>
               <div className="mapping-action-select">
-                <span>Action</span>
                 <Select
                   disabled={!activeProfile || isSaving}
                   onValueChange={(value) => void changeAction(control, value)}
@@ -559,9 +575,9 @@ export function DeviceButtonMappings<Key extends string>({
               {launchOutput
                 ? (
                     <div className="launch-application-picker">
-                      <span>Application</span>
                       <button
                         aria-label={`Choose application for ${control.label}`}
+                        className="launch-application-value"
                         disabled={!activeProfile || isSaving}
                         onClick={() => void chooseApplicationForControl(control)}
                         type="button"
@@ -571,11 +587,19 @@ export function DeviceButtonMappings<Key extends string>({
                           : <AppWindow aria-hidden="true" />}
                         <strong>{isSaving ? "Saving…" : launchApplication?.name ?? launchOutput.bundleId}</strong>
                       </button>
+                      <button
+                        aria-label={`Clear ${control.label} application`}
+                        className="mapping-value-clear"
+                        disabled={!activeProfile || isSaving}
+                        onClick={() => void saveOutput(control, { kind: "suppress" })}
+                        type="button"
+                      >
+                        <X aria-hidden="true" />
+                      </button>
                     </div>
                   )
                 : (
                     <label className="keystroke-recorder">
-                      <span>Key Press</span>
                       <span className="key-press-combobox">
                         {SelectedOutputIcon && (
                           <span className="key-output-current-icon"><SelectedOutputIcon aria-hidden="true" /></span>
@@ -591,6 +615,17 @@ export function DeviceButtonMappings<Key extends string>({
                           readOnly
                           value={isSaving ? "Saving…" : describeOutput(mapping?.to)}
                         />
+                        {mapping?.to.kind !== "suppress" && (
+                          <button
+                            aria-label={`Clear ${control.label} key press`}
+                            className="mapping-value-clear"
+                            disabled={!activeProfile || isSaving}
+                            onClick={() => void saveOutput(control, { kind: "suppress" })}
+                            type="button"
+                          >
+                            <X aria-hidden="true" />
+                          </button>
+                        )}
                         <span className="key-output-select">
                           <Select
                             disabled={!activeProfile || isSaving}
@@ -705,35 +740,66 @@ function displayKey(key: string): string {
 async function captureKeystroke(event: KeyboardEvent<HTMLInputElement>, save: (output: MappingOutput) => Promise<void>) {
   event.preventDefault();
   event.stopPropagation();
-  if (event.key === "Backspace") {
-    await save({ kind: "suppress" });
-    return;
-  }
-  if (["Alt", "Control", "Fn", "Meta", "Shift"].includes(event.key)) return;
-  const key = browserKey(event.key);
-  if (!key) return;
+  const output = recordedKeyboardOutput(event);
+  if (output) await save(output);
+}
+
+interface RecordableKeyboardEvent {
+  altKey: boolean;
+  code: string;
+  ctrlKey: boolean;
+  getModifierState(key: string): boolean;
+  key: string;
+  metaKey: boolean;
+  shiftKey: boolean;
+}
+
+export function recordedKeyboardOutput(event: RecordableKeyboardEvent): MappingOutput | undefined {
+  if (event.code === "Backspace") return { kind: "suppress" };
+  if (["Alt", "Control", "Fn", "Meta", "Shift"].includes(event.key)) return undefined;
+  const key = browserKey(event.code, event.key);
+  if (!key) return undefined;
   const modifiers: HIDModifier[] = [];
   if (event.metaKey) modifiers.push("command");
   if (event.ctrlKey) modifiers.push("control");
   if (event.altKey) modifiers.push("option");
   if (event.shiftKey) modifiers.push("shift");
   if (event.getModifierState("Fn")) modifiers.push("fn");
-  await save({ kind: "keyboard", key, modifiers });
+  return { kind: "keyboard", key, modifiers };
 }
 
-function browserKey(key: string): string | undefined {
-  const named: Readonly<Record<string, string>> = {
+function browserKey(code: string, key: string): string | undefined {
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
+  if (/^Digit\d$/.test(code)) return code.slice(5);
+  if (/^F(?:[1-9]|1\d|20)$/.test(code)) return code.toLowerCase();
+  const namedCodes: Readonly<Record<string, string>> = {
     ArrowDown: "arrowDown",
     ArrowLeft: "arrowLeft",
     ArrowRight: "arrowRight",
     ArrowUp: "arrowUp",
+    Backquote: "`",
+    Backslash: "\\",
+    BracketLeft: "[",
+    BracketRight: "]",
+    Comma: ",",
     Delete: "deleteForward",
+    End: "end",
     Enter: "enter",
+    Equal: "=",
     Escape: "escape",
+    Home: "home",
+    IntlBackslash: "\\",
+    Minus: "-",
+    PageDown: "pageDown",
+    PageUp: "pageUp",
+    Period: ".",
+    Quote: "'",
+    Semicolon: ";",
+    Slash: "/",
+    Space: "space",
     Tab: "tab",
-    " ": "space",
   };
-  if (named[key]) return named[key];
+  if (namedCodes[code]) return namedCodes[code];
   if (/^F(?:[1-9]|1\d|20)$/.test(key)) return key.toLowerCase();
   return key.length === 1 ? key.toLowerCase() : undefined;
 }

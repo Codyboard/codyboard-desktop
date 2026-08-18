@@ -266,9 +266,9 @@ final class KeyboardController: @unchecked Sendable {
             data: DiagnosticKeyEvent(
                 deviceId: deviceId, keyboardType: nil,
                 eventType: pressed ? "keydown" : "keyup",
-                source: kind == "keyboard" ? "keyCode" : "hidUsage",
-                code: kind == "keyboard" ? code : Int(usage),
-                keyCode: kind == "keyboard" ? code : nil,
+                source: kind == "system" ? "hidUsage" : "keyCode",
+                code: kind == "system" ? Int(usage) : code,
+                keyCode: kind == "system" ? nil : code,
                 flags: 0, timestamp: 0
             )
         ))

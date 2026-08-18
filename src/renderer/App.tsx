@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { HashRouter, matchPath, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import type { PermissionStatus } from "../shared/hid";
 
@@ -12,11 +12,31 @@ export default function App() {
     <HashRouter>
       <Routes>
         <Route path="/permissions" element={<PermissionsPage />} />
-        <Route path="/" element={<PermissionGuard><DeviceSelectionPage /></PermissionGuard>} />
-        <Route path="/devices/:deviceId" element={<PermissionGuard><DeviceDetailPage /></PermissionGuard>} />
-        <Route path="*" element={<Navigate replace to="/" />} />
+        <Route path="/*" element={<PermissionGuard><DeviceRouteStack /></PermissionGuard>} />
       </Routes>
     </HashRouter>
+  );
+}
+
+function DeviceRouteStack() {
+  const location = useLocation();
+  const isSelection = location.pathname === "/";
+  const detailMatch = matchPath("/devices/:deviceId", location.pathname);
+  const isDetail = Boolean(detailMatch);
+
+  if (!isSelection && !isDetail) return <Navigate replace to="/" />;
+
+  return (
+    <div className={`device-route-stack ${isDetail ? "has-detail" : ""}`.trim()}>
+      <div aria-hidden={isDetail} className="route-layer-selection" inert={isDetail}>
+        <DeviceSelectionPage />
+      </div>
+      {detailMatch?.params.deviceId && (
+        <div className="route-layer-detail">
+          <DeviceDetailPage deviceId={detailMatch.params.deviceId} />
+        </div>
+      )}
+    </div>
   );
 }
 

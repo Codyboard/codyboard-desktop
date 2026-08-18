@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type PointerEvent } from "react";
 
 import type { HIDDiagnosticEvent } from "../../../shared/hid";
 
-const keys = [
+const letterKeys = [
   "T", "G", "B",
   "R", "F", "V",
   "E", "D", "C",
@@ -10,7 +10,7 @@ const keys = [
   "Q", "A", "Z",
 ] as const;
 
-export type SweepProKey = typeof keys[number];
+export type SweepProKey = typeof letterKeys[number] | "leftShift" | "tab";
 
 export interface SweepProKeyPressEvent {
   key: SweepProKey;
@@ -25,10 +25,10 @@ export interface SweepProProps {
   selectedKey?: SweepProKey;
 }
 
-const keySet = new Set<string>(keys);
+const keySet = new Set<string>(letterKeys);
 const keyCodeToKey: Readonly<Record<number, SweepProKey>> = {
   0: "A", 1: "S", 2: "D", 3: "F", 5: "G", 6: "Z", 7: "X", 8: "C", 9: "V",
-  11: "B", 12: "Q", 13: "W", 14: "E", 15: "R", 17: "T",
+  11: "B", 12: "Q", 13: "W", 14: "E", 15: "R", 17: "T", 48: "tab", 56: "leftShift",
 };
 
 export function SweepPro({
@@ -86,7 +86,7 @@ export function SweepPro({
         <div className="sweep-pro-display" aria-label="Display" />
 
         <div className="sweep-pro-keybed" aria-label="Macro keys">
-          {keys.map((key) => (
+          {letterKeys.map((key) => (
             <button
               type="button"
               aria-label={`${key} key`}
@@ -105,8 +105,32 @@ export function SweepPro({
         </div>
 
         <div className="sweep-pro-side-controls">
-          <button type="button" className="sweep-pro-corner-key" aria-label="Corner key" />
-          <button type="button" className="sweep-pro-side-key" aria-label="Side key" />
+          <button
+            type="button"
+            aria-label="Left Shift key"
+            className={`sweep-pro-corner-key ${pressed.has("leftShift") ? "is-pressed" : ""} ${selectedKey === "leftShift" ? "is-selected" : ""}`.trim()}
+            onPointerCancel={() => pointer("leftShift", "up")}
+            onPointerDown={(event: PointerEvent<HTMLButtonElement>) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              pointer("leftShift", "down");
+            }}
+            onPointerUp={() => pointer("leftShift", "up")}
+          >
+            <span className="sweep-pro-side-key-legend" aria-hidden="true">⇧</span>
+          </button>
+          <button
+            type="button"
+            aria-label="Tab key"
+            className={`sweep-pro-side-key ${pressed.has("tab") ? "is-pressed" : ""} ${selectedKey === "tab" ? "is-selected" : ""}`.trim()}
+            onPointerCancel={() => pointer("tab", "up")}
+            onPointerDown={(event: PointerEvent<HTMLButtonElement>) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              pointer("tab", "down");
+            }}
+            onPointerUp={() => pointer("tab", "up")}
+          >
+            <span className="sweep-pro-side-key-legend" aria-hidden="true">⇥</span>
+          </button>
           <button type="button" className="sweep-pro-knob" aria-label="Rotary knob" />
         </div>
       </section>
@@ -115,6 +139,8 @@ export function SweepPro({
 }
 
 function sweepProKeyFor(event: KeyboardEvent): SweepProKey | undefined {
+  if (event.code === "ShiftLeft") return "leftShift";
+  if (event.key === "Tab") return "tab";
   const key = event.key.toUpperCase();
   return keySet.has(key) ? key as SweepProKey : undefined;
 }

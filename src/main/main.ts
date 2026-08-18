@@ -12,6 +12,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  nativeTheme,
   screen,
   shell,
   Tray,
@@ -24,6 +25,7 @@ import {
 import type {
   CodyboardApplicationInfo,
   CodyboardPermission,
+  CodyboardTheme,
   CompiledOutput,
   HIDListOptions,
   ProfileDomain,
@@ -331,6 +333,11 @@ async function showTrayMenu(): Promise<void> {
 ipcMain.handle('hid:list', (_event, options?: HIDListOptions) =>
   daemon.listDevices(options),
 );
+ipcMain.handle('appearance:set', (_event, theme: CodyboardTheme) => {
+  if (theme !== 'dark' && theme !== 'light')
+    throw new Error('Invalid appearance');
+  nativeTheme.themeSource = theme;
+});
 ipcMain.handle('applications:pick', async () => {
   const options: Electron.OpenDialogOptions = {
     defaultPath: '/Applications',
