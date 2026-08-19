@@ -71,7 +71,10 @@ final class XiaomiVoiceBluetoothController: NSObject {
     var deviceName: String?
     var lastError: String?
 
-    var onPCM: (([Int16]) -> Void)?
+    var onPCM: (([Int16]) -> Bool)?
+    var onStreamStarted: (() -> Bool)?
+    var onStreamStopped: (() -> Void)?
+    var streamOutputReady = false
 
     var state: VoiceBluetoothState = .stopped {
         didSet {
@@ -240,6 +243,7 @@ final class XiaomiVoiceBluetoothController: NSObject {
         microphoneOpened = false
         deviceName = nil
         processor.reset()
+        streamOutputReady = false
     }
 
     func scheduleTimeout(generation: UInt64, expected: BluetoothLifecyclePhase) {

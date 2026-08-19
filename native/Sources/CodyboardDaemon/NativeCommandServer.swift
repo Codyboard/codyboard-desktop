@@ -6,15 +6,18 @@ final class NativeCommandServer {
     private let devices: HIDDeviceManager
     private let keyboard: KeyboardController
     private let voice: XiaomiVoiceBluetoothController
+    private let audio: VirtualAudioOutput
 
     init(
         devices: HIDDeviceManager,
         keyboard: KeyboardController,
-        voice: XiaomiVoiceBluetoothController
+        voice: XiaomiVoiceBluetoothController,
+        audio: VirtualAudioOutput
     ) {
         self.devices = devices
         self.keyboard = keyboard
         self.voice = voice
+        self.audio = audio
     }
 
     func start() {
@@ -34,6 +37,7 @@ final class NativeCommandServer {
         DispatchQueue.main.async { [weak self] in
             self?.keyboard.shutdown()
             self?.voice.shutdown()
+            self?.audio.shutdown()
             exit(EXIT_SUCCESS)
         }
     }
@@ -69,6 +73,26 @@ final class NativeCommandServer {
             case "voice.stop":
                 voice.stop()
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: voice.status))
+            case "audio.devices.list":
+                NativeOutput.shared.send(SuccessResponse(
+                    id: command.id, data: CoreAudioDeviceCatalog.outputDevices()
+                ))
+            case "audio.configure":
+                guard let deviceUID = command.params?.deviceUID else {
+                    throw commandError("Missing CoreAudio device UID")
+                }
+                let result = try audio.configure(deviceUID: deviceUID)
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: result))
+            case "audio.status":
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: audio.status))
+            case "audio.testTone":
+                guard audio.playTestTone() else {
+                    throw commandError("Unable to play CoreAudio test tone")
+                }
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: audio.status))
+            case "audio.stop":
+                audio.stop()
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: audio.status))
             case "permissions.status":
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: permissionStatus()))
             case "permissions.request":

@@ -1,0 +1,57 @@
+diff --git a/BlackHole/BlackHole.c b/BlackHole/BlackHole.c
+index ac516ef..aeab6d1 100644
+--- a/BlackHole/BlackHole.c
++++ b/BlackHole/BlackHole.c
+@@ -150,11 +150,11 @@
+ 
+ 
+ #ifndef kDriver_Name
+-#define                             kDriver_Name                        "BlackHole"
++#define                             kDriver_Name                        "CodyboardVirtualMicrophone"
+ #endif
+ 
+ #ifndef kPlugIn_BundleID
+-#define                             kPlugIn_BundleID                    "audio.existential.BlackHole2ch"
++#define                             kPlugIn_BundleID                    "com.codyboard.VirtualMicrophone"
+ #endif
+ 
+ #ifndef kPlugIn_Icon
+@@ -174,7 +174,7 @@
+ 
+ 
+ #ifndef kDevice_Name
+-#define                             kDevice_Name                        kDriver_Name " %ich"
++#define                             kDevice_Name                        "Codyboard Virtual Microphone"
+ #endif
+ 
+ #ifndef kDevice2_Name
+@@ -2543,7 +2543,7 @@ static OSStatus	BlackHole_GetDevicePropertyData(AudioServerPlugInDriverRef inDri
+ 			//	any 32 bit integer, but common values for this property are defined in
+ 			//	<CoreAudio/AudioHardwareBase.h>
+ 			FailWithAction(inDataSize < sizeof(UInt32), theAnswer = kAudioHardwareBadPropertySizeError, Done, "BlackHole_GetDevicePropertyData: not enough space for the return value of kAudioDevicePropertyTransportType for the device");
+-			*((UInt32*)outData) = kAudioDeviceTransportTypeVirtual;
++			*((UInt32*)outData) = kAudioDeviceTransportTypeUSB;
+ 			*outDataSize = sizeof(UInt32);
+ 			break;
+ 
+diff --git a/BlackHole/BlackHole.plist b/BlackHole/BlackHole.plist
+index bcbc8d6..1d3bdc5 100644
+--- a/BlackHole/BlackHole.plist
++++ b/BlackHole/BlackHole.plist
+@@ -24,14 +24,14 @@
+ 	<string>596</string>
+ 	<key>CFPlugInFactories</key>
+ 	<dict>
+-		<key>e395c745-4eea-4d94-bb92-46224221047c</key>
++		<key>aa54e99a-0561-439a-9fd0-938c912a5c4f</key>
+ 		<string>BlackHole_Create</string>
+ 	</dict>
+ 	<key>CFPlugInTypes</key>
+ 	<dict>
+ 		<key>443ABAB8-E7B3-491A-B985-BEB9187030DB</key>
+ 		<array>
+-			<string>e395c745-4eea-4d94-bb92-46224221047c</string>
++			<string>aa54e99a-0561-439a-9fd0-938c912a5c4f</string>
+ 		</array>
+ 	</dict>
+ </dict>

@@ -53,12 +53,17 @@ extension XiaomiVoiceBluetoothController {
             now: ProcessInfo.processInfo.systemUptime
         )
         if decoded.startedImplicitly { beginStream(generation: generation) }
-        for chunk in decoded.chunks { onPCM?(chunk) }
+        guard streamOutputReady else { return }
+        for chunk in decoded.chunks where onPCM?(chunk) != true {
+            streamOutputReady = false
+            break
+        }
     }
 
     func beginStream(generation: UInt64) {
         guard streamGeneration == nil else { return }
         streamGeneration = generation
+        streamOutputReady = onStreamStarted?() == true
         publishState()
         NativeOutput.shared.send(NativeEvent(
             event: "voiceStreamStarted",
@@ -77,6 +82,8 @@ extension XiaomiVoiceBluetoothController {
         self.streamGeneration = nil
         NativeOutput.shared.send(NativeEvent(event: "voiceMetrics", data: metrics))
         NativeOutput.shared.send(NativeEvent(event: "voiceStreamStopped", data: metrics))
+        if streamOutputReady { onStreamStopped?() }
+        streamOutputReady = false
         publishState()
     }
 

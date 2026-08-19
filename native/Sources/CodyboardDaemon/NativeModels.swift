@@ -17,6 +17,7 @@ struct CommandParams: Decodable {
     let keyboardType: Int?
     let permission: String?
     let configuration: VoiceConfiguration?
+    let deviceUID: String?
 }
 
 struct PermissionStatus: Codable {
@@ -112,6 +113,25 @@ struct VoiceMetrics: Codable, Equatable {
     let sessionID: UInt8
     let decodedFrames: Int
     let decodedSamples: Int
+}
+
+enum AudioOutputState: String, Codable {
+    case unconfigured
+    case configured
+    case starting
+    case ready
+    case draining
+    case failed
+}
+
+struct AudioOutputStatus: Codable, Equatable {
+    let state: AudioOutputState
+    let selectedDevice: AudioDeviceInfo?
+    let active: Bool
+    let healthy: Bool
+    let pendingBuffers: Int
+    let testToneActive: Bool
+    let error: String?
 }
 
 struct DeviceInfo: Codable {
