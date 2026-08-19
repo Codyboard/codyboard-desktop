@@ -1,30 +1,33 @@
-import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
 
-import type { HIDDiagnosticEvent } from "../../../shared/hid";
+import {
+  acceptKnobPulse,
+  changedSweepProKeys,
+  IDLE_KNOB_PULSE_GUARD,
+  sweepProKeyForDiagnostic,
+  sweepProKnobDelta,
+  SWEEP_PRO_LETTER_KEYS,
+  type DeviceMappingPreview,
+  type KnobPulseGuard,
+  type SweepProKey,
+  type SweepProKeyPressEvent,
+  type SweepProMappingPreviews,
+} from "./sweep-pro-input";
 
-const letterKeys = [
-  "T", "G", "B",
-  "R", "F", "V",
-  "E", "D", "C",
-  "W", "S", "X",
-  "Q", "A", "Z",
-] as const;
-
-export type SweepProKey = typeof letterKeys[number]
-  | "leftShift" | "mute" | "tab" | "volumeDown" | "volumeUp";
-
-export type DeviceMappingPreview =
-  | { bundleId: string; iconDataUrl?: string; kind: "application"; label: string }
-  | { compact?: boolean; icon?: LucideIcon; kind: "key"; label: string };
-
-export type SweepProMappingPreviews = Partial<Record<SweepProKey, DeviceMappingPreview>>;
-
-export interface SweepProKeyPressEvent {
-  key: SweepProKey;
-  phase: "down" | "up";
-  source: "hardware" | "pointer";
-}
+export {
+  acceptKnobPulse,
+  IDLE_KNOB_PULSE_GUARD,
+  KNOB_REVERSAL_MS,
+  sweepProKeyForDiagnostic,
+  sweepProKnobDelta,
+} from "./sweep-pro-input";
+export type {
+  DeviceMappingPreview,
+  KnobPulseGuard,
+  SweepProKey,
+  SweepProKeyPressEvent,
+  SweepProMappingPreviews,
+} from "./sweep-pro-input";
 
 export interface SweepProProps {
   ariaLabel?: string;
@@ -34,16 +37,6 @@ export interface SweepProProps {
   onKeyPress?: (event: SweepProKeyPressEvent) => void;
   selectedKey?: SweepProKey;
 }
-
-const keyCodeToKey: Readonly<Record<number, SweepProKey>> = {
-  0: "A", 1: "S", 2: "D", 3: "F", 5: "G", 6: "Z", 7: "X", 8: "C", 9: "V",
-  11: "B", 12: "Q", 13: "W", 14: "E", 15: "R", 17: "T", 48: "tab", 56: "leftShift",
-};
-const consumerUsageToKey: Readonly<Record<number, SweepProKey>> = {
-  0xe2: "mute",
-  0xe9: "volumeUp",
-  0xea: "volumeDown",
-};
 
 export function SweepPro({
   ariaLabel = "Sweep Pro macropad",
@@ -56,6 +49,8 @@ export function SweepPro({
   const [hardwarePressed, setHardwarePressed] = useState<ReadonlySet<SweepProKey>>(new Set());
   const hardwarePressedRef = useRef<ReadonlySet<SweepProKey>>(new Set());
   const [knobRotation, setKnobRotation] = useState(0);
+  const knobGuard = useRef<KnobPulseGuard>(IDLE_KNOB_PULSE_GUARD);
+  const bouncedKnobKeys = useRef<Set<SweepProKey>>(new Set());
   const [pointerPressed, setPointerPressed] = useState<ReadonlySet<SweepProKey>>(new Set());
 
   useEffect(() => {
@@ -63,9 +58,22 @@ export function SweepPro({
 
     const update = (key: SweepProKey | undefined, phase: "down" | "up", source: "hardware") => {
       if (!key) return;
+      const rotation = sweepProKnobDelta(key);
+      if (rotation !== 0) {
+        if (phase === "up") {
+          if (bouncedKnobKeys.current.delete(key)) return;
+        } else {
+          const pulse = acceptKnobPulse(knobGuard.current, Math.sign(rotation), performance.now());
+          if (!pulse.accepted) {
+            bouncedKnobKeys.current.add(key);
+            return;
+          }
+          knobGuard.current = pulse.guard;
+        }
+      }
       const isPressed = phase === "down";
       if (hardwarePressedRef.current.has(key) === isPressed) return;
-      const next = changedSet(hardwarePressedRef.current, key, isPressed);
+      const next = changedSweepProKeys(hardwarePressedRef.current, key, isPressed);
       hardwarePressedRef.current = next;
       setHardwarePressed(next);
       if (phase === "down") setKnobRotation((current) => current + sweepProKnobDelta(key));
@@ -73,6 +81,8 @@ export function SweepPro({
     };
     const clearPressed = () => {
       hardwarePressedRef.current = new Set();
+      bouncedKnobKeys.current = new Set();
+      knobGuard.current = IDLE_KNOB_PULSE_GUARD;
       setHardwarePressed(new Set());
     };
     const unsubscribeDiagnostics = window.codyboard?.diagnostics?.onKey((event) => {
@@ -81,10 +91,10 @@ export function SweepPro({
       update(key, phase, "hardware");
     });
 
-    window.addEventListener("blur", clearPressed);
+    // No blur reset: exclusive capture keeps delivering key-ups while another app is frontmost,
+    // and clearing here would swallow the release of anything held across the focus change.
     return () => {
       clearPressed();
-      window.removeEventListener("blur", clearPressed);
       unsubscribeDiagnostics?.();
     };
   }, [deviceId, listenToHardware, onKeyPress]);
@@ -95,7 +105,7 @@ export function SweepPro({
   );
 
   const pointer = (key: SweepProKey, phase: "down" | "up") => {
-    setPointerPressed((current) => changedSet(current, key, phase === "down"));
+    setPointerPressed((current) => changedSweepProKeys(current, key, phase === "down"));
     onKeyPress?.({ key, phase, source: "pointer" });
   };
   const knobSelected = selectedKey === "mute" || selectedKey === "volumeDown" || selectedKey === "volumeUp";
@@ -115,7 +125,7 @@ export function SweepPro({
         <div className="sweep-pro-display" aria-label="Display" />
 
         <div className="sweep-pro-keybed" aria-label="Macro keys">
-          {letterKeys.map((key) => (
+          {SWEEP_PRO_LETTER_KEYS.map((key) => (
             <button
               type="button"
               aria-label={`${key} key`}
@@ -207,25 +217,4 @@ function MappingPreview({
         : <span>{preview.label}</span>}
     </span>
   );
-}
-
-export function sweepProKeyForDiagnostic(
-  event: HIDDiagnosticEvent,
-  deviceId: string,
-): SweepProKey | undefined {
-  if (event.deviceId !== deviceId) return undefined;
-  return event.source === "keyCode" ? keyCodeToKey[event.code] : consumerUsageToKey[event.code];
-}
-
-export function sweepProKnobDelta(key: SweepProKey): number {
-  if (key === "volumeUp") return 12;
-  if (key === "volumeDown") return -12;
-  return 0;
-}
-
-function changedSet(current: ReadonlySet<SweepProKey>, key: SweepProKey, isPressed: boolean) {
-  const next = new Set(current);
-  if (isPressed) next.add(key);
-  else next.delete(key);
-  return next;
 }

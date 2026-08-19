@@ -1,0 +1,170 @@
+/*
+ * MIDI-only Sweep Pro skin: injection-moulded amber plastic, dished keycaps and a
+ * beat-driven VU where the blank display sits. The shared component is untouched and
+ * the whole dress is scoped here, so the settings view keeps the real ivory hardware.
+ */
+.midi-device-float .sweep-pro-shadow { opacity: 0.55; background: #1a0a02; }
+
+.midi-device-float .sweep-pro-chassis {
+  border-color: rgba(255, 214, 170, 0.45);
+  background:
+    radial-gradient(130% 55% at 50% -12%, rgba(255, 245, 230, 0.42), transparent 62%),
+    linear-gradient(168deg, #f0913e 0%, #e07c2e 38%, #bb5f1e 78%, #964713 100%);
+  box-shadow:
+    inset 0 calc(var(--remote-height) * 0.004) rgba(255, 238, 214, 0.6),
+    inset calc(var(--remote-height) * -0.009) 0 calc(var(--remote-height) * 0.018) rgba(96, 40, 6, 0.4),
+    inset 0 calc(var(--remote-height) * -0.016) calc(var(--remote-height) * 0.026) rgba(84, 33, 4, 0.55);
+}
+
+/* Specular sweep across the moulded shell. */
+.midi-device-float .sweep-pro-chassis::before {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(112deg, rgba(255, 255, 255, 0.22) 0 18%, transparent 34% 100%);
+  content: "";
+}
+
+/* Pilot lamp, blinking on the beat. */
+.midi-device-float .sweep-pro-chassis::after {
+  position: absolute;
+  top: 21.4%;
+  left: 20%;
+  width: calc(var(--remote-height) * 0.016);
+  height: calc(var(--remote-height) * 0.016);
+  border-radius: 50%;
+  animation: midi-device-lamp var(--midi-beat, 0.58s) ease-out infinite;
+  animation-play-state: var(--midi-transport, paused);
+  background: #6cf07a;
+  box-shadow: 0 0 calc(var(--remote-height) * 0.016) rgba(108, 240, 122, 0.85);
+  content: "";
+}
+
+/* The blank display becomes a recessed twin-needle VU. */
+.midi-device-float .sweep-pro-display {
+  border-color: #c96a22;
+  border-radius: calc(var(--remote-height) * 0.012);
+  background: #120d08;
+  box-shadow:
+    0 calc(var(--remote-height) * 0.003) 0 rgba(255, 226, 190, 0.35),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.85),
+    inset 0 calc(var(--remote-height) * 0.006) calc(var(--remote-height) * 0.014) rgba(0, 0, 0, 0.9);
+}
+
+.midi-device-float .sweep-pro-display::before,
+.midi-device-float .sweep-pro-display::after {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 84% 26%, 84% 26%;
+  background-position: 8% 24%, 8% 74%;
+  content: "";
+}
+.midi-device-float .sweep-pro-display::before {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255, 236, 210, 0.16) 0 5%, transparent 5% 8.5%),
+    repeating-linear-gradient(90deg, rgba(255, 236, 210, 0.16) 0 5%, transparent 5% 8.5%);
+}
+.midi-device-float .sweep-pro-display::after {
+  animation: midi-device-vu var(--midi-beat, 0.58s) ease-out infinite;
+  animation-play-state: var(--midi-transport, paused);
+  background-image:
+    repeating-linear-gradient(90deg, #ffb347 0 5%, transparent 5% 8.5%),
+    repeating-linear-gradient(90deg, #ff7a1c 0 5%, transparent 5% 8.5%);
+  filter: drop-shadow(0 0 calc(var(--remote-height) * 0.006) rgba(255, 140, 40, 0.7));
+}
+
+.midi-device-float .sweep-pro-keybed button,
+.midi-device-float .sweep-pro-corner-key,
+.midi-device-float .sweep-pro-side-key {
+  border-color: rgba(122, 54, 10, 0.5);
+  background: linear-gradient(145deg, #f5a054 0%, #e0812f 60%, #c2661f 100%);
+  box-shadow:
+    0 calc(var(--remote-height) * 0.009) 0 #9c4d15,
+    0 calc(var(--remote-height) * 0.015) calc(var(--remote-height) * 0.012) rgba(60, 22, 2, 0.5),
+    inset 0 1px rgba(255, 240, 216, 0.62),
+    inset 0 calc(var(--remote-height) * -0.006) calc(var(--remote-height) * 0.007) rgba(110, 46, 6, 0.34);
+}
+
+/* Dished cap face with the specular sitting high and left. */
+.midi-device-float .sweep-pro-keybed button::after,
+.midi-device-float .sweep-pro-corner-key::after,
+.midi-device-float .sweep-pro-side-key::after {
+  background: radial-gradient(125% 125% at 30% 20%, #ffc888 0%, #f09a4c 44%, #d5772b 100%);
+  box-shadow:
+    inset calc(var(--remote-height) * 0.002) calc(var(--remote-height) * 0.002) rgba(255, 244, 224, 0.7),
+    inset calc(var(--remote-height) * -0.002) calc(var(--remote-height) * -0.003) rgba(118, 50, 8, 0.36);
+}
+
+.midi-device-float .sweep-pro-key-legend {
+  color: #3f1d06;
+  text-shadow: 0 1px rgba(255, 226, 190, 0.42);
+}
+.midi-device-float .sweep-pro-side-key-legend { color: rgba(63, 29, 6, 0.78); }
+.midi-device-float .sweep-pro-knob-legend { color: #2d1304; }
+
+/* Struck caps light from within: the plastic is translucent and back-lit. */
+.midi-device-float .sweep-pro-keybed button.is-pressed,
+.midi-device-float .sweep-pro-corner-key.is-pressed,
+.midi-device-float .sweep-pro-side-key.is-pressed,
+.midi-device-float .sweep-pro-keybed button:active,
+.midi-device-float .sweep-pro-corner-key:active,
+.midi-device-float .sweep-pro-side-key:active {
+  border-color: rgba(255, 224, 170, 0.9);
+  background: linear-gradient(145deg, #ffdca6 0%, #ffb45f 55%, #ff8c2c 100%);
+  box-shadow:
+    0 0 calc(var(--remote-height) * 0.05) rgba(255, 150, 40, 0.8),
+    0 calc(var(--remote-height) * 0.005) 0 #b6601c,
+    inset 0 0 calc(var(--remote-height) * 0.022) rgba(255, 247, 226, 0.9);
+  filter: none;
+}
+
+.midi-device-float .sweep-pro-keybed button.is-pressed::after,
+.midi-device-float .sweep-pro-corner-key.is-pressed::after,
+.midi-device-float .sweep-pro-side-key.is-pressed::after,
+.midi-device-float .sweep-pro-keybed button:active::after,
+.midi-device-float .sweep-pro-corner-key:active::after,
+.midi-device-float .sweep-pro-side-key:active::after {
+  background: radial-gradient(125% 125% at 30% 20%, #fff8e8 0%, #ffd096 44%, #ffa04a 100%);
+  box-shadow: inset 0 0 calc(var(--remote-height) * 0.016) rgba(255, 255, 255, 0.85);
+}
+
+.midi-device-float .sweep-pro-keybed button.is-selected,
+.midi-device-float .sweep-pro-corner-key.is-selected,
+.midi-device-float .sweep-pro-side-key.is-selected {
+  outline-color: rgba(26, 11, 2, 0.85);
+}
+
+.midi-device-column.is-shifted .sweep-pro-keybed button { border-color: rgba(26, 11, 2, 0.7); }
+
+.midi-device-float .sweep-pro-knob-mark {
+  background: #2d1304;
+  box-shadow: none;
+}
+
+.midi-device-float .sweep-pro-knob {
+  border-color: rgba(122, 54, 10, 0.6) !important;
+  background: radial-gradient(circle at 36% 26%, #ffc175 0%, #ea8a37 44%, #bb601c 78%, #96470f 100%) !important;
+}
+.midi-device-float .sweep-pro-knob::after {
+  background: radial-gradient(circle at 38% 30%, #f5a95a, #c46a20 72%);
+  box-shadow: inset 0 1px rgba(255, 240, 216, 0.5);
+}
+
+@keyframes midi-device-lamp {
+  0%, 14% { opacity: 1; }
+  100% { opacity: 0.16; }
+}
+
+@keyframes midi-device-vu {
+  0% { clip-path: inset(0 6% 0 0); }
+  22% { clip-path: inset(0 48% 0 0); }
+  46% { clip-path: inset(0 30% 0 0); }
+  100% { clip-path: inset(0 72% 0 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .midi-beat-wash { display: none; }
+  .midi-device-float .sweep-pro-chassis::after,
+  .midi-device-float .sweep-pro-display::after { animation: none; }
+}
+

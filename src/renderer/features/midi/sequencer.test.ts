@@ -1,25 +1,54 @@
 import { describe, expect, it } from "vitest";
 
-import type { ChordChoice } from "./harmony";
-import { adjustedTempo, appendChord, chordAtStep, wrappedIndex } from "./sequencer";
+import type { ChordSlot } from "./harmony";
+import {
+  adjustedTempo, appendSlot, MAX_SLOTS, removeSlot, slotAtStep, SLOT_STEPS, wrappedIndex,
+} from "./sequencer";
 
-const chord = (degree: ChordChoice["degree"]): ChordChoice => ({ degree, shape: "up" });
+const slot = (degree: ChordSlot["degree"]): ChordSlot => ({ degree, phrase: "stab" });
 
 describe("Get Funky chord loop", () => {
   it("keeps only the four most recent choices", () => {
-    const progression = ["i", "III", "iv", "v", "VI"].reduce<readonly ChordChoice[]>(
-      (current, degree) => appendChord(current, chord(degree as ChordChoice["degree"])),
+    const progression = ["i", "III", "IV", "v", "VI"].reduce<readonly ChordSlot[]>(
+      (current, degree) => appendSlot(current, slot(degree as ChordSlot["degree"])),
       [],
     );
-    expect(progression.map((choice) => choice.degree)).toEqual(["III", "iv", "v", "VI"]);
+    expect(progression).toHaveLength(MAX_SLOTS);
+    expect(progression.map((choice) => choice.degree)).toEqual(["III", "IV", "v", "VI"]);
   });
 
-  it("holds each chord for one beat and loops the recorded choices", () => {
-    const progression = [chord("i"), chord("VI")];
-    expect(chordAtStep(progression, 0)?.degree).toBe("i");
-    expect(chordAtStep(progression, 3)?.degree).toBe("i");
-    expect(chordAtStep(progression, 4)?.degree).toBe("VI");
-    expect(chordAtStep(progression, 8)?.degree).toBe("i");
+  it("closes the gap when a slot is removed", () => {
+    const progression = [slot("i"), slot("IV"), slot("VI"), slot("v")];
+    expect(removeSlot(progression, 1).map((choice) => choice.degree)).toEqual(["i", "VI", "v"]);
+    expect(removeSlot(progression, 0).map((choice) => choice.degree)).toEqual(["IV", "VI", "v"]);
+    expect(removeSlot(progression, 3).map((choice) => choice.degree)).toEqual(["i", "IV", "VI"]);
+  });
+
+  it("ignores removals outside the recorded slots", () => {
+    const progression = [slot("i"), slot("IV")];
+    expect(removeSlot(progression, 2)).toBe(progression);
+    expect(removeSlot(progression, -1)).toBe(progression);
+    expect(removeSlot([], 0)).toEqual([]);
+  });
+
+  it("shortens the loop so the remaining chords take the freed time", () => {
+    const progression = removeSlot([slot("i"), slot("IV"), slot("VI")], 1);
+    expect(slotAtStep(progression, 0)?.degree).toBe("i");
+    expect(slotAtStep(progression, SLOT_STEPS)?.degree).toBe("VI");
+    expect(slotAtStep(progression, SLOT_STEPS * 2)?.degree).toBe("i");
+  });
+
+  it("holds each chord for half a bar and loops the recorded choices", () => {
+    const progression = [slot("i"), slot("VI")];
+    expect(slotAtStep(progression, 0)?.degree).toBe("i");
+    expect(slotAtStep(progression, SLOT_STEPS - 1)?.degree).toBe("i");
+    expect(slotAtStep(progression, SLOT_STEPS)?.degree).toBe("VI");
+    expect(slotAtStep(progression, SLOT_STEPS * 2)?.degree).toBe("i");
+  });
+
+  it("fills the two-bar loop with four chords", () => {
+    expect(MAX_SLOTS * SLOT_STEPS).toBe(32);
+    expect(slotAtStep([], 0)).toBeUndefined();
   });
 
   it("wraps template rotation in both directions", () => {

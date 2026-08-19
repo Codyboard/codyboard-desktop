@@ -1,0 +1,16 @@
+/* Keep structural page layers transparent for the Electron vibrancy surface. */
+.device-selection-page,
+.permission-route-loading,
+.permissions-page,
+.device-detail-page,
+.device-stage.remote-stage,
+.device-detail-panel {
+  background: transparent !important;
+}
+
+.device-selection-page::before,
+.selection-atmosphere,
+.device-stage.remote-stage::before {
+  background: none !important;
+}
+

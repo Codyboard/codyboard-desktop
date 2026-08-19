@@ -1,0 +1,149 @@
+.app-toolbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  box-sizing: border-box;
+  height: 60px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px 0 max(94px, var(--page-gutter, 28px));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  -webkit-app-region: drag;
+}
+
+html.cody-select-open .app-toolbar { -webkit-app-region: no-drag; }
+
+.device-route-stack {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.route-layer-selection {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  opacity: 1;
+}
+
+.device-route-stack.has-detail .route-layer-selection {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.route-layer-detail {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  min-height: 100vh;
+}
+
+.app-toolbar-title {
+  display: flex;
+  height: 32px;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  line-height: 1;
+  transform: translateY(3px);
+}
+
+.app-toolbar-title strong { font-size: 13px; font-weight: 650; letter-spacing: -0.015em; line-height: 1; }
+.app-toolbar-title p { overflow: hidden; margin: 0; color: rgba(218, 223, 221, 0.48); text-overflow: ellipsis; white-space: nowrap; }
+
+.app-toolbar-home {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  border-radius: 6px;
+  color: inherit;
+  outline: none;
+  text-decoration: none;
+  transition: color 140ms ease, opacity 140ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.app-toolbar-home:hover { opacity: 0.72; }
+.app-toolbar-home:focus-visible { box-shadow: 0 0 0 2px rgba(115, 224, 180, 0.3); }
+
+.app-toolbar-device-title { cursor: help; outline: none; }
+.app-toolbar-device-title:focus-visible { color: rgba(232, 238, 235, 0.72); }
+
+.cody-tooltip-content {
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(190, 205, 199, 0.18);
+  border-radius: 8px;
+  background: rgba(18, 22, 21, 0.82);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.055);
+  color: rgba(225, 232, 229, 0.58);
+  font: 600 9px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(18px) saturate(120%);
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  animation: cody-tooltip-in 120ms ease-out;
+}
+
+.cody-tooltip-content code {
+  color: rgba(132, 226, 188, 0.86);
+  font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cody-tooltip-arrow { fill: rgba(18, 22, 21, 0.82); }
+
+.toolbar-back {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  color: inherit;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.toolbar-back:hover { background: rgba(255, 255, 255, 0.08); transform: translateX(-2px); }
+.toolbar-back svg { width: 15px; height: 15px; stroke-width: 1.8; }
+
+.app-toolbar-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  -webkit-app-region: no-drag;
+}
+
+.theme-toggle,
+.toolbar-icon-button {
+  display: grid;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(246, 248, 247, 0.82);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.theme-toggle:hover,
+.toolbar-icon-button:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.09); transform: translateY(-1px); }
+.theme-toggle:active,
+.toolbar-icon-button:active:not(:disabled) { transform: translateY(0); }
+.theme-toggle svg,
+.toolbar-icon-button svg { width: 14px; height: 14px; stroke-width: 1.7; }
+.toolbar-icon-button:disabled { cursor: wait; opacity: 0.58; }
+.toolbar-icon-button[aria-busy="true"] svg { animation: toolbar-icon-spin 720ms linear infinite; }
+

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProfileDocument, ProfileStateDocument } from "../shared/hid.js";
+import type { ProfileDocument, ProfileStateDocument } from "../../shared/hid.js";
 
 import { compileProfiles, parseProfileDocument } from "./profile-schema.js";
 

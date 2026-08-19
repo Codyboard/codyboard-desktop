@@ -1,4 +1,4 @@
-import type { HIDModifier } from "../shared/hid.js";
+import type { HIDModifier } from "../../shared/hid.js";
 
 export const KEY_CODES: Readonly<Record<string, number>> = {
   a: 0, s: 1, d: 2, f: 3, h: 4, g: 5, z: 6, x: 7, c: 8, v: 9,

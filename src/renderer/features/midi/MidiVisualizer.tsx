@@ -6,10 +6,12 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 
 import type { MidiAudioEngine } from "./audio-engine";
 
-const TRACKS = ["kick", "snare", "hat", "ohat", "clap", "tom", "perc", "bass", "arp"] as const;
+const TRACKS = [
+  "kick", "snare", "hat", "ohat", "clap", "tom", "perc", "bass", "chord", "lead",
+] as const;
 const COLORS: Readonly<Record<typeof TRACKS[number], number>> = {
   kick: 0xff4f00, snare: 0xffa300, hat: 0xedeae2, ohat: 0x9fb4c7, clap: 0xff2d55,
-  tom: 0xffd400, perc: 0x7dffb0, bass: 0x36e0ff, arp: 0xb68cff,
+  tom: 0xffd400, perc: 0x7dffb0, bass: 0x36e0ff, chord: 0xb68cff, lead: 0x7ee787,
 };
 
 interface AnimatedPad extends THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial> {
@@ -33,9 +35,10 @@ export function MidiVisualizer({ engine }: { engine: MidiAudioEngine }) {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 160);
-    camera.position.set(1.5, 11.5, 15.5);
+    camera.position.set(1.5, 10.4, 13.8);
     const rig = new THREE.Group();
     rig.position.x = 2.2;
+    rig.scale.setScalar(1.2);
     scene.add(rig);
     scene.add(new THREE.AmbientLight(0x58616d, 1.4));
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.25);
@@ -51,8 +54,8 @@ export function MidiVisualizer({ engine }: { engine: MidiAudioEngine }) {
     const stepSpacing = 0.86;
     const trackSpacing = 0.82;
     const stepX = (step: number) => (step - 7.5) * stepSpacing;
-    const trackZ = (track: number) => (track - 4) * trackSpacing;
-    const bodyGeometry = new THREE.BoxGeometry(16 * stepSpacing + 1.2, 0.5, 9 * trackSpacing + 1.25);
+    const trackZ = (track: number) => (track - (TRACKS.length - 1) / 2) * trackSpacing;
+    const bodyGeometry = new THREE.BoxGeometry(16 * stepSpacing + 1.2, 0.5, TRACKS.length * trackSpacing + 1.25);
     const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x292821, metalness: 0.18, roughness: 0.84 });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.position.y = -0.4;
@@ -80,7 +83,7 @@ export function MidiVisualizer({ engine }: { engine: MidiAudioEngine }) {
     const headMaterial = new THREE.MeshBasicMaterial({
       blending: THREE.AdditiveBlending, color: 0xff4f00, depthWrite: false, opacity: 0.11, transparent: true,
     });
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.76, 4.8, 9 * trackSpacing + 1), headMaterial);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.76, 4.8, TRACKS.length * trackSpacing + 1), headMaterial);
     head.position.y = 1.7;
     rig.add(head);
 
@@ -110,9 +113,10 @@ export function MidiVisualizer({ engine }: { engine: MidiAudioEngine }) {
     let previous = performance.now();
 
     const unsubscribe = engine.onPulse(({ hits, step }) => {
-      activeStep = step;
+      const barStep = step % 16;
+      activeStep = barStep;
       for (const hit of hits) {
-        const pad = pads.get(`${hit}:${step}`);
+        const pad = pads.get(`${hit}:${barStep}`);
         if (pad) {
           pad.userData.flash = 1;
           pad.userData.lift = 1;
@@ -161,8 +165,8 @@ export function MidiVisualizer({ engine }: { engine: MidiAudioEngine }) {
       });
       rig.rotation.y = Math.sin(seconds * 0.16) * 0.07 + pointerX * 0.1;
       camera.position.x += (pointerX * 1.25 + 1.5 - camera.position.x) * delta * 1.8;
-      camera.position.y += (12.5 - pointerY * 1.1 - camera.position.y) * delta * 1.8;
-      camera.lookAt(1.1, 0, 0);
+      camera.position.y += (11.2 - pointerY * 1.1 - camera.position.y) * delta * 1.8;
+      camera.lookAt(1.1, 1.7, 0);
       under.intensity = 21 + Math.sin(seconds * 3) * 5;
       composer.render();
       frame = requestAnimationFrame(render);

@@ -1,0 +1,183 @@
+.mapping-console {
+  display: flex;
+  box-sizing: border-box;
+  height: 100%;
+  flex-direction: column;
+  color: rgba(245, 248, 247, 0.94);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+}
+
+.mapping-console-header {
+  display: grid;
+  min-height: 112px;
+  align-items: center;
+  grid-template-columns: minmax(120px, 1fr) minmax(190px, 0.92fr);
+  gap: 24px;
+  padding: 17px 26px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+  background:
+    linear-gradient(90deg, rgba(104, 222, 175, 0.055), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent);
+}
+
+.mapping-console-header p {
+  margin: 0 0 8px;
+  color: rgba(134, 221, 186, 0.62);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.mapping-console-header h2 {
+  margin: 0;
+  font-size: clamp(25px, 2.6vw, 32px);
+  font-weight: 570;
+  letter-spacing: -0.045em;
+  line-height: 0.88;
+}
+
+.mapping-scope-select { display: grid; min-width: 0; gap: 7px; }
+.mapping-scope-select > span:first-child {
+  color: rgba(214, 221, 218, 0.34);
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.mapping-scope-trigger { height: 42px; font-size: 14px; }
+
+.cody-select-trigger {
+  display: flex;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 10px;
+  outline: none;
+  background: rgba(18, 22, 21, 0.1);
+  backdrop-filter: blur(18px) saturate(115%);
+  color: rgba(242, 246, 244, 0.9);
+  cursor: pointer;
+  font: 550 13px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.cody-select-trigger:hover { border-color: rgba(115, 224, 180, 0.22); background: rgba(23, 31, 28, 0.17); }
+.cody-select-trigger:focus-visible,
+.cody-select-trigger[data-state="open"] {
+  border-color: rgba(115, 224, 180, 0.48);
+  background: rgba(26, 43, 36, 0.23);
+  box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.07);
+}
+.cody-select-trigger:disabled { cursor: default; opacity: 0.42; }
+.cody-select-chevron { width: 15px; height: 15px; flex: 0 0 auto; color: rgba(220, 227, 224, 0.45); stroke-width: 1.8; }
+
+.cody-select-content {
+  position: relative;
+  z-index: 1000;
+  min-width: var(--radix-select-trigger-width);
+  max-height: min(460px, var(--radix-select-content-available-height));
+  overflow: hidden;
+  border: 1px solid rgba(180, 195, 189, 0.2);
+  border-radius: 13px;
+  background: rgba(30, 34, 33, 0.85);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.055);
+  color: rgba(239, 243, 241, 0.92);
+  transform-origin: var(--radix-select-content-transform-origin);
+}
+
+.cody-select-content::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  -webkit-backdrop-filter: blur(16px) saturate(110%);
+  backdrop-filter: blur(16px) saturate(110%);
+  content: "";
+  pointer-events: none;
+}
+
+.cody-select-content > * { position: relative; z-index: 1; }
+
+.cody-select-content[data-state="open"] { animation: cody-select-in 150ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.cody-select-viewport { padding: 6px; }
+.cody-select-item {
+  position: relative;
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 0 12px 0 36px;
+  border-radius: 8px;
+  outline: none;
+  cursor: default;
+  font: 550 14px/1.2 "Avenir Next", "Helvetica Neue", sans-serif;
+  user-select: none;
+}
+.cody-select-item[data-highlighted] { background: rgba(102, 214, 171, 0.12); color: #f7faf8; }
+.cody-select-item[data-state="checked"] { color: rgba(137, 230, 192, 0.96); }
+.cody-select-item[data-disabled] { opacity: 0.36; pointer-events: none; }
+.cody-select-indicator { position: absolute; left: 11px; display: grid; width: 16px; place-items: center; }
+.cody-select-indicator svg { width: 15px; height: 15px; stroke-width: 2.3; }
+.cody-select-label {
+  padding: 13px 12px 7px;
+  color: rgba(204, 213, 209, 0.36);
+  font: 650 9px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.cody-select-separator { height: 1px; margin: 6px; background: rgba(255, 255, 255, 0.075); }
+.cody-select-scroll-button { display: grid; height: 28px; place-items: center; color: rgba(222, 230, 226, 0.5); }
+.cody-select-scroll-button svg { width: 15px; height: 15px; }
+
+.mapping-scope-menu { width: max(var(--radix-select-trigger-width), 300px); }
+.key-output-menu { width: 310px; }
+.key-output-option { display: flex; align-items: center; gap: 12px; }
+.key-output-option svg { width: 18px; height: 18px; flex: 0 0 auto; color: rgba(209, 218, 214, 0.58); stroke-width: 1.75; }
+.application-select-identity { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.application-select-identity img,
+.application-select-identity svg { width: 32px; height: 32px; flex: 0 0 auto; object-fit: contain; }
+.application-select-identity svg { padding: 3px; color: rgba(212, 222, 218, 0.58); stroke-width: 1.7; }
+.application-select-identity > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mapping-scope-trigger .application-select-identity img,
+.mapping-scope-trigger .application-select-identity svg { width: 22px; height: 22px; }
+.mapping-scope-application-option { position: relative; }
+.mapping-scope-application-option .cody-select-item { padding-right: 46px; }
+.select-row-remove {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  outline: none;
+  background: transparent;
+  color: rgba(220, 227, 224, 0.36);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 140ms ease, background 140ms ease;
+}
+.select-row-remove:hover { background: rgba(222, 81, 81, 0.12); color: rgb(255, 171, 171); }
+.select-row-remove:focus-visible { background: rgba(222, 81, 81, 0.12); color: rgb(255, 171, 171); }
+.select-row-remove:disabled { cursor: default; opacity: 0.35; }
+.select-row-remove svg { width: 14px; height: 14px; stroke-width: 1.8; }
+.cody-select-item.is-add-application { color: rgba(137, 224, 188, 0.82); }
+.mapping-scope-action { white-space: nowrap; }
+.mapping-scope-action svg {
+  position: absolute;
+  left: 11px;
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.9;
+}
+

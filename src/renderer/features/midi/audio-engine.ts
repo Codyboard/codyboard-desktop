@@ -1,21 +1,24 @@
-import { MidiVoices } from "./audio-voices";
-import { arpeggioNote, type ChordChoice } from "./harmony";
-import { DRUM_TRACKS, MIDI_STEPS, MIDI_TEMPLATES, noteName } from "./midi-templates";
-import { adjustedTempo, appendChord, chordAtStep, wrappedIndex } from "./sequencer";
+import {
+  createEngineSnapshot,
+  type MidiEngineSnapshot,
+  type MidiLayer,
+} from "./audio-engine-snapshot";
+import { createMidiAudioGraph } from "./audio-graph";
+import { scheduleStep } from "./audio-step-scheduler";
+import type { MidiVoices } from "./audio-voices";
+import type { PerformanceFx } from "./controls";
+import type { ChordSlot } from "./harmony";
+import {
+  BASS_PATTERNS, bassPatternIndex, DRUM_KITS, drumKitIndex, LOOP_STEPS,
+  nextKitInFamily, type DrumFamily,
+} from "./midi-templates";
+import { PerformanceEffects } from "./performance-effects";
+import { MIDI_RIGS } from "./rigs";
+import { adjustedTempo, appendSlot, removeSlot, SLOT_STEPS, wrappedIndex } from "./sequencer";
 
-export type MidiLayer = "BASS" | "DRUM" | "TEMPO";
+export type { MidiEngineSnapshot, MidiLayer } from "./audio-engine-snapshot";
 
-export interface MidiEngineSnapshot {
-  activeLayer: MidiLayer;
-  bassTemplate: string;
-  bpm: number;
-  drumTemplate: string;
-  playing: boolean;
-  progression: readonly ChordChoice[];
-  root: string;
-  step: number;
-  swing: number;
-}
+const LAYER_ORDER: readonly MidiLayer[] = ["RIG", "DRUM", "BASS", "TEMPO"];
 
 export interface MidiPulse {
   hits: readonly string[];
@@ -26,41 +29,40 @@ type Listener<T> = (value: T) => void;
 
 export class MidiAudioEngine {
   private readonly analyser: AnalyserNode;
-  private readonly context = new AudioContext();
-  private readonly master = this.context.createGain();
+  private readonly context: AudioContext;
+  private readonly delay: DelayNode;
+  private readonly delaySend: GainNode;
+  private readonly djFilter: BiquadFilterNode;
+  private readonly master: GainNode;
   private readonly pulses = new Set<Listener<MidiPulse>>();
   private readonly stateListeners = new Set<Listener<MidiEngineSnapshot>>();
   private readonly timeouts = new Set<number>();
   private readonly voices: MidiVoices;
-  private activeLayer: MidiLayer = "DRUM";
-  private bassIndex = 0;
-  private drumIndex = 0;
+  private activeLayer: MidiLayer = "RIG";
+  private bassIndex = bassPatternIndex(MIDI_RIGS[0].defaultBass);
+  private drumIndex = drumKitIndex(MIDI_RIGS[0].defaultDrum);
+  private readonly effects: PerformanceEffects;
   private nextTime = 0;
-  private pendingBassIndex?: number;
-  private pendingDrumIndex?: number;
-  private pendingProgression?: readonly ChordChoice[];
+  private pendingProgression?: readonly ChordSlot[];
   private playing = false;
-  private progression: readonly ChordChoice[] = [];
+  private progression: readonly ChordSlot[] = [];
+  private rigIndex = 0;
   private sequenceStep = 0;
   private step = 0;
-  private tempo = MIDI_TEMPLATES[0].bpm;
+  private tempo = DRUM_KITS[drumKitIndex(MIDI_RIGS[0].defaultDrum)].bpm;
   private timer?: number;
-  private resumeWhenVisible = false;
 
   constructor() {
-    const compressor = this.context.createDynamicsCompressor();
-    compressor.threshold.value = -14;
-    compressor.knee.value = 22;
-    compressor.ratio.value = 5;
-    compressor.attack.value = 0.004;
-    compressor.release.value = 0.2;
-    this.master.gain.value = 0.82;
-    this.analyser = this.context.createAnalyser();
-    this.analyser.fftSize = 128;
-    this.analyser.smoothingTimeConstant = 0.72;
-    this.master.connect(compressor).connect(this.analyser);
-    compressor.connect(this.context.destination);
-    this.voices = new MidiVoices(this.context, this.master);
+    const graph = createMidiAudioGraph(MIDI_RIGS[0].delayMix);
+    this.analyser = graph.analyser;
+    this.context = graph.context;
+    this.delay = graph.delay;
+    this.delaySend = graph.delaySend;
+    this.djFilter = graph.djFilter;
+    this.master = graph.master;
+    this.voices = graph.voices;
+    this.effects = new PerformanceEffects(this.context, this.djFilter);
+    this.syncDelayTime();
     this.play();
   }
 
@@ -69,19 +71,18 @@ export class MidiAudioEngine {
   }
 
   getSnapshot(): MidiEngineSnapshot {
-    const drum = MIDI_TEMPLATES[this.drumIndex];
-    const bass = MIDI_TEMPLATES[this.bassIndex];
-    return {
+    return createEngineSnapshot({
+      activeFx: this.effects.active(),
       activeLayer: this.activeLayer,
-      bassTemplate: bass.name,
-      bpm: this.tempo,
-      drumTemplate: drum.name,
+      bassIndex: this.bassIndex,
+      drumIndex: this.drumIndex,
+      pendingProgression: this.pendingProgression,
       playing: this.playing,
-      progression: this.pendingProgression ?? this.progression,
-      root: noteName(bass.rootMidi),
+      progression: this.progression,
+      rigIndex: this.rigIndex,
       step: this.step,
-      swing: drum.swing,
-    };
+      tempo: this.tempo,
+    });
   }
 
   onPulse(listener: Listener<MidiPulse>): () => void {
@@ -95,8 +96,17 @@ export class MidiAudioEngine {
     return () => this.stateListeners.delete(listener);
   }
 
-  addChord(choice: ChordChoice): void {
-    this.pendingProgression = appendChord(this.pendingProgression ?? this.progression, choice);
+  addChord(slot: ChordSlot): void {
+    this.pendingProgression = appendSlot(this.pendingProgression ?? this.progression, slot);
+    this.emitState();
+  }
+
+  /** Drops one slot from the loop; like addChord it lands on the next half bar. */
+  removeChord(index: number): void {
+    const current = this.pendingProgression ?? this.progression;
+    const next = removeSlot(current, index);
+    if (next === current) return;
+    this.pendingProgression = next;
     this.emitState();
   }
 
@@ -105,36 +115,62 @@ export class MidiAudioEngine {
     this.emitState();
   }
 
+  selectRig(index: number): void {
+    this.rigIndex = wrappedIndex(0, index, MIDI_RIGS.length);
+    this.adoptRigDefaults();
+    this.restartLoop();
+  }
+
+  selectDrumFamily(family: DrumFamily): void {
+    this.adoptDrumKit(nextKitInFamily(this.drumIndex, family));
+    this.restartLoop();
+  }
+
+  triggerFx(fx: PerformanceFx): void {
+    this.effects.trigger(fx);
+    this.emitState();
+  }
+
+  /** Returns the instrument to its opening state: first rig, empty loop, no effects, playing. */
+  reset(): void {
+    this.progression = [];
+    this.pendingProgression = undefined;
+    this.rigIndex = 0;
+    this.adoptRigDefaults();
+    this.activeLayer = "RIG";
+    this.effects.reset();
+    if (this.playing) this.restartLoop();
+    else this.play();
+  }
+
   toggleLayer(): void {
-    this.activeLayer = this.activeLayer === "DRUM"
-      ? "BASS"
-      : this.activeLayer === "BASS" ? "TEMPO" : "DRUM";
+    const index = LAYER_ORDER.indexOf(this.activeLayer);
+    this.activeLayer = LAYER_ORDER[(index + 1) % LAYER_ORDER.length];
     this.emitState();
   }
 
   turnKnob(delta: -1 | 1): void {
-    if (this.activeLayer === "DRUM")
-      this.pendingDrumIndex = wrappedIndex(this.pendingDrumIndex ?? this.drumIndex, delta, MIDI_TEMPLATES.length);
-    else if (this.activeLayer === "BASS")
-      this.pendingBassIndex = wrappedIndex(this.pendingBassIndex ?? this.bassIndex, delta, MIDI_TEMPLATES.length);
-    else
+    if (this.activeLayer === "RIG") {
+      this.rigIndex = wrappedIndex(this.rigIndex, delta, MIDI_RIGS.length);
+      this.adoptRigDefaults();
+      this.restartLoop();
+    } else if (this.activeLayer === "DRUM") {
+      this.adoptDrumKit(wrappedIndex(this.drumIndex, delta, DRUM_KITS.length));
+      this.restartLoop();
+    } else if (this.activeLayer === "BASS") {
+      this.bassIndex = wrappedIndex(this.bassIndex, delta, BASS_PATTERNS.length);
+      this.restartLoop();
+    } else {
+      // Tempo is continuous: it takes effect at once but must not stutter the groove back to step one.
       this.tempo = adjustedTempo(this.tempo, delta);
-    this.emitState();
+      this.syncDelayTime();
+      this.emitState();
+    }
   }
 
   togglePlayback(): void {
     if (this.playing) this.pause();
     else this.play();
-  }
-
-  setPageVisible(visible: boolean): void {
-    if (!visible) {
-      this.resumeWhenVisible = this.playing;
-      this.pause();
-    } else if (this.resumeWhenVisible) {
-      this.resumeWhenVisible = false;
-      this.play();
-    }
   }
 
   dispose(): void {
@@ -173,53 +209,33 @@ export class MidiAudioEngine {
   private tick(): void {
     while (this.playing && this.nextTime < this.context.currentTime + 0.12) {
       this.applyQueuedChanges();
-      const drum = MIDI_TEMPLATES[this.drumIndex];
+      const drum = DRUM_KITS[this.drumIndex];
       const swingDelay = this.sequenceStep % 2 === 1 ? drum.swing * this.stepDuration() * 0.6 : 0;
       this.schedule(this.sequenceStep, this.nextTime + swingDelay);
       this.nextTime += this.stepDuration();
-      this.sequenceStep = (this.sequenceStep + 1) % MIDI_STEPS;
+      this.sequenceStep = (this.sequenceStep + 1) % LOOP_STEPS;
     }
   }
 
   private applyQueuedChanges(): void {
-    if (this.sequenceStep % 4 === 0 && this.pendingProgression !== undefined) {
-      this.progression = this.pendingProgression;
-      this.pendingProgression = undefined;
-    }
-    if (this.sequenceStep === 0) {
-      if (this.pendingDrumIndex !== undefined) {
-        this.drumIndex = this.pendingDrumIndex;
-        this.tempo = MIDI_TEMPLATES[this.drumIndex].bpm;
-      }
-      if (this.pendingBassIndex !== undefined) this.bassIndex = this.pendingBassIndex;
-      this.pendingDrumIndex = undefined;
-      this.pendingBassIndex = undefined;
-    }
+    if (this.sequenceStep % SLOT_STEPS !== 0 || this.pendingProgression === undefined) return;
+    this.progression = this.pendingProgression;
+    this.pendingProgression = undefined;
   }
 
   private schedule(step: number, time: number): void {
-    const drum = MIDI_TEMPLATES[this.drumIndex];
-    const bass = MIDI_TEMPLATES[this.bassIndex];
-    const hits: string[] = [];
-    for (const track of DRUM_TRACKS) {
-      if (drum.drums[track][step] === "x") {
-        this.voices.playDrum(track, time);
-        hits.push(track);
-      }
-    }
-    if (bass.bass[step] === "x") {
-      this.voices.bass(time, bass.rootMidi + bass.notes[step]);
-      hits.push("bass");
-    }
-    const chord = chordAtStep(this.progression, step);
-    if (chord) {
-      this.voices.arpeggio(time, arpeggioNote(chord, bass.rootMidi, step % 4));
-      hits.push("arp");
-    }
-    if (step % 4 === 0) {
-      this.voices.metronome(time, step === 0);
-      hits.push("click");
-    }
+    const hits = scheduleStep({
+      bassIndex: this.bassIndex,
+      drumIndex: this.drumIndex,
+      effects: this.effects,
+      progression: this.progression,
+      rigIndex: this.rigIndex,
+      step,
+      stepDuration: this.stepDuration(),
+      time,
+      voices: this.voices,
+    });
+
     const delay = Math.max(0, (time - this.context.currentTime) * 1_000);
     const timeout = window.setTimeout(() => {
       this.timeouts.delete(timeout);
@@ -229,6 +245,33 @@ export class MidiAudioEngine {
       this.emitState();
     }, delay);
     this.timeouts.add(timeout);
+  }
+
+  private adoptRigDefaults(): void {
+    const rig = MIDI_RIGS[this.rigIndex];
+    this.bassIndex = bassPatternIndex(rig.defaultBass);
+    this.adoptDrumKit(drumKitIndex(rig.defaultDrum));
+    this.delaySend.gain.setTargetAtTime(rig.delayMix, this.context.currentTime, 0.05);
+  }
+
+  private adoptDrumKit(index: number): void {
+    this.drumIndex = index;
+    this.tempo = DRUM_KITS[this.drumIndex].bpm;
+    this.syncDelayTime();
+  }
+
+  /** Instrument changes are live: the loop jumps straight back to step one instead of finishing the bar. */
+  private restartLoop(): void {
+    this.sequenceStep = 0;
+    this.step = 0;
+    if (this.playing) this.nextTime = this.context.currentTime + 0.03;
+    this.emitState();
+  }
+
+  private syncDelayTime(): void {
+    this.delay.delayTime.setTargetAtTime(
+      (60 / this.tempo) * 0.75, this.context.currentTime, 0.05,
+    );
   }
 
   private stepDuration(): number {

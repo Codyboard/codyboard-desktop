@@ -1,0 +1,23 @@
+.device-stage.remote-stage {
+  --remote-height: min(858px, calc(100vh - 52px));
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 46%, rgba(105, 111, 111, 0.2) 0, rgba(24, 27, 28, 0.06) 40%, transparent 65%),
+    linear-gradient(145deg, rgba(23, 26, 27, 0.74) 0%, rgba(12, 14, 15, 0.7) 56%, rgba(8, 9, 9, 0.78) 100%);
+  isolation: isolate;
+}
+
+.device-stage.remote-stage::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.92' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+  content: "";
+  opacity: 0.09;
+  pointer-events: none;
+}
+

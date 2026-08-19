@@ -1,0 +1,200 @@
+.profile-switcher {
+  display: grid;
+  min-width: 190px;
+  gap: 7px;
+  color: rgba(222, 227, 225, 0.48);
+  font: 600 9px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  -webkit-app-region: no-drag;
+}
+
+.app-toolbar-actions .profile-switcher {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.profile-select-trigger {
+  width: fit-content;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  border-color: transparent;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 550;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.profile-select-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(32, 38, 36, 0.2);
+  color: rgba(255, 255, 255, 1);
+}
+
+.profile-select-trigger:hover .cody-select-chevron { color: rgba(244, 248, 246, 0.78); }
+
+.profile-select-trigger:focus-visible,
+.profile-select-trigger[data-state="open"] {
+  border-color: rgba(115, 224, 180, 0.18);
+  background: rgba(31, 48, 41, 0.26);
+  box-shadow: none;
+}
+
+.profile-select-trigger .cody-select-chevron { width: 11px; height: 11px; }
+.profile-select-menu { min-width: 180px; }
+.profile-menu-option { position: relative; }
+.profile-menu-option .cody-select-item { padding-right: 46px; }
+.profile-menu-action-content {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.profile-menu-action-content > svg {
+  position: absolute;
+  left: 11px;
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.9;
+}
+
+.profile-dialog-backdrop {
+  position: fixed;
+  z-index: 1300;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 7, 7, 0.48);
+  backdrop-filter: blur(12px) saturate(90%);
+  -webkit-app-region: no-drag;
+}
+
+.profile-dialog {
+  position: relative;
+  width: min(390px, calc(100vw - 48px));
+  box-sizing: border-box;
+  padding: 28px;
+  border: 1px solid rgba(178, 199, 190, 0.2);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 95% 0%, rgba(99, 219, 171, 0.1), transparent 38%),
+    rgba(25, 29, 28, 0.96);
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.5), inset 0 1px rgba(255, 255, 255, 0.055);
+  color: rgba(244, 247, 246, 0.94);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  animation: cody-select-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.profile-dialog-eyebrow {
+  color: rgba(125, 224, 184, 0.64);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.profile-dialog h2 { margin: 10px 34px 8px 0; font-size: 22px; font-weight: 580; letter-spacing: -0.025em; }
+.profile-dialog p { margin: 0 0 22px; color: rgba(221, 228, 225, 0.52); font-size: 12px; line-height: 1.55; }
+.profile-dialog label {
+  display: block;
+  margin-bottom: 8px;
+  color: rgba(222, 229, 226, 0.58);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.profile-dialog input {
+  width: 100%;
+  height: 42px;
+  box-sizing: border-box;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  outline: none;
+  background: rgba(8, 11, 10, 0.34);
+  color: rgba(247, 249, 248, 0.94);
+  font: 550 13px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+}
+.profile-dialog input:focus { border-color: rgba(115, 224, 180, 0.48); box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.07); }
+.profile-dialog input::placeholder { color: rgba(220, 227, 224, 0.26); }
+.profile-dialog-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(231, 236, 234, 0.56);
+  cursor: pointer;
+}
+.profile-dialog-close:hover { background: rgba(255, 255, 255, 0.09); color: rgba(247, 249, 248, 0.9); }
+.profile-dialog-close svg { width: 14px; height: 14px; }
+.profile-dialog .profile-dialog-error { margin: 10px 0 0; color: rgba(255, 157, 157, 0.9); }
+.profile-dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 24px; }
+.profile-dialog-actions button {
+  min-width: 88px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(239, 243, 241, 0.72);
+  cursor: pointer;
+  font: 600 11px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+}
+.profile-dialog-actions button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: rgba(250, 252, 251, 0.94); }
+.profile-dialog-actions button.is-primary { border-color: rgba(98, 220, 172, 0.32); background: rgba(72, 191, 145, 0.16); color: rgba(143, 237, 199, 0.92); }
+.profile-dialog-actions button.is-destructive { border-color: rgba(237, 105, 105, 0.28); background: rgba(205, 69, 69, 0.12); color: rgba(255, 157, 157, 0.9); }
+.profile-dialog-actions button:disabled { cursor: default; opacity: 0.4; }
+
+@keyframes selection-header-in {
+  from { opacity: 0; transform: translateY(-18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes device-card-in {
+  0% { opacity: 0; transform: translateY(42px) scale(0.94); }
+  62% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes device-scan {
+  from { opacity: 0.2; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(-2px); }
+}
+
+@keyframes toolbar-icon-spin {
+  to { transform: rotate(1turn); }
+}
+
+@keyframes cody-select-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cody-tooltip-in {
+  from { opacity: 0; transform: translateY(-3px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes empty-state-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes empty-radar {
+  0% { opacity: 0; transform: scale(0.6); }
+  28% { opacity: 0.7; }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+
