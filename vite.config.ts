@@ -4,6 +4,9 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  // Packaged Electron windows load index.html over file://, so renderer assets
+  // must resolve relative to the document instead of from the filesystem root.
+  base: "./",
   plugins: [react()],
   resolve: {
     alias: {
