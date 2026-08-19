@@ -38,6 +38,7 @@ try {
       path.join(projectDirectory, "resources", "tray-iconTemplate.png"),
     ],
     ignore: [/pnpm-lock\.yaml$/, /pnpm-workspace\.yaml$/],
+    icon: path.join(projectDirectory, "resources", "app-icon.icns"),
     name: "Codyboard",
     out: releaseDirectory,
     overwrite: true,
