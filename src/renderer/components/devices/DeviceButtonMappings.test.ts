@@ -5,7 +5,15 @@ import {
   performActionTypeChange,
   recordedKeyboardOutput,
   SWEEP_PRO_CONTROLS,
+  XIAOMI_REMOTE_CONTROLS,
 } from "./DeviceButtonMappings";
+
+describe("Xiaomi remote controls", () => {
+  it("exposes the protected raw Power usage", () => {
+    expect(XIAOMI_REMOTE_CONTROLS.find(({ key }) => key === "power")?.input)
+      .toEqual({ kind: "hidUsage", usage: 0x66 });
+  });
+});
 
 describe("action type changes", () => {
   it.each(["keystroke", "launch", "open-url", "type-text"])("clears the previous value before switching to %s", async (action) => {

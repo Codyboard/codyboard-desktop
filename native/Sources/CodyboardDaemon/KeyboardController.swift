@@ -17,9 +17,13 @@ final class KeyboardController: @unchecked Sendable {
     var activeDevicePresses = ActiveDevicePressStore()
     var profilesNeedRawHID = false
     var pendingPhysicalEvents: [PendingDeviceInputEvent] = []
+    let powerEventSuppressor = XiaomiPowerEventSuppressor()
     lazy var rawHIDMonitor: RawHIDMonitor = {
         let monitor = RawHIDMonitor()
         monitor.onUsage = { [weak self] deviceId, usage, pressed in
+            if usage == XiaomiHIDProtectionController.powerUsage {
+                self?.powerEventSuppressor.arm(pressed: pressed)
+            }
             self?.receiveRawHIDUsage(deviceId: deviceId, usage: usage, pressed: pressed)
         }
         monitor.onInput = { [weak self] deviceId, kind, code, usage, pressed in
@@ -27,6 +31,7 @@ final class KeyboardController: @unchecked Sendable {
                 deviceId: deviceId, kind: kind, code: code, usage: usage, pressed: pressed
             )
         }
+        monitor.onReset = { [weak self] in self?.powerEventSuppressor.reset() }
         return monitor
     }()
     lazy var physicalHIDMonitor: PhysicalKeyboardHIDMonitor = {
@@ -156,6 +161,10 @@ final class KeyboardController: @unchecked Sendable {
         let keyboardType = type == systemDefined ? nil : Int(event.getIntegerValueField(.keyboardEventKeyboardType))
         let pressed = system?.pressed ?? eventPressed(type: type, keyCode: code, flags: event.flags)
         let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+        if kind == "keyboard",
+           powerEventSuppressor.shouldSuppress(keyCode: code, pressed: pressed) {
+            return nil
+        }
         let activeLaunchTrigger = ActiveLaunchTrigger(
             trigger: trigger, source: keyboardType.map { "keyboard-type:\($0)" }
         )
@@ -188,6 +197,12 @@ final class KeyboardController: @unchecked Sendable {
         }
 
         return Unmanaged.passUnretained(event)
+    }
+
+    func shutdown() {
+        rawHIDMonitor.stop()
+        physicalHIDMonitor.stop()
+        stop()
     }
 
 }

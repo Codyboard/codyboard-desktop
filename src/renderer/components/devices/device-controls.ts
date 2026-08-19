@@ -8,6 +8,7 @@ import {
   Menu,
   Minus,
   Plus,
+  Power,
   Tv,
   Undo2,
   Volume1,
@@ -31,6 +32,7 @@ export interface DeviceControl<Key extends string> {
 }
 
 export const XIAOMI_REMOTE_CONTROLS: readonly DeviceControl<XiaomiRemoteKey>[] = [
+  { icon: Power, input: { kind: "hidUsage", usage: 0x66 }, key: "power", label: "Power" },
   { icon: ChevronUp, input: { kind: "keyboard", key: "arrowUp", modifiers: ["fn"] }, key: "up", label: "Up" },
   { icon: ChevronDown, input: { kind: "keyboard", key: "arrowDown", modifiers: ["fn"] }, key: "down", label: "Down" },
   { icon: ChevronLeft, input: { kind: "keyboard", key: "arrowLeft", modifiers: ["fn"] }, key: "left", label: "Left" },

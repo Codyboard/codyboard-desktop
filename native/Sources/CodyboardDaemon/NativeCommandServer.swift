@@ -24,7 +24,10 @@ final class NativeCommandServer {
                 NativeOutput.shared.error(id: nil, code: "invalidCommand", message: error.localizedDescription)
             }
         }
-        DispatchQueue.main.async { CFRunLoopStop(CFRunLoopGetMain()) }
+        DispatchQueue.main.async { [weak self] in
+            self?.keyboard.shutdown()
+            CFRunLoopStop(CFRunLoopGetMain())
+        }
     }
 
     private func handle(_ command: Command) {

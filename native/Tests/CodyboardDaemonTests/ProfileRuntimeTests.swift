@@ -6,6 +6,49 @@ final class ProfileRuntimeTests: XCTestCase {
     private let globalOutput = CompiledOutput(kind: "keyboard", code: 37, modifiers: [])
     private let appOutput = CompiledOutput(kind: "keyboard", code: 11, modifiers: ["command"])
 
+    func testPowerProtectionPreservesOtherMappingsAndRestoresOriginalState() {
+        let existing = XiaomiHIDMapping(source: 1, destination: 2)
+        var current = [existing]
+        let service = XiaomiHIDMappingService(
+            id: 7, read: { current }, write: { current = $0; return true }
+        )
+        let protection = XiaomiHIDProtectionController(services: { [service] })
+
+        XCTAssertTrue(protection.refresh())
+        XCTAssertTrue(protection.isPowerProtected)
+        XCTAssertEqual(current, [existing, XiaomiHIDProtectionController.powerMapping])
+
+        protection.restore()
+        XCTAssertFalse(protection.isPowerProtected)
+        XCTAssertEqual(current, [existing])
+    }
+
+    func testPowerProtectionRollsBackWhenAnyServiceFails() {
+        var first = [XiaomiHIDMapping(source: 3, destination: 4)]
+        let services = [
+            XiaomiHIDMappingService(
+                id: 1, read: { first }, write: { first = $0; return true }
+            ),
+            XiaomiHIDMappingService(id: 2, read: { [] }, write: { _ in false }),
+        ]
+        let protection = XiaomiHIDProtectionController(services: { services })
+
+        XCTAssertFalse(protection.refresh())
+        XCTAssertFalse(protection.isPowerProtected)
+        XCTAssertEqual(first, [XiaomiHIDMapping(source: 3, destination: 4)])
+    }
+
+    func testProtectedF20IsSuppressedOnlyWhileRawPowerIsActive() {
+        let suppressor = XiaomiPowerEventSuppressor()
+        suppressor.arm(pressed: true, now: 1)
+        XCTAssertTrue(suppressor.shouldSuppress(keyCode: 90, pressed: true, now: 1.01))
+        XCTAssertFalse(suppressor.shouldSuppress(keyCode: 89, pressed: true, now: 1.01))
+
+        suppressor.arm(pressed: false, now: 2)
+        XCTAssertTrue(suppressor.shouldSuppress(keyCode: 90, pressed: false, now: 2.1))
+        XCTAssertFalse(suppressor.shouldSuppress(keyCode: 90, pressed: false, now: 2.11))
+    }
+
     func testSweepProUsagesCoverAllVisibleKeys() {
         let usages: [UInt32] = [
             0x17, 0x0A, 0x05, 0x15, 0x09, 0x19, 0x08, 0x07,
