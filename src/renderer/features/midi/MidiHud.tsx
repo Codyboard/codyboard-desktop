@@ -2,18 +2,22 @@ import { Infinity as InfinityMark } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import type { MidiEngineSnapshot } from "./audio-engine";
-import { FX_LABELS, FX_ORDER } from "./controls";
+import { directionFromModifiers, FX_LABELS, FX_ORDER } from "./controls";
 import { chordLabel } from "./harmony";
 import { LOOP_STEPS } from "./midi-templates";
 import { MAX_SLOTS } from "./sequencer";
 
 export function MidiHud({
   hardwareMode,
+  onRemoveChord,
+  onStepRig,
   resetCountdown,
   shifted,
   snapshot,
 }: {
   hardwareMode: boolean;
+  onRemoveChord: (index: number) => void;
+  onStepRig: (direction: -1 | 1) => void;
   resetCountdown?: number;
   shifted: boolean;
   snapshot: MidiEngineSnapshot;
@@ -23,7 +27,23 @@ export function MidiHud({
       <section className="midi-oled" aria-label="Tape display">
         <div className="midi-oled-screen">
           <header className="midi-oled-status">
-            <b>{snapshot.rig}</b>
+            <button
+              aria-label={`Current rig ${snapshot.rig}. Click for next rig; hold Control, Command, or Option for previous rig.`}
+              className="midi-oled-rig"
+              onClick={(event) => {
+                if (event.detail === 0) onStepRig(directionFromModifiers(event));
+              }}
+              onContextMenu={(event) => event.preventDefault()}
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                onStepRig(directionFromModifiers(event));
+              }}
+              title="Next rig · hold ⌃, ⌘, or ⌥ for previous"
+              type="button"
+            >
+              {snapshot.rig}
+            </button>
             <span>{hardwareMode ? "SWEEP PRO" : "VIRTUAL"}</span>
             <Pill label="SWG" segments={segments(snapshot.swing * 100, 30)} value={Math.round(snapshot.swing * 100)} />
             <Pill label="BPM" segments={segments(snapshot.bpm - 60, 120)} value={snapshot.bpm} />
@@ -48,16 +68,43 @@ export function MidiHud({
               <polyline points="4,1 16,15 84,15 96,1" vectorEffect="non-scaling-stroke" />
             </svg>
             <div className="midi-progression" aria-label="Current chord progression">
-              {Array.from({ length: MAX_SLOTS }, (_, index) => (
-                <b className={slotClass(snapshot, index)} key={index}>
-                  {snapshot.progression[index] ? chordLabel(snapshot.progression[index]) : "·"}
-                </b>
-              ))}
+              {Array.from({ length: MAX_SLOTS }, (_, index) => {
+                const slot = snapshot.progression[index];
+                if (!slot) return <b className="" key={index}>·</b>;
+                const label = chordLabel(slot);
+                return (
+                  <button
+                    aria-label={`Remove ${label} from the loop`}
+                    className={slotClass(snapshot, index)}
+                    key={index}
+                    onClick={() => onRemoveChord(index)}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <div className="midi-oled-title">
-            <b><i />{snapshot.drumTemplate} · {snapshot.bassTemplate}</b>
+            <button
+              aria-label={`Current rig ${snapshot.rig}. Click for next rig; hold Control, Command, or Option for previous rig.`}
+              className="midi-oled-track"
+              onClick={(event) => {
+                if (event.detail === 0) onStepRig(directionFromModifiers(event));
+              }}
+              onContextMenu={(event) => event.preventDefault()}
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                onStepRig(directionFromModifiers(event));
+              }}
+              title="Next rig · hold ⌃, ⌘, or ⌥ for previous"
+              type="button"
+            >
+              <i />{snapshot.drumTemplate} · {snapshot.bassTemplate}
+            </button>
             <span>{snapshot.rigTagline} · {snapshot.root}</span>
           </div>
 

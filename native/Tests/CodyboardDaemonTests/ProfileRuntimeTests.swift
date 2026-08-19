@@ -140,17 +140,56 @@ final class ProfileRuntimeTests: XCTestCase {
         XCTAssertNil(presses.uniqueAction(kind: "keyboard", code: 17))
     }
 
-    func testMIDICaptureSuppressesOnlyTheSelectedDevice() {
+    func testMIDICaptureSuppressesOnlyTheSweepProSource() {
         let mapped = ActiveDeviceAction.output(globalOutput)
         let captured = resolveNewDevicePress(
-            deviceId: "Sweep Pro", midiCaptureDeviceId: "Sweep Pro"
+            isMIDICaptureActive: true, isMIDICaptureSource: true
         ) { mapped }
         let other = resolveNewDevicePress(
-            deviceId: "Built-in Keyboard", midiCaptureDeviceId: "Sweep Pro"
+            isMIDICaptureActive: true, isMIDICaptureSource: false
         ) { mapped }
 
         guard case .suppress = captured else { return XCTFail("Expected MIDI capture to suppress the key") }
         guard case .output(let output) = other else { return XCTFail("Expected other devices to keep their mapping") }
+        XCTAssertEqual(output.code, globalOutput.code)
+    }
+
+    func testSweepProProfileResumesWhenMIDICaptureStops() {
+        let mapped = ActiveDeviceAction.output(globalOutput)
+        let action = resolveNewDevicePress(
+            isMIDICaptureActive: false, isMIDICaptureSource: true
+        ) { mapped }
+
+        guard case .output(let output) = action else {
+            return XCTFail("Expected the profile mapping after MIDI capture stops")
+        }
+        XCTAssertEqual(output.code, globalOutput.code)
+    }
+
+    func testMIDICaptureSuspendsAllProfileMappings() {
+        var consultedProfile = false
+        let action = resolveProfileAction(isProfilesSuspended: true) {
+            consultedProfile = true
+            return .output(globalOutput)
+        }
+
+        guard case .passthrough = action else {
+            return XCTFail("Expected profiles to pass through while MIDI is active")
+        }
+        XCTAssertFalse(consultedProfile)
+    }
+
+    func testAllProfileMappingsResumeAfterMIDICapture() {
+        var consultedProfile = false
+        let action = resolveProfileAction(isProfilesSuspended: false) {
+            consultedProfile = true
+            return .output(globalOutput)
+        }
+
+        guard case .output(let output) = action else {
+            return XCTFail("Expected profiles to resume after MIDI capture")
+        }
+        XCTAssertTrue(consultedProfile)
         XCTAssertEqual(output.code, globalOutput.code)
     }
 

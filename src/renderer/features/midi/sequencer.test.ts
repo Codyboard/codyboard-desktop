@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChordSlot } from "./harmony";
-import { adjustedTempo, appendSlot, MAX_SLOTS, slotAtStep, SLOT_STEPS, wrappedIndex } from "./sequencer";
+import {
+  adjustedTempo, appendSlot, MAX_SLOTS, removeSlot, slotAtStep, SLOT_STEPS, wrappedIndex,
+} from "./sequencer";
 
 const slot = (degree: ChordSlot["degree"]): ChordSlot => ({ degree, phrase: "stab" });
 
@@ -13,6 +15,27 @@ describe("Get Funky chord loop", () => {
     );
     expect(progression).toHaveLength(MAX_SLOTS);
     expect(progression.map((choice) => choice.degree)).toEqual(["III", "IV", "v", "VI"]);
+  });
+
+  it("closes the gap when a slot is removed", () => {
+    const progression = [slot("i"), slot("IV"), slot("VI"), slot("v")];
+    expect(removeSlot(progression, 1).map((choice) => choice.degree)).toEqual(["i", "VI", "v"]);
+    expect(removeSlot(progression, 0).map((choice) => choice.degree)).toEqual(["IV", "VI", "v"]);
+    expect(removeSlot(progression, 3).map((choice) => choice.degree)).toEqual(["i", "IV", "VI"]);
+  });
+
+  it("ignores removals outside the recorded slots", () => {
+    const progression = [slot("i"), slot("IV")];
+    expect(removeSlot(progression, 2)).toBe(progression);
+    expect(removeSlot(progression, -1)).toBe(progression);
+    expect(removeSlot([], 0)).toEqual([]);
+  });
+
+  it("shortens the loop so the remaining chords take the freed time", () => {
+    const progression = removeSlot([slot("i"), slot("IV"), slot("VI")], 1);
+    expect(slotAtStep(progression, 0)?.degree).toBe("i");
+    expect(slotAtStep(progression, SLOT_STEPS)?.degree).toBe("VI");
+    expect(slotAtStep(progression, SLOT_STEPS * 2)?.degree).toBe("i");
   });
 
   it("holds each chord for half a bar and loops the recorded choices", () => {

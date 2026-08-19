@@ -41,16 +41,15 @@ export function MidiPage() {
     const nextEngine = new MidiAudioEngine();
     setEngine(nextEngine);
     const unsubscribe = nextEngine.onState(setSnapshot);
-    const onVisibilityChange = () => nextEngine.setPageVisible(!document.hidden);
-    document.addEventListener("visibilitychange", onVisibilityChange);
+    // The loop keeps running while minimized or backgrounded; closing the window unmounts this page.
     return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
       unsubscribe();
       nextEngine.dispose();
     };
   }, []);
 
   useEffect(() => {
+    const captureOwnerId = crypto.randomUUID();
     let capturedDeviceId: string | undefined;
     let disposed = false;
     let scanning = false;
@@ -58,31 +57,23 @@ export function MidiPage() {
       if (scanning || disposed) return;
       scanning = true;
       try {
-        if (document.hidden) {
-          if (capturedDeviceId) await window.codyboard.midi.setExclusiveDevice();
-          capturedDeviceId = undefined;
-          setHardwareDeviceId(undefined);
-          return;
-        }
         const supported = findSupportedDevices(await window.codyboard.listHIDs());
         const sweep = supported.find((device) => device.model === "sweep-pro");
-        const nextDeviceId = sweep?.profileDomain;
-        if (nextDeviceId === capturedDeviceId) return;
-        if (capturedDeviceId) await window.codyboard.midi.setExclusiveDevice();
+        const nextCaptureDeviceId = sweep?.profileDomain;
+        if (nextCaptureDeviceId === capturedDeviceId) return;
+        if (capturedDeviceId)
+          await window.codyboard.midi.setExclusiveDevice(undefined, captureOwnerId);
         capturedDeviceId = undefined;
         setHardwareDeviceId(undefined);
-        if (nextDeviceId) {
+        if (nextCaptureDeviceId && sweep) {
           try {
-            const permissions = await window.codyboard.permissions.status();
-            if (!permissions.accessibility || !permissions.inputMonitoring)
-              throw new Error("Hardware permissions are required");
-            await window.codyboard.midi.setExclusiveDevice(nextDeviceId);
+            await window.codyboard.midi.setExclusiveDevice(nextCaptureDeviceId, captureOwnerId);
             if (disposed) {
-              await window.codyboard.midi.setExclusiveDevice();
+              await window.codyboard.midi.setExclusiveDevice(undefined, captureOwnerId);
               return;
             }
-            capturedDeviceId = nextDeviceId;
-            setHardwareDeviceId(nextDeviceId);
+            capturedDeviceId = nextCaptureDeviceId;
+            setHardwareDeviceId(sweep.profileDomain);
             setCaptureError(false);
           } catch {
             setCaptureError(true);
@@ -97,14 +88,12 @@ export function MidiPage() {
       }
     };
     void scan();
+    // Only rescans for hotplug; leaving the page is the one thing that releases the keyboard.
     const interval = window.setInterval(() => void scan(), 2_000);
-    const onVisibilityChange = () => void scan();
-    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       disposed = true;
       window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      void window.codyboard.midi.setExclusiveDevice();
+      void window.codyboard.midi.setExclusiveDevice(undefined, captureOwnerId);
     };
   }, []);
 
@@ -215,9 +204,27 @@ export function MidiPage() {
     void window.codyboard.permissions.openSettings(permission);
   };
 
+  const stepRig = useCallback((direction: -1 | 1) => {
+    if (!engine || !snapshot) return;
+    const current = MIDI_RIGS.findIndex(({ name }) => name === snapshot.rig);
+    engine.selectRig((current < 0 ? 0 : current) + direction);
+  }, [engine, snapshot]);
+
+  const beat = Math.floor((snapshot?.step ?? 0) / 4);
+  const pageStyle = {
+    "--midi-quarter": `${60 / (snapshot?.bpm ?? 104)}s`,
+  } as CSSProperties;
+
   return (
-    <main className="midi-page">
+    <main className="midi-page" style={pageStyle}>
       <div className="midi-window-drag" />
+      {snapshot?.playing && (
+        <div
+          key={`${beat}-${snapshot.bpm}`}
+          aria-hidden="true"
+          className={`midi-beat-wash is-beat-${beat % 4}`}
+        />
+      )}
       <section
         className={`midi-device-column ${shifted ? "is-shifted" : ""}`.trim()}
         aria-label="Sweep Pro instrument"
@@ -245,6 +252,8 @@ export function MidiPage() {
         {snapshot && (
           <MidiHud
             hardwareMode={Boolean(hardwareDeviceId)}
+            onRemoveChord={(index) => engine?.removeChord(index)}
+            onStepRig={stepRig}
             resetCountdown={resetCountdown}
             shifted={shifted}
             snapshot={snapshot}

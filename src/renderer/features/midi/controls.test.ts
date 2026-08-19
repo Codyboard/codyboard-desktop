@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  consumeShift, FX_ORDER, IDLE_SHIFT_LAYER, padAction, shiftActive, shiftDown, shiftUp,
+  consumeShift, directionFromModifiers, FX_ORDER, IDLE_SHIFT_LAYER, padAction, shiftActive,
+  shiftDown, shiftUp,
 } from "./controls";
 import { DRUM_FAMILIES } from "./midi-templates";
 import { MIDI_RIGS } from "./rigs";
@@ -25,9 +26,20 @@ describe("Get Funky shift layer", () => {
   });
 });
 
+describe("Get Funky browsing direction", () => {
+  it("moves forward without a modifier", () => {
+    expect(directionFromModifiers({ altKey: false, ctrlKey: false, metaKey: false })).toBe(1);
+  });
+
+  it.each(["altKey", "ctrlKey", "metaKey"] as const)("moves backward while %s is held", (key) => {
+    expect(directionFromModifiers({ altKey: false, ctrlKey: false, metaKey: false, [key]: true })).toBe(-1);
+  });
+});
+
 describe("Get Funky pad actions", () => {
   it("plays harmony without the layer", () => {
-    expect(padAction("Q", false)).toEqual({ kind: "chord", slot: { degree: "i", phrase: "stab" } });
+    expect(padAction("T", false)).toEqual({ kind: "chord", slot: { degree: "i", phrase: "stab" } });
+    expect(padAction("Q", false)).toEqual({ kind: "chord", slot: { degree: "i", phrase: "riff" } });
   });
 
   it("assigns rigs, drum kits and effects to the three shifted columns", () => {

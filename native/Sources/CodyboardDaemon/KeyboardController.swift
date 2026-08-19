@@ -33,7 +33,8 @@ final class KeyboardController: @unchecked Sendable {
         let monitor = PhysicalKeyboardHIDMonitor()
         monitor.onInput = { [weak self] deviceId, kind, code, usage, pressed in
             self?.receivePhysicalInput(
-                deviceId: deviceId, kind: kind, code: code, usage: usage, pressed: pressed
+                deviceId: deviceId, isMIDICaptureSource: true,
+                kind: kind, code: code, usage: usage, pressed: pressed
             )
         }
         return monitor
@@ -235,9 +236,10 @@ final class KeyboardController: @unchecked Sendable {
                 details: ["keyCode": String(code)]
             )
         }
-        if let deviceId = consumePhysicalDeviceId(kind: kind, code: code, pressed: pressed) {
+        if let physicalInput = consumePhysicalInput(kind: kind, code: code, pressed: pressed) {
             return resolveDeviceEvent(
-                input: DeviceInputIdentity(deviceId: deviceId, kind: kind, code: code),
+                input: DeviceInputIdentity(deviceId: physicalInput.deviceId, kind: kind, code: code),
+                isMIDICaptureSource: physicalInput.isMIDICaptureSource,
                 trigger: trigger, event: event, pressed: pressed, autorepeat: autorepeat
             )
         }
@@ -295,12 +297,14 @@ final class KeyboardController: @unchecked Sendable {
     }
 
     private func receivePhysicalInput(
-        deviceId: String, kind: String, code: Int, usage: UInt32, pressed: Bool
+        deviceId: String, isMIDICaptureSource: Bool = false,
+        kind: String, code: Int, usage: UInt32, pressed: Bool
     ) {
         let now = DispatchTime.now().uptimeNanoseconds
         pendingPhysicalEvents.removeAll { now - $0.timestamp > 250_000_000 }
         pendingPhysicalEvents.append(PendingDeviceInputEvent(
-            deviceId: deviceId, kind: kind, code: code, pressed: pressed, timestamp: now
+            deviceId: deviceId, isMIDICaptureSource: isMIDICaptureSource,
+            kind: kind, code: code, pressed: pressed, timestamp: now
         ))
         NativeOutput.shared.send(NativeEvent(
             event: "diagnosticKey",
@@ -315,18 +319,20 @@ final class KeyboardController: @unchecked Sendable {
         ))
     }
 
-    private func consumePhysicalDeviceId(kind: String, code: Int, pressed: Bool) -> String? {
+    private func consumePhysicalInput(
+        kind: String, code: Int, pressed: Bool
+    ) -> PendingDeviceInputEvent? {
         let now = DispatchTime.now().uptimeNanoseconds
         pendingPhysicalEvents.removeAll { now - $0.timestamp > 250_000_000 }
         guard let index = pendingPhysicalEvents.firstIndex(where: {
             $0.kind == kind && $0.code == code && $0.pressed == pressed
         }) else { return nil }
-        return pendingPhysicalEvents.remove(at: index).deviceId
+        return pendingPhysicalEvents.remove(at: index)
     }
 
     private func resolveDeviceEvent(
-        input: DeviceInputIdentity, trigger: CompiledTrigger, event: CGEvent,
-        pressed: Bool, autorepeat: Bool
+        input: DeviceInputIdentity, isMIDICaptureSource: Bool,
+        trigger: CompiledTrigger, event: CGEvent, pressed: Bool, autorepeat: Bool
     ) -> Unmanaged<CGEvent>? {
         let action: ActiveDeviceAction
         if pressed {
@@ -334,9 +340,11 @@ final class KeyboardController: @unchecked Sendable {
                 action = active
             } else {
                 action = resolveNewDevicePress(
-                    deviceId: input.deviceId,
-                    midiCaptureDeviceId: midiCaptureDeviceId
-                ) { resolveDeviceAction(deviceId: input.deviceId, trigger: trigger) }
+                    isMIDICaptureActive: midiCaptureDeviceId != nil,
+                    isMIDICaptureSource: isMIDICaptureSource
+                ) {
+                    resolveDeviceAction(deviceId: input.deviceId, trigger: trigger)
+                }
                 activeDevicePresses.begin(input, action: action)
             }
         } else {
@@ -352,24 +360,26 @@ final class KeyboardController: @unchecked Sendable {
     }
 
     private func resolveDeviceAction(deviceId: String, trigger: CompiledTrigger) -> ActiveDeviceAction {
-        switch runtime.resolve(
-            trigger: trigger, deviceId: deviceId, bundleIdentifier: frontmostBundleIdentifier
-        ) {
-        case .none, .ambiguous:
-            return .passthrough
-        case .output(let output):
-            if output.kind == "suppress" { return .suppress }
-            if output.kind == "passthrough" { return .passthrough }
-            if output.kind == "launchApplication" {
-                return output.bundleId.map(ActiveDeviceAction.launchApplication) ?? .suppress
+        resolveProfileAction(isProfilesSuspended: midiCaptureDeviceId != nil) {
+            switch runtime.resolve(
+                trigger: trigger, deviceId: deviceId, bundleIdentifier: frontmostBundleIdentifier
+            ) {
+            case .none, .ambiguous:
+                return .passthrough
+            case .output(let output):
+                if output.kind == "suppress" { return .suppress }
+                if output.kind == "passthrough" { return .passthrough }
+                if output.kind == "launchApplication" {
+                    return output.bundleId.map(ActiveDeviceAction.launchApplication) ?? .suppress
+                }
+                if output.kind == "openURL" {
+                    return output.url.map(ActiveDeviceAction.openURL) ?? .suppress
+                }
+                if output.kind == "typeText" {
+                    return output.text.map { ActiveDeviceAction.typeText($0, output.pressEnter ?? false) } ?? .suppress
+                }
+                return .output(output)
             }
-            if output.kind == "openURL" {
-                return output.url.map(ActiveDeviceAction.openURL) ?? .suppress
-            }
-            if output.kind == "typeText" {
-                return output.text.map { ActiveDeviceAction.typeText($0, output.pressEnter ?? false) } ?? .suppress
-            }
-            return .output(output)
         }
     }
 
@@ -448,6 +458,7 @@ final class KeyboardController: @unchecked Sendable {
 
 private struct PendingDeviceInputEvent {
     let deviceId: String
+    let isMIDICaptureSource: Bool
     let kind: String
     let code: Int
     let pressed: Bool
@@ -475,11 +486,18 @@ enum ActiveDeviceAction {
 }
 
 func resolveNewDevicePress(
-    deviceId: String,
-    midiCaptureDeviceId: String?,
+    isMIDICaptureActive: Bool,
+    isMIDICaptureSource: Bool,
     otherwise: () -> ActiveDeviceAction
 ) -> ActiveDeviceAction {
-    deviceId == midiCaptureDeviceId ? .suppress : otherwise()
+    isMIDICaptureActive && isMIDICaptureSource ? .suppress : otherwise()
+}
+
+func resolveProfileAction(
+    isProfilesSuspended: Bool,
+    otherwise: () -> ActiveDeviceAction
+) -> ActiveDeviceAction {
+    isProfilesSuspended ? .passthrough : otherwise()
 }
 
 struct ActiveDevicePressStore {

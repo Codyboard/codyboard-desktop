@@ -19,7 +19,7 @@ Codyboard detects supported physical HID devices, lets you assign actions to eve
 - Optionally press Enter after a text action.
 - Create and switch between reusable profiles.
 - Open **Get Funky 🪩** from the menu bar and make a quantized loop with the on-screen or physical Sweep Pro.
-- Keep capture active while the settings window is hidden in the menu bar.
+- Keep capture active while Get Funky is minimized or behind other apps; closing its window stops playback and releases the keyboard.
 - Store configuration locally as readable YAML files.
 
 ## Screenshots
@@ -35,8 +35,9 @@ Codyboard detects supported physical HID devices, lets you assign actions to eve
 ## Get Funky 🪩
 
 Choose **Get Funky 🪩** from the menu bar to open the built-in loop instrument. It starts immediately—there is no welcome screen or keyboard command to begin—and the on-screen Sweep Pro works even when no hardware is connected.
+Closing the window exits the instrument immediately: playback stops and an exclusively captured Sweep Pro is released. Minimizing the window or placing it behind another app keeps the loop running.
 
-The 15 pads are a performance grid. Rows are the five chords of the key, and the three columns are different ways of playing them: a comped chord stab, a chord decomposition arpeggio, and a lead riff. Everything is quantized and locked to the key, so any combination stays in tune. The four most recent pads loop as a two-bar progression.
+The 15 pads are a performance grid. Rows are five ways of playing a chord — a comped stab, a strummed spread, a decomposition arpeggio, a root pedal under moving upper tones, and a pentatonic lead riff — and the three columns are the roots `i7`, `IV9`, and `VI`. So a sideways move changes chord while the texture holds, and a vertical move changes texture while the chord holds. Everything is quantized and locked to the key, so any combination stays in tune. The four most recent pads loop as a two-bar progression.
 
 Hold or tap **Shift** to reach the second layer on the same 15 pads:
 
@@ -48,7 +49,7 @@ Hold or tap **Shift** to reach the second layer on the same 15 pads:
 
 Tab plays or pauses, Shift + Tab clears the loop, and holding Tab for three seconds resets everything back to the opening state. Pressing the knob cycles the rig, drum, bass and tempo layers; turning it browses 5 rigs, 16 drum kits and 16 bass patterns, or moves tempo from 60–180 BPM.
 
-When a physical Sweep Pro is connected and permissions are available, Codyboard temporarily gives the instrument exclusive control of its buttons. Existing profile actions and system-volume changes are suspended until you leave the page; other connected devices continue to work normally.
+When a physical Sweep Pro is connected, Codyboard temporarily gives the instrument exclusive control of its buttons. While Get Funky is open, all Codyboard profile mappings—global and application-specific, across every device—are suspended. Other keyboards retain their original unmapped behavior, and the saved profiles resume unchanged when you leave the page.
 
 ## Supported hardware
 

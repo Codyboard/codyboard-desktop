@@ -24,9 +24,35 @@
   pointer-events: none;
 }
 
+/* A translucent colour wash is remounted on each quarter-note pulse by MidiPage. */
+.midi-beat-wash {
+  position: absolute;
+  inset: -18%;
+  z-index: 0;
+  animation: midi-beat-wash var(--midi-quarter, 0.58s) cubic-bezier(0.16, 0.72, 0.24, 1) both;
+  background:
+    radial-gradient(circle at var(--midi-pulse-x, 24%) 58%, rgba(255, 88, 8, 0.34), transparent 34%),
+    radial-gradient(circle at calc(100% - var(--midi-pulse-x, 24%)) 42%, rgba(0, 212, 225, 0.2), transparent 30%),
+    linear-gradient(118deg, rgba(255, 157, 42, 0.13), transparent 42% 58%, rgba(0, 170, 190, 0.09));
+  filter: blur(22px) saturate(1.2);
+  pointer-events: none;
+  transform-origin: var(--midi-pulse-x, 24%) 55%;
+  will-change: opacity, transform;
+}
+
+.midi-beat-wash.is-beat-1 { --midi-pulse-x: 38%; }
+.midi-beat-wash.is-beat-2 { --midi-pulse-x: 64%; }
+.midi-beat-wash.is-beat-3 { --midi-pulse-x: 78%; }
+
+@keyframes midi-beat-wash {
+  0% { opacity: 0.74; transform: scale(0.94); }
+  18% { opacity: 0.5; }
+  100% { opacity: 0.06; transform: scale(1.08); }
+}
+
 .midi-window-drag {
   position: fixed;
-  z-index: 30;
+  z-index: 3;
   top: 0;
   right: 0;
   left: 0;
@@ -227,6 +253,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .midi-beat-wash { display: none; }
   .midi-device-float .sweep-pro-chassis::after,
   .midi-device-float .sweep-pro-display::after { animation: none; }
 }
@@ -244,7 +271,7 @@
   justify-items: center;
   gap: 16px;
   padding: 28px 30px 26px;
-  pointer-events: none;
+  pointer-events: auto;
   text-transform: uppercase;
 }
 
@@ -306,9 +333,11 @@
     radial-gradient(circle 1.7px at 10px calc(100% - 10px), rgba(237, 234, 226, 0.24), transparent 100%),
     radial-gradient(circle 1.7px at calc(100% - 10px) calc(100% - 10px), rgba(237, 234, 226, 0.24), transparent 100%),
     linear-gradient(180deg, rgba(255, 240, 220, 0.06), transparent 40%),
-    rgba(36, 32, 26, 0.5);
+    rgba(36, 32, 26, 0.32);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-app-region: no-drag;
+  backdrop-filter: blur(18px) saturate(1.08);
 }
 
 .midi-oled-screen {
@@ -321,11 +350,13 @@
   padding: 11px 14px 10px;
   border-radius: 15px;
   gap: 11px;
-  background: #0c0a07;
+  background: rgba(12, 10, 7, 0.52);
   box-shadow:
     inset 0 0 0 1px rgba(240, 217, 180, 0.07),
-    inset 0 0 46px rgba(0, 0, 0, 0.95),
-    inset 0 6px 22px rgba(0, 0, 0, 0.6);
+    inset 0 0 46px rgba(0, 0, 0, 0.62),
+    inset 0 6px 22px rgba(0, 0, 0, 0.34);
+  -webkit-backdrop-filter: blur(24px) saturate(0.82);
+  backdrop-filter: blur(24px) saturate(0.82);
   color: var(--oled-ink);
 }
 /* Dot matrix plus a soft phosphor bloom over the whole panel. */
@@ -347,12 +378,26 @@
   border-bottom: 1px solid rgba(240, 217, 180, 0.14);
   gap: 8px;
 }
-.midi-oled-status b {
+.midi-oled-rig {
+  padding: 2px 3px;
+  border: 0;
+  border-radius: 2px;
+  outline: none;
+  background: transparent;
   color: var(--oled-hot);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
   font-size: 11px;
   letter-spacing: 0.1em;
   text-shadow: 0 0 9px rgba(255, 90, 18, 0.55);
+  transition: background 120ms ease, box-shadow 120ms ease, color 120ms ease;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
 }
+.midi-oled-rig:hover { background: rgba(255, 90, 18, 0.11); color: #ff8a3a; }
+.midi-oled-rig:focus-visible { box-shadow: 0 0 0 1px var(--oled-hot), 0 0 9px rgba(255, 90, 18, 0.42); }
+.midi-oled-rig:active { background: rgba(255, 90, 18, 0.18); }
 .midi-oled-status > span { margin-right: auto; color: var(--oled-dim); font-size: 7px; letter-spacing: 0.18em; }
 
 .midi-oled-pill {
@@ -439,7 +484,8 @@
   stroke-width: 1;
 }
 .midi-progression { position: relative; display: flex; margin-top: 6px; gap: 5px; }
-.midi-progression b {
+.midi-progression b,
+.midi-progression button {
   display: grid;
   width: 46px;
   height: 22px;
@@ -448,19 +494,56 @@
   border-radius: 4px;
   background: #0c0a07;
   color: rgba(240, 217, 180, 0.24);
+  font: inherit;
   font-size: 8px;
 }
-.midi-progression b.is-filled { border-color: rgba(255, 90, 18, 0.3); color: var(--oled-ink); }
-.midi-progression b.is-playing {
+.midi-progression button {
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+.midi-progression button.is-filled { border-color: rgba(255, 90, 18, 0.3); color: var(--oled-ink); }
+.midi-progression button.is-playing {
   border-color: transparent;
   background: rgba(255, 90, 18, 0.55);
   box-shadow: 0 0 14px rgba(255, 90, 18, 0.4);
   color: #fff6ee;
 }
+/* Hovering reads as removal: the slot dims and strikes through before the click lands. */
+.midi-progression button:hover,
+.midi-progression button:focus-visible {
+  border-color: rgba(255, 90, 18, 0.75);
+  background: rgba(255, 90, 18, 0.12);
+  box-shadow: none;
+  color: var(--oled-ink);
+  text-decoration: line-through;
+  outline: none;
+}
+.midi-progression button:active { transform: translateY(1px); }
 
 .midi-oled-title { display: grid; justify-items: center; gap: 4px; }
-.midi-oled-title b { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 0.08em; }
-.midi-oled-title b i { width: 6px; height: 6px; border-radius: 50%; background: var(--oled-hot); }
+.midi-oled-track {
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 3px;
+  outline: none;
+  background: transparent;
+  color: var(--oled-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 6px;
+  letter-spacing: 0.08em;
+  transition: background 120ms ease, box-shadow 120ms ease, color 120ms ease;
+  -webkit-app-region: no-drag;
+}
+.midi-oled-track i { width: 6px; height: 6px; border-radius: 50%; background: var(--oled-hot); }
+.midi-oled-track:hover { background: rgba(255, 90, 18, 0.11); color: #fff6ee; }
+.midi-oled-track:focus-visible { box-shadow: 0 0 0 1px var(--oled-hot), 0 0 9px rgba(255, 90, 18, 0.42); }
+.midi-oled-track:active { background: rgba(255, 90, 18, 0.18); }
 .midi-oled-title span { color: var(--oled-dim); font-size: 7px; letter-spacing: 0.18em; }
 
 .midi-oled-plate {

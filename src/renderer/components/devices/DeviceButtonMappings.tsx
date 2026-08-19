@@ -418,8 +418,8 @@ export function DeviceButtonMappings<Key extends string>({
     onPreviewChange?.(mappingPreviews);
   }, [mappingPreviews, onPreviewChange]);
 
-  const saveOutput = async (control: DeviceControl<Key>, output: MappingOutput) => {
-    if (profileDomain === undefined || !activeProfile || !selectedGroup) return;
+  const saveOutput = async (control: DeviceControl<Key>, output: MappingOutput): Promise<boolean> => {
+    if (profileDomain === undefined || !activeProfile || !selectedGroup) return false;
     setError(undefined);
     setSavingKey(control.key);
     try {
@@ -430,8 +430,10 @@ export function DeviceButtonMappings<Key extends string>({
         to: output,
       });
       setSnapshot(await window.codyboard.profiles.update(profileDomain, activeProfile.id, draft));
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
+      return false;
     } finally {
       setSavingKey(undefined);
       setRecordingKey(undefined);
@@ -563,23 +565,27 @@ export function DeviceButtonMappings<Key extends string>({
   };
 
   const changeAction = async (control: DeviceControl<Key>, action: string) => {
-    if (action === "unchanged") {
-      setEditingTextKey(undefined);
-      setEditingURLKey(undefined);
-      setURLDraft("");
-      await resetOutput(control);
-    } else if (action === "launch") {
-      setEditingTextKey(undefined);
-      setEditingURLKey(undefined);
-      setURLDraft("");
-      await chooseApplicationForControl(control);
-    } else if (action === "open-url") {
-      beginURLEditing(control);
-    } else if (action === "type-text") {
-      beginTextEditing(control);
-    } else {
-      beginKeyRecording(control);
-    }
+    setEditingTextKey(undefined);
+    setEditingURLKey(undefined);
+    setURLDraft("");
+    setRecordingKey(undefined);
+
+    await performActionTypeChange(
+      action,
+      () => saveOutput(control, { kind: "suppress" }),
+      () => resetOutput(control),
+      async () => {
+        if (action === "launch") {
+          await chooseApplicationForControl(control);
+        } else if (action === "open-url") {
+          beginURLEditing(control);
+        } else if (action === "type-text") {
+          beginTextEditing(control);
+        } else {
+          beginKeyRecording(control);
+        }
+      },
+    );
   };
 
   return (
@@ -770,7 +776,7 @@ export function DeviceButtonMappings<Key extends string>({
                           setEditingTextKey(undefined);
                           void saveOutput(control, { kind: "suppress" });
                         }}
-                        onSave={(output) => saveOutput(control, output)}
+                        onSave={async (output) => { await saveOutput(control, output); }}
                         output={typeTextOutput}
                       />
                     )
@@ -1078,6 +1084,20 @@ function describeOutput(output: MappingOutput | undefined): string {
   return [...modifiers, displayKey(output.key ?? `Key ${output.keyCode}`)].join("  ");
 }
 
+export async function performActionTypeChange(
+  action: string,
+  clear: () => Promise<boolean>,
+  reset: () => Promise<void>,
+  activate: () => Promise<void> | void,
+): Promise<void> {
+  if (action === "unchanged") {
+    await reset();
+    return;
+  }
+  if (!await clear()) return;
+  await activate();
+}
+
 export function mappingPreviewForControl<Key extends string>(
   control: DeviceControl<Key>,
   output: MappingOutput | undefined,
@@ -1143,7 +1163,7 @@ function displayKey(key: string): string {
   return NAMED_KEYS[key] ?? (key.length === 1 ? key.toUpperCase() : key);
 }
 
-async function captureKeystroke(event: KeyboardEvent<HTMLInputElement>, save: (output: MappingOutput) => Promise<void>) {
+async function captureKeystroke(event: KeyboardEvent<HTMLInputElement>, save: (output: MappingOutput) => Promise<unknown>) {
   event.preventDefault();
   event.stopPropagation();
   const output = recordedKeyboardOutput(event);

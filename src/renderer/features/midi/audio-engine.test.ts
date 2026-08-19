@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MidiAudioEngine, type MidiPulse } from "./audio-engine";
 import { FX_ORDER } from "./controls";
 import { MIDI_PAD_KEYS, MIDI_PAD_SLOTS } from "./harmony";
-import { BASS_PATTERNS, DRUM_FAMILIES, DRUM_KITS } from "./midi-templates";
+import { BASS_PATTERNS, DRUM_FAMILIES, DRUM_KITS, drumKitIndex } from "./midi-templates";
 import { MIDI_RIGS } from "./rigs";
 
 class FakeParam {
@@ -126,15 +126,41 @@ describe("Get Funky audio engine", () => {
     }
   });
 
+  it("removes a chord and closes the gap on the next half bar", () => {
+    const engine = new MidiAudioEngine();
+    for (const key of ["T", "G", "B"] as const) engine.addChord(MIDI_PAD_SLOTS[key]);
+    advance(engine, context, 8);
+    expect(engine.getSnapshot().progression.map((slot) => slot.degree)).toEqual(["i", "IV", "VI"]);
+
+    engine.removeChord(1);
+    // The HUD reflects it at once, then the audio loop adopts it on the half-bar boundary.
+    expect(engine.getSnapshot().progression.map((slot) => slot.degree)).toEqual(["i", "VI"]);
+    advance(engine, context, 8);
+    expect(engine.getSnapshot().progression.map((slot) => slot.degree)).toEqual(["i", "VI"]);
+    engine.dispose();
+  });
+
+  it("ignores a removal aimed at an empty slot", () => {
+    const engine = new MidiAudioEngine();
+    engine.addChord(MIDI_PAD_SLOTS.T);
+    advance(engine, context, 8);
+    engine.removeChord(3);
+    expect(engine.getSnapshot().progression).toHaveLength(1);
+    engine.dispose();
+  });
+
   it("commits queued chords on the next half bar and keeps four slots", () => {
     const engine = new MidiAudioEngine();
     const pulses: MidiPulse[] = [];
     engine.onPulse((pulse) => pulses.push(pulse));
+    // One column, so these five share a root and differ only in texture; the oldest is evicted.
     for (const key of ["Q", "W", "E", "R", "T"] as const) engine.addChord(MIDI_PAD_SLOTS[key]);
     expect(engine.getSnapshot().progression).toHaveLength(4);
     advance(engine, context, 6);
+    expect(engine.getSnapshot().progression.map((slot) => slot.phrase))
+      .toEqual(["pedal", "arp", "spread", "stab"]);
     expect(engine.getSnapshot().progression.map((slot) => slot.degree))
-      .toEqual(["III", "IV", "v", "VI"]);
+      .toEqual(["i", "i", "i", "i"]);
     engine.dispose();
   });
 
@@ -210,9 +236,11 @@ describe("Get Funky audio engine", () => {
     const engine = new MidiAudioEngine();
     advance(engine, context, 2);
     expect(position(engine)).toBeGreaterThan(0);
+    const drum = engine.getSnapshot().drumTemplate;
+    const nextDrum = DRUM_KITS[(drumKitIndex(drum) + 1) % DRUM_KITS.length].name;
     engine.toggleLayer();
     engine.turnKnob(1);
-    expect(engine.getSnapshot().drumTemplate).toBe(DRUM_KITS[1].name);
+    expect(engine.getSnapshot().drumTemplate).toBe(nextDrum);
     expect(position(engine)).toBe(0);
 
     advance(engine, context, 2);

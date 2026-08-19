@@ -23,6 +23,16 @@ export const FX_LABELS: Readonly<Record<PerformanceFx, string>> = {
 
 export const IDLE_SHIFT_LAYER: ShiftLayerState = { held: false, latched: false };
 
+interface DirectionModifiers {
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+}
+
+export function directionFromModifiers(modifiers: DirectionModifiers): -1 | 1 {
+  return modifiers.altKey || modifiers.ctrlKey || modifiers.metaKey ? -1 : 1;
+}
+
 export function shiftActive(state: ShiftLayerState): boolean {
   return state.held || state.latched;
 }

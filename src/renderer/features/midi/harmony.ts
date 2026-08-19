@@ -1,5 +1,5 @@
 export type HarmonyDegree = "III" | "IV" | "VI" | "i" | "v";
-export type PhraseEngine = "arp" | "riff" | "stab";
+export type PhraseEngine = "arp" | "pedal" | "riff" | "spread" | "stab";
 export type PhraseRole = "chord" | "lead";
 
 export interface ChordSlot {
@@ -26,8 +26,14 @@ export const MIDI_PAD_KEYS = [
 ] as const;
 export type MidiPadKey = typeof MIDI_PAD_KEYS[number];
 
-export const HARMONY_ROWS: readonly HarmonyDegree[] = ["VI", "v", "IV", "III", "i"];
-export const PHRASE_COLUMNS: readonly PhraseEngine[] = ["stab", "arp", "riff"];
+/** Every degree the voicing table knows, including the two the grid does not currently show. */
+export const HARMONY_DEGREES: readonly HarmonyDegree[] = ["VI", "v", "IV", "III", "i"];
+
+/** Three roots across, so a row is one texture and a sideways move is a chord change. */
+export const HARMONY_COLUMNS: readonly HarmonyDegree[] = ["i", "IV", "VI"];
+
+/** Five textures down, ordered blockiest to most melodic. */
+export const PHRASE_ROWS: readonly PhraseEngine[] = ["stab", "spread", "arp", "pedal", "riff"];
 
 /** Dorian-leaning funk voicings: seventh and ninth stacks instead of bare triads. */
 const degreeVoicings: Readonly<Record<HarmonyDegree, readonly number[]>> = {
@@ -43,7 +49,7 @@ const degreeLabels: Readonly<Record<HarmonyDegree, string>> = {
 };
 
 const phraseGlyphs: Readonly<Record<PhraseEngine, string>> = {
-  arp: "↗", riff: "~", stab: "■",
+  arp: "↗", pedal: "≡", riff: "~", spread: "/", stab: "■",
 };
 
 const pentatonic = [0, 3, 5, 7, 10] as const;
@@ -52,7 +58,7 @@ const strongSteps = new Set([0, 4, 8, 12]);
 export const MIDI_PAD_SLOTS: Readonly<Record<MidiPadKey, ChordSlot>> = Object.fromEntries(
   MIDI_PAD_KEYS.map((key, index) => [
     key,
-    { degree: HARMONY_ROWS[Math.floor(index / 3)], phrase: PHRASE_COLUMNS[index % 3] },
+    { degree: HARMONY_COLUMNS[index % 3], phrase: PHRASE_ROWS[Math.floor(index / 3)] },
   ]),
 ) as Readonly<Record<MidiPadKey, ChordSlot>>;
 
@@ -119,6 +125,34 @@ export function phraseAt(
       notes: chordVoicing(slot.degree).map((semitone) => semitone + source.chordOctave),
       role: "chord",
       velocity: mark === "o" ? accent * 0.42 : accent,
+    };
+  }
+  if (slot.phrase === "spread") {
+    const voicing = chordVoicing(slot.degree);
+    // Walk back to the comp hit this note belongs to; one chord tone lands per sixteenth,
+    // so a single strum unrolls across the bar instead of stacking on one step.
+    for (let offset = 0; offset < voicing.length; offset += 1) {
+      const mark = source.comp[(((index - offset) % 16) + 16) % 16];
+      if (mark !== "x" && mark !== "o") continue;
+      return {
+        notes: [voicing[offset] + source.chordOctave],
+        role: "chord",
+        velocity: accent * (mark === "o" ? 0.42 : 1) * (1 - offset * 0.12),
+      };
+    }
+    return undefined;
+  }
+  if (slot.phrase === "pedal") {
+    const voicing = chordVoicing(slot.degree);
+    if (strongSteps.has(index)) {
+      return { notes: [voicing[0] + source.chordOctave], role: "chord", velocity: accent };
+    }
+    if (index % 2 === 1) return undefined;
+    const upper = voicing.slice(1);
+    return {
+      notes: [upper[Math.floor(index / 2) % upper.length] + source.chordOctave + 12],
+      role: "chord",
+      velocity: accent * 0.7,
     };
   }
   if (slot.phrase === "arp") {

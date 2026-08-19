@@ -115,10 +115,10 @@ export function SweepPro({
       update(key, phase, "hardware");
     });
 
-    window.addEventListener("blur", clearPressed);
+    // No blur reset: exclusive capture keeps delivering key-ups while another app is frontmost,
+    // and clearing here would swallow the release of anything held across the focus change.
     return () => {
       clearPressed();
-      window.removeEventListener("blur", clearPressed);
       unsubscribeDiagnostics?.();
     };
   }, [deviceId, listenToHardware, onKeyPress]);

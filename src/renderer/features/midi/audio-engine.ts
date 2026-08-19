@@ -6,7 +6,9 @@ import {
   MIDI_STEPS, nextKitInFamily, noteName, type DrumFamily,
 } from "./midi-templates";
 import { MIDI_RIGS } from "./rigs";
-import { adjustedTempo, appendSlot, slotAtStep, SLOT_STEPS, wrappedIndex } from "./sequencer";
+import {
+  adjustedTempo, appendSlot, removeSlot, slotAtStep, SLOT_STEPS, wrappedIndex,
+} from "./sequencer";
 
 export type MidiLayer = "BASS" | "DRUM" | "RIG" | "TEMPO";
 
@@ -61,7 +63,6 @@ export class MidiAudioEngine {
   private pendingProgression?: readonly ChordSlot[];
   private playing = false;
   private progression: readonly ChordSlot[] = [];
-  private resumeWhenVisible = false;
   private rigIndex = 0;
   private riserRequested = false;
   private sequenceStep = 0;
@@ -169,6 +170,15 @@ export class MidiAudioEngine {
     this.emitState();
   }
 
+  /** Drops one slot from the loop; like addChord it lands on the next half bar. */
+  removeChord(index: number): void {
+    const current = this.pendingProgression ?? this.progression;
+    const next = removeSlot(current, index);
+    if (next === current) return;
+    this.pendingProgression = next;
+    this.emitState();
+  }
+
   clearHarmony(): void {
     this.pendingProgression = [];
     this.emitState();
@@ -255,16 +265,6 @@ export class MidiAudioEngine {
   togglePlayback(): void {
     if (this.playing) this.pause();
     else this.play();
-  }
-
-  setPageVisible(visible: boolean): void {
-    if (!visible) {
-      this.resumeWhenVisible = this.playing;
-      this.pause();
-    } else if (this.resumeWhenVisible) {
-      this.resumeWhenVisible = false;
-      this.play();
-    }
   }
 
   dispose(): void {

@@ -51,10 +51,16 @@ const trayIconPath = app.isPackaged
   : path.join(currentDir, '..', 'resources', 'tray-iconTemplate.png');
 let tray: Tray | null = null;
 let settingsWindow: BrowserWindow | null = null;
+let midiCaptureOwnerId: string | undefined;
 let isQuitting = false;
 let isOpeningTrayMenu = false;
 const daemon = new CodyboardDaemonClient(daemonPath);
 const profiles = new ProfileCoordinator(daemon, undefined, defaultConfigPath);
+
+async function releaseMIDICapture(): Promise<void> {
+  midiCaptureOwnerId = undefined;
+  await daemon.setMIDICapture();
+}
 
 function trayIcon(): Electron.NativeImage {
   const icon = nativeImage.createFromPath(trayIconPath);
@@ -174,11 +180,13 @@ async function resolveApplication(
 }
 
 function showSettings(route = '/'): void {
-  if (!route.startsWith('/midi')) void daemon.setMIDICapture().catch(() => undefined);
-  const navigate = () => {
-    void settingsWindow?.webContents.executeJavaScript(
+  if (!route.startsWith('/midi')) void releaseMIDICapture().catch(() => undefined);
+  const navigate = async () => {
+    await settingsWindow?.webContents.executeJavaScript(
       `window.location.hash = ${JSON.stringify(route)}`,
     );
+    if (settingsWindow?.isVisible())
+      settingsWindow.webContents.setAudioMuted(false);
   };
 
   if (!settingsWindow) {
@@ -213,10 +221,14 @@ function showSettings(route = '/'): void {
       },
     });
     settingsWindow.on('close', (event) => {
+      settingsWindow?.webContents.setAudioMuted(true);
       if (!isQuitting) {
         event.preventDefault();
         settingsWindow?.hide();
-        void daemon.setMIDICapture().catch(() => undefined);
+        void settingsWindow?.webContents.executeJavaScript(
+          `if (window.location.hash.startsWith('#/midi')) window.location.hash = '/'`,
+        );
+        void releaseMIDICapture().catch(() => undefined);
         void daemon
           .setDiagnosticKeyboardType()
           .catch((error: unknown) =>
@@ -225,9 +237,9 @@ function showSettings(route = '/'): void {
       }
     });
     settingsWindow.webContents.on('render-process-gone', () => {
-      void daemon.setMIDICapture().catch(() => undefined);
+      void releaseMIDICapture().catch(() => undefined);
     });
-    settingsWindow.webContents.once('did-finish-load', navigate);
+    settingsWindow.webContents.once('did-finish-load', () => void navigate());
     if (isDevelopment)
       void settingsWindow.loadURL(process.env.VITE_DEV_SERVER_URL!);
     else
@@ -235,7 +247,7 @@ function showSettings(route = '/'): void {
         path.join(currentDir, '..', 'dist', 'index.html'),
       );
   } else {
-    navigate();
+    void navigate();
   }
   settingsWindow.show();
   settingsWindow.focus();
@@ -379,10 +391,27 @@ ipcMain.handle('diagnostics:set', async (_event, keyboardType?: number) => {
   console.info(`[diagnostics:set] listening=${result.listening} generation=${result.generation}`);
   return result;
 });
-ipcMain.handle('midi:set-exclusive-device', (_event, deviceId?: string) => {
+ipcMain.handle('midi:set-exclusive-device', async (
+  _event,
+  deviceId: string | undefined,
+  ownerId: string,
+) => {
   if (deviceId !== undefined && (typeof deviceId !== 'string' || !deviceId.trim()))
     throw new Error('Invalid MIDI capture device');
-  return daemon.setMIDICapture(deviceId);
+  if (typeof ownerId !== 'string' || !ownerId.trim())
+    throw new Error('Invalid MIDI capture owner');
+  if (deviceId === undefined) {
+    if (midiCaptureOwnerId !== ownerId) return;
+    await releaseMIDICapture();
+    return;
+  }
+  midiCaptureOwnerId = ownerId;
+  try {
+    await daemon.setMIDICapture(deviceId);
+  } catch (error) {
+    if (midiCaptureOwnerId === ownerId) midiCaptureOwnerId = undefined;
+    throw error;
+  }
 });
 ipcMain.handle('permissions:status', () => daemon.permissionStatus());
 ipcMain.handle(
@@ -454,7 +483,7 @@ void app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
-  void daemon.setMIDICapture().catch(() => undefined);
+  void releaseMIDICapture().catch(() => undefined);
   daemon.stop();
 });
 app.on('window-all-closed', () => {

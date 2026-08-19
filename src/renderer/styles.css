@@ -1468,6 +1468,7 @@
     height: calc(var(--remote-height) * 0.9);
     cursor: pointer;
     filter: drop-shadow(calc(var(--remote-height) * -0.009) calc(var(--remote-height) * 0.012) calc(var(--remote-height) * 0.012) rgba(0, 0, 0, 0.28));
+    user-select: none;
   }
 
   .sweep-pro-chassis {
@@ -1785,6 +1786,7 @@
     width: calc(var(--remote-height) * 0.258);
     height: var(--remote-height);
     overflow: hidden;
+    user-select: none;
     border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: calc(var(--remote-height) * 0.009) calc(var(--remote-height) * 0.009) calc(var(--remote-height) * 0.004) calc(var(--remote-height) * 0.004);
     background:

@@ -11,6 +11,15 @@ export function appendSlot(
   return [...progression, slot].slice(-MAX_SLOTS);
 }
 
+/** Removing a slot closes the gap, so the loop shortens instead of leaving a hole. */
+export function removeSlot(
+  progression: readonly ChordSlot[],
+  index: number,
+): readonly ChordSlot[] {
+  if (index < 0 || index >= progression.length) return progression;
+  return progression.filter((_, position) => position !== index);
+}
+
 export function slotAtStep(
   progression: readonly ChordSlot[],
   step: number,

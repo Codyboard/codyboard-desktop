@@ -2,9 +2,45 @@ import { describe, expect, it } from "vitest";
 
 import {
   mappingPreviewForControl,
+  performActionTypeChange,
   recordedKeyboardOutput,
   SWEEP_PRO_CONTROLS,
 } from "./DeviceButtonMappings";
+
+describe("action type changes", () => {
+  it.each(["keystroke", "launch", "open-url", "type-text"])("clears the previous value before switching to %s", async (action) => {
+    const calls: string[] = [];
+    await performActionTypeChange(
+      action,
+      async () => { calls.push("clear"); return true; },
+      async () => { calls.push("reset"); },
+      () => { calls.push("activate"); },
+    );
+    expect(calls).toEqual(["clear", "activate"]);
+  });
+
+  it("does not switch action type when clearing the previous value fails", async () => {
+    const calls: string[] = [];
+    await performActionTypeChange(
+      "open-url",
+      async () => { calls.push("clear"); return false; },
+      async () => { calls.push("reset"); },
+      () => { calls.push("activate"); },
+    );
+    expect(calls).toEqual(["clear"]);
+  });
+
+  it("removes an application override instead of clearing it when switching to unchanged", async () => {
+    const calls: string[] = [];
+    await performActionTypeChange(
+      "unchanged",
+      async () => { calls.push("clear"); return true; },
+      async () => { calls.push("reset"); },
+      () => { calls.push("activate"); },
+    );
+    expect(calls).toEqual(["reset"]);
+  });
+});
 
 describe("Sweep Pro controls", () => {
   it("maps every physical key to itself by default", () => {

@@ -10,7 +10,8 @@ const api: CodyboardAPI = {
   },
   listHIDs: (options) => ipcRenderer.invoke("hid:list", options),
   midi: {
-    setExclusiveDevice: (deviceId) => ipcRenderer.invoke("midi:set-exclusive-device", deviceId),
+    setExclusiveDevice: (deviceId, ownerId) =>
+      ipcRenderer.invoke("midi:set-exclusive-device", deviceId, ownerId),
   },
   keyboard: { send: (output) => ipcRenderer.invoke("keyboard:send", output) },
   permissions: {

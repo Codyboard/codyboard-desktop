@@ -24,6 +24,15 @@ export interface MidiRig extends PhraseSource {
  */
 export const MIDI_RIGS: readonly MidiRig[] = [
   {
+    name: "RHODES", tagline: "RHODES · SUB",
+    chordVoice: "epiano", leadVoice: "square", bassVoice: "sub",
+    defaultDrum: "SMOOTH", defaultBass: "PUMP",
+    rootMidi: 41, chordOctave: 24, leadOctave: 36, delayMix: 0.3,
+    comp: "..x...x...x...x.",
+    arp: [0, -1, 1, -1, 2, -1, 3, -1, 4, -1, 3, -1, 2, -1, 1, -1],
+    riff: [-1, -1, 2, -1, -1, 3, -1, -1, 4, -1, -1, 3, -1, 2, -1, -1],
+  },
+  {
     name: "CLAV77", tagline: "CLAVINET · SLAP",
     chordVoice: "clav", leadVoice: "clavLead", bassVoice: "slap",
     defaultDrum: "FUNK77", defaultBass: "FUNK77",
@@ -40,15 +49,6 @@ export const MIDI_RIGS: readonly MidiRig[] = [
     comp: "..x..x..x...x.x.",
     arp: [0, 2, 4, 6, 7, 5, 3, 1, 0, 2, 4, 6, 7, 5, 3, 1],
     riff: [4, -1, -1, 3, 2, -1, 3, -1, 4, -1, 5, -1, 4, 3, 2, -1],
-  },
-  {
-    name: "RHODES", tagline: "RHODES · SUB",
-    chordVoice: "epiano", leadVoice: "square", bassVoice: "sub",
-    defaultDrum: "SMOOTH", defaultBass: "PUMP",
-    rootMidi: 41, chordOctave: 24, leadOctave: 36, delayMix: 0.3,
-    comp: "..x...x...x...x.",
-    arp: [0, -1, 1, -1, 2, -1, 3, -1, 4, -1, 3, -1, 2, -1, 1, -1],
-    riff: [-1, -1, 2, -1, -1, 3, -1, -1, 4, -1, -1, 3, -1, 2, -1, -1],
   },
   {
     name: "MOOG", tagline: "POLY SYNTH · MOOG",
