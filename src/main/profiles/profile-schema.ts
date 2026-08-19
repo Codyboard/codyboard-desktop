@@ -11,9 +11,9 @@ import type {
   ProfileDomain,
   ProfileDraft,
   ProfileStateDocument
-} from "../shared/hid.js";
-import { profileDomainKey } from "../shared/hid.js";
-import { mappingInputSignature } from "../shared/profile-mappings.js";
+} from "../../shared/hid.js";
+import { profileDomainKey } from "../../shared/hid.js";
+import { mappingInputSignature } from "../../shared/profile-mappings.js";
 
 import { KEY_CODES, MODIFIER_KEY_CODES, SYSTEM_KEY_CODES, normalizeModifiers } from "./key-codes.js";
 

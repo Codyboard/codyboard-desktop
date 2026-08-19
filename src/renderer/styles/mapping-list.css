@@ -1,0 +1,74 @@
+.mapping-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 12px 14px 52px;
+  scroll-padding-block: 12px 52px;
+  scroll-behavior: smooth;
+  scrollbar-color: rgba(112, 222, 179, 0.26) transparent;
+  scrollbar-width: thin;
+}
+
+.mapping-row {
+  position: relative;
+  display: grid;
+  min-height: 70px;
+  align-items: center;
+  grid-template-columns: 50px minmax(96px, 0.5fr) minmax(122px, 0.85fr) minmax(150px, 1fr);
+  gap: clamp(9px, 1vw, 15px);
+  padding: 0 clamp(14px, 1.5vw, 20px);
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 12px;
+  background:
+    linear-gradient(108deg, rgba(255, 255, 255, 0.024), transparent 48%),
+    rgba(21, 24, 23, 0.24);
+  backdrop-filter: blur(16px) saturate(110%);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.018);
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.mapping-row + .mapping-row { margin-top: 9px; }
+.mapping-row:hover { border-color: rgba(255, 255, 255, 0.1); background-color: rgba(27, 31, 30, 0.32); }
+.mapping-row.is-selected {
+  border-color: rgba(105, 222, 175, 0.28);
+  background:
+    linear-gradient(100deg, rgba(75, 196, 148, 0.085), transparent 58%),
+    rgba(22, 29, 26, 0.34);
+  box-shadow: 0 0 0 1px rgba(87, 210, 161, 0.04), 0 18px 42px rgba(0, 0, 0, 0.13);
+}
+.mapping-row.is-recording { border-color: rgba(126, 228, 188, 0.5); }
+.mapping-row.is-inherited .mapping-button-name small { color: rgba(124, 220, 181, 0.58); }
+.mapping-row.is-inherited .keystroke-recorder input:not(:focus),
+.mapping-row.is-inherited .launch-application-value:not(:focus-visible),
+.mapping-row.is-inherited .open-url-value:not(:focus),
+.mapping-row.is-inherited .type-text-value:not(:focus) {
+  color: rgba(224, 231, 228, 0.52);
+  background: rgba(5, 7, 7, 0.14);
+}
+.mapping-row.is-inherited .key-output-current-icon { color: rgba(209, 218, 214, 0.36); }
+
+.mapping-button-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 13px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
+  color: rgba(239, 243, 241, 0.78);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055), 0 9px 22px rgba(0, 0, 0, 0.16);
+}
+
+.mapping-button-icon svg { width: 20px; height: 20px; stroke-width: 1.65; }
+.mapping-button-icon > strong { font-size: 16px; font-weight: 650; line-height: 1; }
+.mapping-row.is-selected .mapping-button-icon {
+  border-color: rgba(105, 222, 175, 0.35);
+  background: rgba(77, 198, 150, 0.12);
+  color: #86e2bb;
+}
+
+.mapping-button-name { display: grid; min-width: 0; gap: 7px; }
+.mapping-button-name strong { overflow: hidden; font-size: clamp(13px, 1.2vw, 16px); font-weight: 590; letter-spacing: -0.025em; text-overflow: ellipsis; white-space: nowrap; }
+.mapping-button-name small { overflow: hidden; color: rgba(214, 221, 218, 0.32); font: 500 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+

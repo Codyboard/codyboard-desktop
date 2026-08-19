@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse, stringify } from "yaml";
 
-import type { CompiledProfileSet, ProfileDraft } from "../shared/hid.js";
+import type { CompiledProfileSet, ProfileDraft } from "../../shared/hid.js";
 
 import { ProfileCoordinator } from "./profile-coordinator.js";
 

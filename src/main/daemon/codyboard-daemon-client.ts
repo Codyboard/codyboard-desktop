@@ -10,7 +10,7 @@ import type {
   HIDListOptions,
   NativeError,
   PermissionStatus,
-} from "../shared/hid.js";
+} from "../../shared/hid.js";
 
 interface NativeMessage {
   id?: string;

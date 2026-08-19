@@ -1,0 +1,344 @@
+.device-selection-page {
+  --page-gutter: clamp(48px, 5vw, 72px);
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 62% 72% at 50% 45%, rgba(97, 105, 107, 0.17), transparent 68%),
+    radial-gradient(ellipse 40% 38% at 16% 14%, rgba(74, 82, 84, 0.12), transparent 72%),
+    linear-gradient(132deg, rgba(26, 28, 29, 0.68) 0%, rgba(17, 19, 20, 0.62) 44%, rgba(8, 10, 11, 0.74) 100%);
+  color: #f0f2f1;
+  isolation: isolate;
+}
+
+.device-selection-page::before {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(90deg, transparent 0 49.92%, rgba(255, 255, 255, 0.035) 50%, transparent 50.08%),
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 80px;
+  content: "";
+  mask-image: linear-gradient(to bottom, black, transparent 86%);
+}
+
+.selection-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.2'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+  opacity: 0.13;
+  pointer-events: none;
+}
+
+.selection-header {
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 36px;
+  padding: clamp(22px, 3.5vh, 34px) var(--page-gutter) 12px max(94px, var(--page-gutter));
+  animation: selection-header-in 800ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.selection-kicker {
+  margin: 0 0 6px;
+  color: rgba(210, 216, 214, 0.46);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.selection-header h1 {
+  margin: 0;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: clamp(23px, 2.2vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.selection-subtitle {
+  max-width: 360px;
+  margin: 0 0 2px;
+  color: rgba(218, 223, 221, 0.52);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: clamp(10px, 1vw, 13px);
+  letter-spacing: 0.015em;
+  text-align: right;
+}
+
+.device-carousel {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 0 10px;
+  scrollbar-color: rgba(210, 216, 214, 0.34) rgba(255, 255, 255, 0.045);
+  scrollbar-width: thin;
+  -webkit-app-region: no-drag;
+}
+
+.device-carousel::-webkit-scrollbar { height: 5px; }
+.device-carousel::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.045); }
+.device-carousel::-webkit-scrollbar-thumb { border-radius: 10px; background: rgba(210, 216, 214, 0.34); }
+
+.device-carousel-track {
+  display: flex;
+  min-width: min-content;
+  margin: auto;
+  align-items: center;
+  gap: clamp(38px, 5vw, 76px);
+  padding: 18px clamp(48px, 9vw, 124px) 28px;
+}
+
+.device-card {
+  --device-card-corner-inset: 10px;
+  --device-card-corner-radius: 10px;
+  --device-card-radius: 16px;
+  --remote-height: min(39vh, 320px);
+  --device-index: 0;
+  position: relative;
+  display: grid;
+  width: clamp(260px, min(31vw, 50vh), 420px);
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  overflow: hidden;
+  border-radius: var(--device-card-radius);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.036), rgba(255, 255, 255, 0.006) 54%, rgba(0, 0, 0, 0.055)),
+    rgba(19, 22, 23, 0.34);
+  backdrop-filter: blur(18px) saturate(112%);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.22), inset 0 1px rgba(255, 255, 255, 0.04);
+  opacity: 0;
+  outline: 1px solid transparent;
+  outline-offset: 7px;
+  scroll-snap-align: center;
+  transform: translateY(42px) scale(0.94);
+  animation: device-card-in 900ms cubic-bezier(0.16, 1, 0.3, 1) calc(180ms + var(--device-index) * 140ms) forwards;
+  transition: border-color 420ms ease, box-shadow 420ms ease, outline-color 420ms ease, transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.device-card::before,
+.device-card::after {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-color: rgba(231, 235, 233, 0.22);
+  content: "";
+  transition: border-color 300ms ease;
+}
+
+.device-card::before {
+  top: var(--device-card-corner-inset);
+  left: var(--device-card-corner-inset);
+  border-top: 1px solid;
+  border-left: 1px solid;
+  border-radius: var(--device-card-corner-radius) 0 0;
+}
+.device-card::after {
+  right: var(--device-card-corner-inset);
+  bottom: var(--device-card-corner-inset);
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+  border-radius: 0 0 var(--device-card-corner-radius);
+}
+
+.device-card:hover,
+.device-card:focus-within {
+  z-index: 2;
+  border-color: rgba(220, 228, 225, 0.22);
+  box-shadow: 0 42px 90px rgba(0, 0, 0, 0.48), inset 0 1px rgba(255, 255, 255, 0.08);
+  outline-color: rgba(218, 225, 222, 0.09);
+  transform: translateY(-9px) scale(1.045);
+}
+
+.device-card:hover::before,
+.device-card:hover::after,
+.device-card:focus-within::before,
+.device-card:focus-within::after { border-color: rgba(235, 240, 238, 0.58); }
+
+.device-card-glow {
+  position: absolute;
+  top: 8%;
+  width: 64%;
+  height: 77%;
+  border-radius: 50%;
+  background: rgba(178, 188, 185, 0.11);
+  filter: blur(48px);
+  opacity: 0.22;
+  transition: opacity 420ms ease, transform 520ms ease;
+}
+
+.device-card:hover .device-card-glow,
+.device-card:focus-within .device-card-glow { opacity: 0.68; transform: scale(1.12); }
+
+.device-preview {
+  position: absolute;
+  top: 4.5%;
+  left: 0;
+  display: grid;
+  width: 100%;
+  height: 82%;
+  place-items: center;
+  pointer-events: none;
+  transform: translateY(5px);
+  transition: filter 450ms ease, transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.device-card:hover .device-preview,
+.device-card:focus-within .device-preview {
+  filter: brightness(1.08) contrast(1.02);
+  transform: translateY(-4px) scale(1.025);
+}
+
+.device-preview .remote-shadow {
+  margin-top: calc(var(--remote-height) * 0.91);
+}
+
+.device-card-caption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  padding: 18px 24px 16px;
+  border-radius: 0 0 15px 15px;
+  background: linear-gradient(to bottom, transparent, rgba(13, 15, 16, 0.54) 36%, rgba(13, 15, 16, 0.68));
+  backdrop-filter: blur(14px) saturate(105%);
+  text-align: center;
+}
+
+.device-card-caption p {
+  margin: 0;
+  font-family: "DIN Condensed", "Avenir Next Condensed", sans-serif;
+  font-size: clamp(19px, 1.8vw, 26px);
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  line-height: 1;
+}
+
+.device-card-caption span {
+  display: block;
+  margin-top: 6px;
+  color: rgba(206, 212, 210, 0.36);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.device-card-link {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  cursor: pointer;
+}
+
+.device-card-link:focus-visible { outline: 2px solid rgba(237, 242, 240, 0.78); outline-offset: 5px; }
+
+.selection-footer {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 var(--page-gutter) 22px max(94px, var(--page-gutter));
+  color: rgba(210, 216, 214, 0.32);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.status-light {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #9ad7b8;
+  box-shadow: 0 0 9px rgba(126, 224, 172, 0.72);
+}
+
+.device-loading,
+.device-empty-state {
+  display: grid;
+  width: min(460px, 70vw);
+  min-height: 220px;
+  place-content: center;
+  color: rgba(222, 226, 225, 0.52);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  text-align: center;
+}
+
+.device-loading { grid-template-columns: repeat(3, 5px); gap: 8px; }
+.device-loading span { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: device-scan 900ms ease-in-out infinite alternate; }
+.device-loading span:nth-child(2) { animation-delay: 150ms; }
+.device-loading span:nth-child(3) { animation-delay: 300ms; }
+.device-loading p { grid-column: 1 / -1; margin: 13px 0 0; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; }
+
+.device-empty-state {
+  width: min(520px, 76vw);
+  justify-items: center;
+  animation: empty-state-in 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.empty-device-radar {
+  position: relative;
+  display: grid;
+  width: 92px;
+  height: 92px;
+  margin-bottom: 22px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.055), transparent 66%);
+}
+
+.empty-device-radar span {
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  animation: empty-radar 2.4s ease-out infinite;
+}
+
+.empty-device-radar span:nth-child(2) { inset: 27px; animation-delay: 800ms; }
+.empty-device-radar svg { width: 20px; height: 20px; color: rgba(233, 237, 235, 0.72); stroke-width: 1.5; }
+.device-empty-state h2 { margin: 0; color: rgba(242, 245, 244, 0.92); font-size: 20px; font-weight: 600; letter-spacing: -0.025em; }
+.device-empty-state > p { max-width: 360px; margin: 9px 0 0; color: rgba(215, 221, 219, 0.48); font-size: 12px; line-height: 1.6; }
+.empty-device-support { margin-top: 9px; color: rgba(207, 213, 211, 0.3); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+.device-empty-state > button {
+  display: flex;
+  height: 34px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(244, 247, 246, 0.9);
+  cursor: pointer;
+  font: 600 11px/1 "Avenir Next", "Helvetica Neue", sans-serif;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.device-empty-state > button:hover { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.12); transform: translateY(-1px); }
+.device-empty-state > button:active { transform: translateY(0); }
+.device-empty-state > button svg { width: 13px; height: 13px; stroke-width: 1.8; }
+.device-empty-state.is-error .empty-device-radar svg { color: rgba(235, 172, 162, 0.72); }
+
+.permission-route-loading {
+  width: 100vw;
+  height: 100vh;
+  background: rgba(10, 12, 12, 0.68);
+}
+

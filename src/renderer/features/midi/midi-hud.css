@@ -1,0 +1,325 @@
+.midi-loop-column { position: absolute; z-index: 1; inset: 0; overflow: hidden; }
+.midi-visualizer-canvas { display: block; width: 100%; height: 100%; opacity: 0.66; }
+
+.midi-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  box-sizing: border-box;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  gap: 16px;
+  padding: 28px 30px 26px;
+  pointer-events: auto;
+  text-transform: uppercase;
+}
+
+/* One control bar anchoring the bottom of the window. */
+.midi-console {
+  display: flex;
+  grid-row: 3;
+  align-items: center;
+  align-self: end;
+  gap: 10px;
+  padding: 6px;
+  border: 1px solid rgba(237, 234, 226, 0.12);
+  border-radius: 999px;
+  background: rgba(18, 17, 13, 0.34);
+  backdrop-filter: blur(14px);
+}
+.midi-console-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(237, 234, 226, 0.03);
+}
+.midi-console-cell span { color: var(--midi-dim); font-size: 7px; letter-spacing: 0.16em; }
+.midi-console-cell b { font-size: 9px; letter-spacing: 0.06em; }
+.midi-console-cell.is-armed { background: rgba(255, 79, 0, 0.16); }
+.midi-console-cell.is-armed b { color: var(--midi-orange); }
+.midi-console-rule { width: 1px; height: 16px; background: rgba(237, 234, 226, 0.14); }
+.midi-console-fx { display: flex; gap: 4px; }
+.midi-console-fx b {
+  display: grid;
+  min-width: 44px;
+  height: 24px;
+  place-items: center;
+  padding: 0 9px;
+  border-radius: 999px;
+  color: rgba(237, 234, 226, 0.34);
+  font-size: 7px;
+  letter-spacing: 0.12em;
+}
+.midi-console-fx b.is-active {
+  background: rgba(255, 79, 0, 0.18);
+  color: var(--midi-orange);
+  text-shadow: 0 0 10px rgba(255, 79, 0, 0.5);
+}
+
+/* Recessed amber-phosphor panel in a warm plastic bezel, with exposed bezel screws. */
+.midi-oled {
+  position: relative;
+  grid-row: 1;
+  width: min(432px, 40vw);
+  padding: 11px;
+  border: 1px solid rgba(237, 234, 226, 0.09);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle 1.7px at 10px 10px, rgba(237, 234, 226, 0.24), transparent 100%),
+    radial-gradient(circle 1.7px at calc(100% - 10px) 10px, rgba(237, 234, 226, 0.24), transparent 100%),
+    radial-gradient(circle 1.7px at 10px calc(100% - 10px), rgba(237, 234, 226, 0.24), transparent 100%),
+    radial-gradient(circle 1.7px at calc(100% - 10px) calc(100% - 10px), rgba(237, 234, 226, 0.24), transparent 100%),
+    linear-gradient(180deg, rgba(255, 240, 220, 0.06), transparent 40%),
+    rgba(36, 32, 26, 0.32);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-app-region: no-drag;
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.midi-oled-screen {
+  --oled-ink: #f0d9b4;
+  --oled-dim: #8d7550;
+  --oled-hot: #ff5a12;
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  padding: 11px 14px 10px;
+  border-radius: 15px;
+  gap: 11px;
+  background: rgba(12, 10, 7, 0.52);
+  box-shadow:
+    inset 0 0 0 1px rgba(240, 217, 180, 0.07),
+    inset 0 0 46px rgba(0, 0, 0, 0.62),
+    inset 0 6px 22px rgba(0, 0, 0, 0.34);
+  -webkit-backdrop-filter: blur(24px) saturate(0.82);
+  backdrop-filter: blur(24px) saturate(0.82);
+  color: var(--oled-ink);
+}
+/* Dot matrix plus a soft phosphor bloom over the whole panel. */
+.midi-oled-screen::after {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 80% at 50% 40%, rgba(255, 138, 46, 0.07), transparent 70%);
+  content: "";
+  pointer-events: none;
+}
+
+.midi-oled-status {
+  display: flex;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(240, 217, 180, 0.14);
+  gap: 8px;
+}
+.midi-oled-rig {
+  padding: 2px 3px;
+  border: 0;
+  border-radius: 2px;
+  outline: none;
+  background: transparent;
+  color: var(--oled-hot);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 9px rgba(255, 90, 18, 0.55);
+  transition: background 120ms ease, box-shadow 120ms ease, color 120ms ease;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+.midi-oled-rig:hover { background: rgba(255, 90, 18, 0.11); color: #ff8a3a; }
+.midi-oled-rig:focus-visible { box-shadow: 0 0 0 1px var(--oled-hot), 0 0 9px rgba(255, 90, 18, 0.42); }
+.midi-oled-rig:active { background: rgba(255, 90, 18, 0.18); }
+.midi-oled-status > span { margin-right: auto; color: var(--oled-dim); font-size: 7px; letter-spacing: 0.18em; }
+
+.midi-oled-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(240, 217, 180, 0.07);
+  color: var(--oled-ink);
+  font-size: 7px;
+  font-style: normal;
+  letter-spacing: 0.12em;
+}
+.midi-oled-pill em { display: flex; gap: 1px; }
+.midi-oled-pill s { width: 2px; height: 7px; background: rgba(240, 217, 180, 0.2); }
+.midi-oled-pill s.is-lit { background: var(--oled-hot); }
+
+.midi-oled-deck {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.midi-oled-transport { display: grid; justify-items: center; gap: 7px; }
+.midi-oled-transport > div { display: flex; align-items: center; gap: 8px; }
+.midi-oled-clock {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(255, 138, 46, 0.35);
+}
+.midi-oled-transport i {
+  padding: 3px 8px;
+  border: 1px solid rgba(240, 217, 180, 0.2);
+  border-radius: 3px;
+  color: rgba(240, 217, 180, 0.45);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.14em;
+}
+.midi-oled-transport i.is-running {
+  border-color: transparent;
+  background: var(--oled-hot);
+  color: #180c02;
+  font-weight: 700;
+  box-shadow: 0 0 16px rgba(255, 90, 18, 0.45);
+}
+.midi-oled-transport i.is-resetting { border-color: var(--oled-hot); color: var(--oled-hot); }
+.midi-oled-transport span { color: var(--oled-dim); font-size: 8px; letter-spacing: 0.16em; }
+
+.midi-reel {
+  width: 84px;
+  height: 84px;
+  flex: none;
+  animation: midi-reel-spin 2s linear infinite;
+  fill: none;
+  stroke-linecap: round;
+  transform-origin: center;
+}
+.midi-reel-rim { stroke: rgba(240, 217, 180, 0.42); stroke-width: 1.3; }
+.midi-reel-pack { stroke: rgba(240, 217, 180, 0.1); stroke-width: 9; }
+.midi-reel-spoke { stroke: rgba(240, 217, 180, 0.55); stroke-width: 3.6; }
+.midi-reel-hub { fill: rgba(240, 217, 180, 0.55); stroke: none; }
+.midi-reel-pin { fill: #0c0a07; stroke: none; }
+.midi-reel.is-loaded .midi-reel-pack { stroke: rgba(255, 90, 18, 0.34); }
+.midi-reel.is-loaded .midi-reel-hub { fill: var(--oled-hot); }
+
+/* The tape leaves each reel on a diagonal and runs flat under the chord slots. */
+.midi-tape-path {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-top: -12px;
+}
+.midi-tape-line {
+  position: absolute;
+  inset: -6px 0 auto;
+  width: 100%;
+  height: 30px;
+  fill: none;
+  stroke: rgba(240, 217, 180, 0.3);
+  stroke-width: 1;
+}
+.midi-progression { position: relative; display: flex; margin-top: 6px; gap: 5px; }
+.midi-progression b,
+.midi-progression button {
+  display: grid;
+  width: 46px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid rgba(240, 217, 180, 0.12);
+  border-radius: 4px;
+  background: #0c0a07;
+  color: rgba(240, 217, 180, 0.24);
+  font: inherit;
+  font-size: 8px;
+}
+.midi-progression button {
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+.midi-progression button.is-filled { border-color: rgba(255, 90, 18, 0.3); color: var(--oled-ink); }
+.midi-progression button.is-playing {
+  border-color: transparent;
+  background: rgba(255, 90, 18, 0.55);
+  box-shadow: 0 0 14px rgba(255, 90, 18, 0.4);
+  color: #fff6ee;
+}
+/* Hovering reads as removal: the slot dims and strikes through before the click lands. */
+.midi-progression button:hover,
+.midi-progression button:focus-visible {
+  border-color: rgba(255, 90, 18, 0.75);
+  background: rgba(255, 90, 18, 0.12);
+  box-shadow: none;
+  color: var(--oled-ink);
+  text-decoration: line-through;
+  outline: none;
+}
+.midi-progression button:active { transform: translateY(1px); }
+
+.midi-oled-title { display: grid; justify-items: center; gap: 4px; }
+.midi-oled-track {
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 3px;
+  outline: none;
+  background: transparent;
+  color: var(--oled-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 6px;
+  letter-spacing: 0.08em;
+  transition: background 120ms ease, box-shadow 120ms ease, color 120ms ease;
+  -webkit-app-region: no-drag;
+}
+.midi-oled-track i { width: 6px; height: 6px; border-radius: 50%; background: var(--oled-hot); }
+.midi-oled-track:hover { background: rgba(255, 90, 18, 0.11); color: #fff6ee; }
+.midi-oled-track:focus-visible { box-shadow: 0 0 0 1px var(--oled-hot), 0 0 9px rgba(255, 90, 18, 0.42); }
+.midi-oled-track:active { background: rgba(255, 90, 18, 0.18); }
+.midi-oled-title span { color: var(--oled-dim); font-size: 7px; letter-spacing: 0.18em; }
+
+.midi-oled-plate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid rgba(240, 217, 180, 0.1);
+  color: var(--oled-dim);
+  font-size: 6px;
+  letter-spacing: 0.24em;
+}
+.midi-oled-plate b {
+  display: flex;
+  align-items: center;
+  gap: 0.2em;
+  color: var(--oled-ink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+/* The lucide lemniscate only inks the middle third of its box, so it is oversized to sit on the cap height. */
+.midi-brand-mark {
+  width: 1.5em;
+  height: 1.5em;
+  color: var(--oled-hot);
+  transform: translateY(-0.015em);
+}
+
+@keyframes midi-reel-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .midi-reel { animation: none; }
+}
+

@@ -1,0 +1,90 @@
+.midi-page {
+  --midi-paper: #edeae2;
+  --midi-dim: #8d8a82;
+  --midi-orange: #ff4f00;
+  position: relative;
+  display: block;
+  width: 100vw;
+  min-width: 800px;
+  height: 100vh;
+  min-height: 450px;
+  overflow: hidden;
+  background: transparent;
+  color: var(--midi-paper);
+  font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+  isolation: isolate;
+}
+
+.midi-page::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: transparent;
+  content: "";
+  pointer-events: none;
+}
+
+/* A translucent colour wash is remounted on each quarter-note pulse by MidiPage. */
+.midi-beat-wash {
+  position: absolute;
+  inset: -18%;
+  z-index: 0;
+  animation: midi-beat-wash var(--midi-quarter, 0.58s) cubic-bezier(0.16, 0.72, 0.24, 1) both;
+  background:
+    radial-gradient(circle at var(--midi-pulse-x, 24%) 58%, rgba(255, 88, 8, 0.34), transparent 34%),
+    radial-gradient(circle at calc(100% - var(--midi-pulse-x, 24%)) 42%, rgba(0, 212, 225, 0.2), transparent 30%),
+    linear-gradient(118deg, rgba(255, 157, 42, 0.13), transparent 42% 58%, rgba(0, 170, 190, 0.09));
+  filter: blur(22px) saturate(1.2);
+  pointer-events: none;
+  transform-origin: var(--midi-pulse-x, 24%) 55%;
+  will-change: opacity, transform;
+}
+
+.midi-beat-wash.is-beat-1 { --midi-pulse-x: 38%; }
+.midi-beat-wash.is-beat-2 { --midi-pulse-x: 64%; }
+.midi-beat-wash.is-beat-3 { --midi-pulse-x: 78%; }
+
+@keyframes midi-beat-wash {
+  0% { opacity: 0.74; transform: scale(0.94); }
+  18% { opacity: 0.5; }
+  100% { opacity: 0.06; transform: scale(1.08); }
+}
+
+.midi-window-drag {
+  position: fixed;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 52px;
+  -webkit-app-region: drag;
+}
+
+.midi-device-column {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  bottom: 0;
+  left: -4vw;
+  display: grid;
+  width: 36vw;
+  min-width: 270px;
+  place-items: center;
+  pointer-events: none;
+}
+
+.midi-device-float {
+  --remote-height: 46vh;
+  position: relative;
+  display: grid;
+  width: calc(var(--remote-height) * 0.68);
+  height: calc(var(--remote-height) * 0.98);
+  place-items: center;
+  animation: midi-device-hover 5s ease-in-out infinite;
+  pointer-events: auto;
+}
+
+.midi-device-float .sweep-pro-shadow { opacity: 0.4; transform: translate(5px, 12px); }
+.midi-device-float .sweep-pro { z-index: 1; }
+.midi-device-column.is-shifted .sweep-pro-keybed button { border-color: rgba(255, 79, 0, 0.55); }
+

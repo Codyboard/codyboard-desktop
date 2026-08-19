@@ -1,97 +1,72 @@
-# Codyboard Desktop Agent Notes
+# Codyboard Desktop — Agent Map
 
-## Tooling
+## Commands
 
-- Use `pnpm` exclusively for JavaScript dependencies and scripts. Do not use npm or Yarn.
-- Use `uv` instead of `pip` for Python work.
-- Run `pnpm lint` before handing off TypeScript or React changes. ESLint uses typed rules and alphabetized `import-x/order`; use `pnpm lint:fix` for mechanical fixes.
-- The Husky pre-commit hook runs `lint-staged`; keep staged JavaScript and TypeScript files auto-fixable by ESLint.
-- Before handing off implementation changes, run `pnpm lint`, `pnpm test`, `pnpm test:native`, and `pnpm build` unless the change clearly cannot affect that layer.
+- JS/TS: `pnpm` only. Python: `uv`, not `pip`.
+- Required before handoff: `pnpm lint && pnpm test && pnpm test:native && pnpm build`.
+- ESLint enforces typed rules and `import-x/order`; use `pnpm lint:fix` only for mechanical fixes.
+- Keep TS/Swift files focused and normally under ~300 lines. Split CSS by visual responsibility, not an arbitrary line count; never compress formatting to hide size.
 
-## Documentation
+## Find code by task
 
-- Keep `README.md` user-facing and accurate for the latest released behavior. Do not expose internal implementation identifiers unless they help users build or diagnose the app.
-- Store repository screenshots under `docs/screenshots/` with descriptive kebab-case names. Never reference clipboard, `/tmp`, or other machine-local paths from committed Markdown.
-- Verify screenshot dimensions and visible content before committing. Do not add blank, corrupted, secret-bearing, or user-identifying screenshots.
-- Use repository-relative image paths so screenshots render on GitHub and in local Markdown viewers.
-- When commands, permissions, supported hardware, or profile storage change, update the corresponding README section in the same change.
+| Task | Start here | Related |
+|---|---|---|
+| App bootstrap/events | `src/main/main.ts` | `src/main/app/settings-window.ts`, `tray-controller.ts` |
+| IPC channel | `src/main/app/ipc-handlers.ts` | `src/preload/preload.ts`, `src/shared/codyboard-api.ts` |
+| Native subprocess transport | `src/main/daemon/codyboard-daemon-client.ts` | `native/.../NativeCommandServer.swift`, `NativeModels.swift` |
+| App lookup/icons | `src/main/app/application-catalog.ts` | `ipc-handlers.ts` |
+| Profile mutation/runtime replace | `src/main/profiles/profile-coordinator.ts` | `profile-schema.ts`, `profile-store.ts` |
+| Profile YAML I/O/rollback | `src/main/profiles/profile-store.ts` | `resources/default-config/` |
+| Shared HID types | `src/shared/hid-device.ts` | `profile-types.ts`; `hid.ts` is only a compatibility barrel |
+| Profile mapping pure logic | `src/shared/profile-mappings.ts` | colocated tests |
+| Native capture lifecycle/Event Tap | `native/.../KeyboardController.swift` | `KeyboardController+Commands.swift` |
+| Native device event correlation | `native/.../KeyboardController+DeviceInput.swift` | `KeyboardInputDomain.swift` |
+| Native output execution | `native/.../KeyboardController+ActionExecution.swift` | `KeyboardSimulator.swift` |
+| Device catalog/VID-PID | `src/shared/device-catalog.ts` | `HIDDeviceManager.swift` |
+| Device mapping UI | `DeviceButtonMappings.tsx` | `use-device-mappings.ts`, `DeviceMappingRow.tsx`, `MappingValueControls.tsx` |
+| Mapping presets/device defaults | `device-controls.ts`, `mapping-output-presets.ts` | `mapping-output.ts` |
+| Sweep Pro hardware decoding | `SweepPro.tsx` | `sweep-pro-input.ts` |
+| Get Funky page lifecycle | `features/midi/MidiPage.tsx` | `use-midi-engine.ts`, `use-midi-hardware.ts`, `use-midi-performance-controls.ts` |
+| MIDI scheduling/state | `features/midi/audio-engine.ts` | `audio-step-scheduler.ts`, `audio-engine-snapshot.ts`, `performance-effects.ts` |
+| Web Audio graph/voices | `audio-graph.ts`, `audio-voices.ts` | `drum-voices.ts`, `melodic-voices.ts`, `audio-primitives.ts` |
+| MIDI harmony/data | `harmony.ts`, `sequencer.ts` | `rigs.ts`, `midi-templates.ts`, `controls.ts` |
+| Global styles | `renderer/styles/zz-components.css` | imports focused files under `renderer/styles/` in cascade order |
+| MIDI styles | `features/midi/midi.css` | imports page, device skin, HUD, permission styles |
 
-## Architecture
+Paths beginning `native/...` mean `native/Sources/CodyboardDaemon/`; renderer component paths are under `src/renderer/components/devices/` unless stated.
 
-- The desktop shell is Electron + React + TypeScript. It normally runs headless with a system tray; the tray menu contains Get Funky, Settings, permissions, and Quit.
-- macOS keyboard capture, matching, and rewriting belong in the long-lived Swift `CodyboardDaemon` process. Keep the Event Tap hot path free of file and cross-process lookups.
-- `CodyboardDaemonClient` owns the Swift subprocess and JSON-lines request/response transport. Do not put profile or HID domain policy back into this transport class.
-- `ProfileCoordinator` is the Electron main-process cold-path owner for YAML persistence, validation, compilation, atomic daemon snapshot replacement, and rollback.
-- The Swift package, executable target, source module, and test module are all named `CodyboardDaemon`; do not reintroduce the former `CodyboardHIDHelper` naming.
-- Keep native capture alive for the full Electron app lifecycle, including while the main window is hidden and only the system tray remains.
-- The Event Tap listens for `keyDown`, `keyUp`, `flagsChanged`, and `systemDefined`; auxiliary controls such as volume and media keys are exposed as `systemdefined` events.
-- The renderer API is object-oriented around `codyboard.profiles`, `ProfileManager`, and stable per-type `KeyboardProfileCollection` objects.
-- Use `listHIDs()` to retrieve the live list of physical keyboard HID devices and their IORegistry IDs. Virtual devices such as Karabiner are excluded by default; pass `{ includeVirtual: true }` only for diagnostics.
-- Keyboard type means `CGEventField.keyboardEventKeyboardType`; Codyboard Presenter uses type `40` (`46` is the user's Magic Keyboard).
-- A keyboard type cannot uniquely identify multiple physical devices. Future per-device selection must use IOHID identity such as registry ID, vendor/product IDs, or serial number.
-- Treat raw remote-only controls such as Power and Back as HID usages when possible. Do not assume their synthesized macOS keycodes uniquely identify the physical button.
+## Hard boundaries
 
-## Renderer
+- Electron main composes services; do not move filesystem, tray, app lookup, window, or IPC policy back into `main.ts`.
+- `CodyboardDaemonClient` is transport only. `ProfileCoordinator` owns mutation/compile/atomic runtime replace; `ProfileStore` owns disk and rollback.
+- Keyboard capture/matching/rewriting stays in Swift. Keep the Event Tap path free of file and cross-process lookups.
+- Swift package/module/executable/tests are named `CodyboardDaemon`; never restore `CodyboardHIDHelper`.
+- `listHIDs()` returns physical IORegistry identities; virtual devices are excluded unless `{ includeVirtual: true }`.
+- Supported devices are exact VID/PID: Xiaomi `0x2717/0x32B8`; Sweep Pro `0x1D50/0x615E`. Keyboard type is not a unique device ID.
+- Profiles live at `~/.codyboard/profiles/device-{domain}/{profile-id}.yaml`; active IDs live in `~/.codyboard/settings.yaml`. No file watchers. Never reseed after settings or the profiles directory exists.
+- With no active profiles, native code must not create an Event Tap or request Accessibility permission.
 
-- The settings window opens centered at 16:10 within 75% of the primary display work area, then remains freely resizable without a locked aspect ratio. The renderer uses a single `index.html` entry with `HashRouter`: `/permissions` is the permission gate, `/` selects a connected device, `/devices/:deviceId` shows its details, and `/midi` hosts Get Funky.
-- Accessibility and Input Monitoring are hard gates for device routes. Read their actual state from Swift, never infer success in React; permission actions register the native request and open the corresponding macOS System Settings pane.
-- Use the macOS `hiddenInset` title-bar style: hide standard window chrome but keep the native traffic lights. The window and page surfaces are translucent. Appearance is an explicit sun/moon Light/Dark choice stored in `localStorage`; do not follow the system appearance and do not force a Tailwind `.dark` class.
-- The selection and detail pages share `AppToolbar`, with page identity on the left and the appearance switch on the right. Detail pages add their back navigation to the same toolbar.
-- `AppToolbar` is exactly 60px tall. Its title group uses a 3px downward optical adjustment for glyphs with descenders, and the native traffic lights are centered on the same header axis.
-- Keep the device-selection header compact like a desktop application, not an oversized marketing hero. Every device card is a strict 1:1 square.
-- When no supported hardware is found, show the designed empty state with supported-model guidance and a working rescan action; do not leave a bare diagnostic message.
-- Supported-device filtering is exact VID/PID matching: 小米蓝牙语音遥控器 is `0x2717/0x32B8`; Sweep Pro is `0x1D50/0x615E`.
-- `Device` is the TSX boundary for a physical-device view and receives a `keyboardType` prop for internal device behavior; do not display that implementation identifier in the device UI or hardcode it inside the remote renderer.
-- `XiaomiRemote` exposes `onKeyPress` for both `down` and `up` phases and must provide pressed/released visual feedback for pointer and real type-40 hardware events.
-- `SweepPro` is the dedicated renderer for the 15-key board, side keys, and rotary control; keep its hardware mapping and visual behavior separate from `XiaomiRemote`.
-- The current React + Tailwind + shadcn-style settings UI is disposable and will be rewritten. Keep domain behavior outside visual components.
+## MIDI invariants
 
-## Get Funky MIDI
+- Opening `/midi` autoplays. Closing/leaving it disposes audio/timers/RAF/Three.js and releases capture; merely losing focus does not.
+- Each `MidiPage` mount owns capture with a UUID. `MIDICaptureController` must ignore stale-owner release calls.
+- While MIDI capture is active: suspend every global/application profile mapping across all devices; suppress captured Sweep Pro input while still emitting diagnostics. Release restores the unchanged profile snapshot.
+- Keep hardware polling/capture in `use-midi-hardware.ts`, gestures/latch/reset in `use-midi-performance-controls.ts`, and `MidiPage.tsx` declarative.
+- Scheduler interval stays 25 ms with look-ahead. Harmony commits next half-bar; rig/drum/bass changes restart at step 0; tempo changes immediately without restart.
+- Audio path: drum/bass/music buses → mix → DJ filter → master → compressor → analyser. Delay/reverb are music sends only; voices never connect directly to destination.
+- `SweepPro` is shared with settings. Hardware dedupe and knob reversal filtering belong in `SweepPro.tsx`/`sweep-pro-input.ts`, not MIDI hooks.
+- MIDI skin selectors stay scoped under `.midi-device-float`; do not use Tailwind `@layer` in MIDI CSS. Preserve transparent WebGL pixels and bloom alpha.
 
-- The tray item is always named `Get Funky 🪩` and opens `/midi`. This is a public feature, not an easter egg, and it must remain usable without connected hardware or macOS input permissions through the on-screen Sweep Pro.
-- MIDI renderer code lives under `src/renderer/features/midi/`: `MidiPage` owns feature lifecycle and hardware discovery, `MidiHud` owns readouts, `MidiVisualizer` owns Three.js, `audio-engine` owns scheduling/state, `audio-voices` owns Web Audio synthesis, `controls` owns pad routing and the shift layer, and `midi-templates`, `rigs`, `harmony`, and `sequencer` contain data and pure domain logic.
-- Get Funky starts playing immediately when opened. Do not add a welcome/boot screen or require Enter, Space, or another gesture. The BrowserWindow uses `autoplayPolicy: "no-user-gesture-required"`; hiding or leaving the page must pause/dispose audio, timers, RAF callbacks, Three.js resources, and hardware capture.
-- `MidiPage` polls `listHIDs()` every two seconds for exact Sweep Pro VID/PID `0x1D50/0x615E`. It stays in virtual mode when absent, automatically captures a newly available device, and releases capture on disconnect, unmount, renderer failure, or window close.
-- Opening Get Funky claims the Sweep Pro exclusively for as long as the page is mounted, independent of window focus or visibility. While MIDI capture is active, the daemon suspends all global and application-specific profile resolution across every device; the captured Sweep Pro is suppressed before the profile runtime is consulted. Leaving the page releases the keyboard and resumes the unchanged profile snapshot. The loop keeps playing while the window is minimized or behind other apps, but closing the window exits Get Funky and stops playback.
-- The 15 letter keys are a 5-by-3 performance grid. Rows are the phrase engines `stab` (comped chord), `spread` (the stab unrolled one chord tone per sixteenth), `arp` (chord decomposition), `pedal` (root held under cycling upper tones), and `riff` (pentatonic lead); columns are harmonic degrees `i7`, `IV9`, and `VI`. A row is one texture across three roots, so `HARMONY_COLUMNS` and `PHRASE_ROWS` in `harmony.ts` are the only place that layout is decided — `degreeVoicings` still carries `III` and `v` for swapping a column. Inputs update the HUD immediately but enter audio on the next half bar.
-- Rig, drum kit, and bass pattern changes are live: they apply on the spot and call `restartLoop()` so playback jumps back to step one instead of finishing the bar. Tempo is the exception — it applies at once but must not restart the loop, or dialling the knob would stutter the groove. Harmony stays quantized; only `pendingProgression` waits, and it commits on the next half bar.
-- A chord slot lasts eight steps, four slots make the two-bar loop, and only the four most recent choices play. The engine step counter runs `0..LOOP_STEPS-1`; drum, bass, and phrase patterns index `step % MIDI_STEPS`.
-- Left Shift is a modifier layer, not a clear key. Holding it keeps the layer active; tapping it latches the layer until the next pad. Shifted column one selects a rig, column two jumps to a drum style family (repeated presses walk that family's variants), column three fires a performance effect, and shifted Tab clears the loop.
-- Tab acts on key-up so it can carry a hold gesture: a short press toggles playback, and holding it for three seconds calls `MidiAudioEngine.reset()` for a full return to the opening state — first rig, empty loop, no effects, playing from step one. The hold shows a countdown on the key legend and in the transport badge, and must be cancelled on window blur and unmount. Keep this latch logic pure in `controls.ts`.
-- A rig is the whole instrument combo: chord, lead, and bass timbres, comping mask, arpeggio pattern, riff contour, key, delay mix, and default drum and bass templates. Selecting a rig adopts those defaults immediately and restarts the loop at step one; the knob can still override drum, bass, and tempo afterwards. Built-in rigs are named after their instruments — CLAV77, HORNS, RHODES, MOOG, and NEON — so they never collide with the genre names used by the drum families.
-- Performance effects are FILTER, DROP, HALF, DBL, and RISER. FILTER, HALF, and DBL are toggles; DROP and RISER are one-shots that resolve on the next bar with a crash. HALF and DBL are mutually exclusive.
-- The knob is the browsing control: pressing it cycles `RIG → DRUM → BASS → TEMPO` and rotation walks the full rig, drum kit, and bass pattern libraries, or moves tempo in 2 BPM increments clamped to 60–180 BPM. Drum kit changes also adopt that kit's default BPM. The shifted grid only adds shortcuts; it must never become the sole way to reach a kit.
-- Drum kits and bass patterns are separate libraries with independent selection. `DRUM_KITS` covers five families — FUNK (FUNK77, MOTOWN, NOLA), DISCO (BAD, STRUT, PHILLY), HOUSE (SMOOTH, DEEP, GARAGE, ELECTRO), HIPHOP (BILLIE, BOOMBAP, TRAP), and GLOBAL (AFRO, LATIN, DNB) — and every kit carries its own BPM and swing. `BASS_PATTERNS` ships the same count as `DRUM_KITS`: FUNK77, SLAP16, OCTAVE, PUMP, DEEPSUB, WALK, BOOGIE, REESE, EIGHT08, TUMBAO, ROLL, GHOST, ACID, DUB, TWOSTEP, and POKER. Add styles by extending these tables, keep every family at two or more kits, and keep kit BPM inside 60–180. Keep this data out of React components and preserve the 25 ms scheduler with a short Web Audio look-ahead.
-- Bass notes follow the current chord: pattern `notes` are indices into `bassTones()`, which only offers perfect intervals and the flat seventh so any bass pattern stays consonant with any chord. Riff downbeats are snapped onto a chord tone. Do not introduce raw semitone offsets that bypass these guards.
-- The audio graph is `drum`, `bass`, and `music` buses into a mix bus, then the DJ filter, master gain, compressor, and analyser. Delay and reverb are sends from the music bus only. `MidiVoices` writes to the buses it is constructed with and must not reach the destination directly.
-- Get Funky dresses the Sweep Pro as a moulded amber-plastic tape controller: glossy shell with a specular sweep, dished keycaps with the highlight high and left, dark brown legends, an orange knob with a dark indicator, and a green pilot lamp. Struck caps light from within — the plastic reads as translucent and back-lit, with the halo spilling onto the shell — so never restore a darkening press state here.
-- The device's blank display becomes a recessed twin-row segmented VU. It and the pilot lamp animate off `--midi-beat` and `--midi-transport`, which `MidiPage` sets on `.midi-device-float` from the snapshot, so both are tempo-locked and freeze when the transport stops. Honour `prefers-reduced-motion` by stopping them.
-- The skin is pure CSS scoped under `.midi-device-float` in `midi.css`; `SweepPro` itself stays unskinned so the settings view keeps the real ivory hardware. Never wrap these overrides in `@layer` — Tailwind's PostCSS pass rejects a bare `@layer components` block in this file, and its own layers are flattened in the build, so a plain selector with `!important` is enough to beat the base rules.
-- `SweepPro` is shared by the settings and MIDI views. Hardware transition deduplication belongs in that component; do not add a second pressed-key cache in `MidiPage`. The rotary encoder chatters on direction, so `acceptKnobPulse` guards hardware knob pulses there: a pulse opposite to the last accepted one inside `KNOB_REVERSAL_MS` is bounce and is dropped along with its matching key-up, which also keeps the on-screen knob from jittering. The window has to outlast the release, not a contact bounce — the stray pulse arrives when the finger leaves, long after the last real detent — so it is set in the hundreds of milliseconds. The window is measured from the last accepted pulse so a burst of bounces cannot extend it, and same-direction pulses are never delayed — a fast turn must stay fast. Requiring a second pulse to confirm a direction change was tried and rejected: swallowing the first click of a deliberate reversal feels worse than the occasional stray step. Pointer and wheel input is not debounced. MIDI adds a minimum 220 ms selected-key highlight so short physical presses have visible feedback.
-- The instrument has exactly one screen: a retro reel-to-reel display in the upper middle of the window, styled after 1970s tape decks — a warm plastic bezel with corner screws around an amber-phosphor panel with a dot-matrix overlay, vignette, and glow. Do not reintroduce a second readout strip; new status belongs on this screen.
-- The screen reads, top to bottom: a status bar (rig name, input mode, swing and tempo segment pills), a deck row with a reel at each end and the bar:beat:sixteenth timecode, PLAYING/PAUSED badge and tape counter between them, the four-slot loop riding a tape path that leaves each reel on a diagonal, the current drum and bass kit as the "track title" with the rig tagline and key beneath it, and a nameplate row holding the `Cody ∞ Loop` wordmark on the left and `TYPE II · K-01` on the right.
-- Reel rotation is `240 / bpm` seconds per turn — tape speed tracks tempo the way a real transport does — and the reels pause with playback. Honour `prefers-reduced-motion` by stopping them.
-- The page is a three-band vertical stack that must fill the window with no dead space: the tape screen at the top, the Three.js machine with the Sweep Pro floating over its left side filling the middle, and one control bar pinned to the bottom carrying KNOB, LAYER, and the five effect chips. There is no separate page title or floating corner box, and the device is not captioned with its link state — the screen carries both the product name and the input.
-- The MIDI visual is one full-window Three.js canvas with the 46vh Sweep Pro floating above its left side; it is not a two-column layout. The current left offset is `-4vw`. The camera is framed so the machine runs off the bottom edge rather than floating in the middle. The product name lives only on the screen nameplate. The lemniscate in it is the lucide `Infinity` icon, never an emoji and never a font glyph — at title weight the text character renders as two filled blobs. It is oversized to about 1.5em because the icon only inks the middle third of its box, and it must keep the accent colour and sit on the cap height of the surrounding type.
-- Preserve full-window translucency: the renderer and page background stay transparent, the canvas CSS opacity is `0.66`, and undrawn WebGL pixels must have alpha 0. `preserveBloomTransparency()` patches `UnrealBloomPass` blur alpha so bloom cannot turn empty pixels into opaque black. Do not set `scene.background`, add a black canvas background, or remove this alpha preservation when changing post-processing.
-- Renderer access to exclusive input is `codyboard.midi.setExclusiveDevice(deviceId?)`, bridged by `midi:set-exclusive-device` and the daemon `midi.capture` command. The state is transient and must never be persisted in YAML or settings.
-- `KeyboardController.setMIDICapture` starts the physical HID monitor and Event Tap without replacing the profile snapshot. New presses from the captured Sweep Pro resolve to suppress while still emitting diagnostic events to React; presses active before capture retain their original key-up action, other devices keep normal mappings, and stopping capture restores the existing profile immediately.
-- Keep harmony, rig, control, sequencer, and engine behavior covered by Vitest under the MIDI feature directory, and keep native capture protocol/isolation tests in `ProfileRuntimeTests.swift`. `audio-engine.test.ts` drives the scheduler against a stub `AudioContext`; extend it when adding voices or effects so synthesis paths stay smoke-tested. Changes spanning input or scheduling require `pnpm lint`, `pnpm test`, `pnpm test:native`, and `pnpm build`.
+## Renderer/style invariants
 
-## Profile storage
+- Routes: `/permissions`, `/`, `/devices/:deviceId`, `/midi` via `HashRouter`.
+- Device routes require actual Swift Accessibility + Input Monitoring status. `/midi` remains usable virtually without hardware/permissions.
+- Window is translucent `hiddenInset`; light/dark is explicit local storage state, not system-following.
+- `styles.css` contains Tailwind/base only. `styles/zz-components.css` is the ordered global CSS entry; preserve its import order. Add styles to the narrowest existing file.
+- `midi.css` is an ordered import entry. Keep settings Sweep Pro ivory and MIDI-only skin amber.
 
-- Store one profile per YAML file under `~/.codyboard/profiles/hid-{type}/{profile-id}.yaml`.
-- Store the single active profile per keyboard type in the shared `~/.codyboard/settings.yaml`; this file may hold future app settings too.
-- Do not watch these files. Read them at startup or explicit reload and write them only through the profile API.
-- On a genuinely fresh installation, seed the bundled active type 40 default profile once. Never recreate it after the user has established settings or a profiles directory.
-- With no active profiles, the Swift daemon must not create an Event Tap or request Accessibility permission.
-- Keep default mappings in `resources/default-config`; do not hardcode experiment mappings in Swift or React.
+## Tests/docs/releases
 
-## Releases
-
-- Use semantic versioning from the `version` field in `package.json`. New backward-compatible actions or substantial capabilities increment the minor version; fixes increment the patch version.
-- `pnpm package:mac` produces the Apple Silicon application at `release/Codyboard.app`. The entire `release/` directory is generated and ignored; never commit packaged applications or archives.
-- The current package script performs ad-hoc signing, not Apple notarization. Do not describe a build as notarized unless a notarization workflow is added and verified.
-- Before tagging a release, run `pnpm lint`, `pnpm test`, `pnpm test:native`, and `pnpm package:mac`.
-- Verify `CFBundleShortVersionString`, `CFBundleVersion`, and `codesign --verify --deep --strict` on the packaged application before publishing it.
-- Create annotated tags named `v{version}` and attach a versioned arm64 ZIP to the GitHub Release. Record the archive SHA-256 in the release handoff.
+- Mapping/profile pure logic: adjacent Vitest files. MIDI scheduler: `audio-engine.test.ts` with `audio-engine-test-fixture.ts`. Native input/capture isolation: `ProfileRuntimeTests.swift`.
+- Update README only for user-visible behavior, commands, permissions, hardware, or storage. Store screenshots in `docs/screenshots/`; use repo-relative links and inspect them before commit.
+- Version from `package.json` using semver. `pnpm package:mac` is ad-hoc signed, not notarized. Release artifacts under `release/` are generated and never committed.
