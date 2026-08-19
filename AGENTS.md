@@ -22,6 +22,10 @@
 | Native capture lifecycle/Event Tap | `native/.../KeyboardController.swift` | `KeyboardController+Commands.swift` |
 | Native device event correlation | `native/.../KeyboardController+DeviceInput.swift` | `KeyboardInputDomain.swift` |
 | Native output execution | `native/.../KeyboardController+ActionExecution.swift` | `KeyboardSimulator.swift` |
+| Remote mic architecture | `docs/remote-mic.md` | BLE, ATVV, CoreAudio, driver identity, verification |
+| Remote mic BLE/ATVV | `native/.../XiaomiVoiceBluetoothController.swift` | `ATVVProtocol.swift`, `BluetoothLifecycle.swift` |
+| Remote mic audio output | `native/.../VirtualAudioOutput.swift` | `CoreAudioDeviceCatalog.swift`, `AudioPlaybackState.swift` |
+| Virtual microphone driver | `scripts/build-virtual-microphone.sh` | `third_party/blackhole/`, `scripts/install-virtual-microphone.sh` |
 | Device catalog/VID-PID | `src/shared/device-catalog.ts` | `HIDDeviceManager.swift` |
 | Device mapping UI | `DeviceButtonMappings.tsx` | `use-device-mappings.ts`, `DeviceMappingRow.tsx`, `MappingValueControls.tsx` |
 | Mapping presets/device defaults | `device-controls.ts`, `mapping-output-presets.ts` | `mapping-output.ts` |
@@ -46,6 +50,17 @@ Paths beginning `native/...` mean `native/Sources/CodyboardDaemon/`; renderer co
 - Profiles live at `~/.codyboard/profiles/device-{domain}/{profile-id}.yaml`; active IDs live in `~/.codyboard/settings.yaml`. No file watchers. Never reseed after settings or the profiles directory exists.
 - With no active profiles, native code must not create an Event Tap or request Accessibility permission.
 
+## Remote microphone invariants
+
+- Read `docs/remote-mic.md` before changing BLE voice capture, ATVV decoding, CoreAudio routing or the HAL driver.
+- PCM remains inside Swift; IPC exposes state/metrics only. Production audio is 16 kHz mono.
+- Virtual device identity is fixed: `Codyboard Virtual Microphone`, UID `CodyboardVirtualMicrophone2ch_UID`, bundle ID `com.codyboard.VirtualMicrophone`.
+- Bind CoreAudio output by UID/device ID. Never change the system default input as part of streaming.
+- Start audio per voice session and drain `.dataPlayedBack` buffers before stopping or releasing a trigger.
+- CoreBluetooth callbacks must remain generation-safe; stale reconnect/session callbacks do no work.
+- Voice trigger implementation stays generic; no product-specific app names or detection in native code.
+- Remote microphone changes must not touch Power handling.
+
 ## MIDI invariants
 
 - Opening `/midi` autoplays. Closing/leaving it disposes audio/timers/RAF/Three.js and releases capture; merely losing focus does not.
@@ -68,5 +83,6 @@ Paths beginning `native/...` mean `native/Sources/CodyboardDaemon/`; renderer co
 ## Tests/docs/releases
 
 - Mapping/profile pure logic: adjacent Vitest files. MIDI scheduler: `audio-engine.test.ts` with `audio-engine-test-fixture.ts`. Native input/capture isolation: `ProfileRuntimeTests.swift`.
+- Remote mic protocol/audio: `ATVVProtocolTests.swift` and `VirtualAudioOutputTests.swift`; rebuild the driver with `pnpm build:virtual-mic` when its patch or scripts change.
 - Update README only for user-visible behavior, commands, permissions, hardware, or storage. Store screenshots in `docs/screenshots/`; use repo-relative links and inspect them before commit.
 - Version from `package.json` using semver. `pnpm package:mac` is ad-hoc signed, not notarized. Release artifacts under `release/` are generated and never committed.

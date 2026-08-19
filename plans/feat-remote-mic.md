@@ -8,7 +8,7 @@
 
 每个 Phase 独立提交；目标测试和全量门禁通过后才进入下一 Phase。
 
-状态：Phase 0–3 实现完成；Phase 3 仅待用户安装后做 QuickTime 验证。后续 Phase 不修改 Power。
+状态：Phase 0–3 完成，QuickTime 已验证 loud and clear。后续 Phase 不修改 Power。
 
 ### 0. 隔离工作区
 
