@@ -44,6 +44,9 @@ final class NativeCommandServer {
             case "diagnostics.set":
                 let result = try keyboard.setDiagnostics(keyboardType: command.params?.keyboardType)
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: result))
+            case "midi.capture":
+                let result = try keyboard.setMIDICapture(deviceId: command.params?.deviceId)
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: result))
             case "permissions.status":
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: permissionStatus()))
             case "permissions.request":

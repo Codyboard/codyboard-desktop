@@ -18,6 +18,7 @@ Codyboard detects supported physical HID devices, lets you assign actions to eve
 - Type Unicode text—including Chinese and English—without using the clipboard.
 - Optionally press Enter after a text action.
 - Create and switch between reusable profiles.
+- Open **Get Funky 🪩** from the menu bar and make a quantized loop with the on-screen or physical Sweep Pro.
 - Keep capture active while the settings window is hidden in the menu bar.
 - Store configuration locally as readable YAML files.
 
@@ -30,6 +31,14 @@ Codyboard detects supported physical HID devices, lets you assign actions to eve
 ### Application-aware button mappings
 
 ![Codyboard mapping editor showing application overrides, shortcuts, and text actions](docs/screenshots/button-mappings.png)
+
+## Get Funky 🪩
+
+Choose **Get Funky 🪩** from the menu bar to open the built-in loop instrument. It starts immediately—there is no welcome screen or keyboard command to begin—and the on-screen Sweep Pro works even when no hardware is connected.
+
+The 15 pads play beat-quantized, in-key chord arpeggios. Tab plays or pauses, Shift clears the chord loop, and pressing the knob cycles through drum, bass, and tempo layers. Turn the knob to move through the built-in BAD, BILLIE, SMOOTH, and FUNK77 templates or adjust tempo from 60–180 BPM.
+
+When a physical Sweep Pro is connected and permissions are available, Codyboard temporarily gives the instrument exclusive control of its buttons. Existing profile actions and system-volume changes are suspended until you leave the page; other connected devices continue to work normally.
 
 ## Supported hardware
 
@@ -48,6 +57,8 @@ Device detection uses exact vendor and product identifiers. Virtual keyboards ar
 - Input Monitoring permission
 
 Accessibility allows Codyboard to send mapped shortcuts and text. Input Monitoring allows it to read device-only controls such as Power and Back. Permission state is read directly from macOS, and input data stays on the Mac.
+
+The virtual **Get Funky 🪩** instrument does not require either permission. Permissions are only needed to play it from a physical Sweep Pro.
 
 ## Install
 

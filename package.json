@@ -1,6 +1,6 @@
 {
   "name": "codyboard-desktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "packageManager": "pnpm@11.5.0",
   "description": "Codyboard Presenter macropad desktop app",
@@ -31,6 +31,7 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.2",
     "tailwind-merge": "^2.6.0",
+    "three": "0.160.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
@@ -40,6 +41,7 @@
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.3",
     "@types/react-dom": "^19.0.2",
+    "@types/three": "0.160.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.2",

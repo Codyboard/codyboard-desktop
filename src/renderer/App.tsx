@@ -3,6 +3,7 @@ import { HashRouter, matchPath, Navigate, Route, Routes, useLocation } from "rea
 
 import type { PermissionStatus } from "../shared/hid";
 
+import { MidiPage } from "./features/midi/MidiPage";
 import { DeviceDetailPage } from "./pages/DeviceDetailPage";
 import { DeviceSelectionPage } from "./pages/DeviceSelectionPage";
 import { PermissionsPage } from "./pages/PermissionsPage";
@@ -12,6 +13,7 @@ export default function App() {
     <HashRouter>
       <Routes>
         <Route path="/permissions" element={<PermissionsPage />} />
+        <Route path="/midi" element={<MidiPage />} />
         <Route path="/*" element={<PermissionGuard><DeviceRouteStack /></PermissionGuard>} />
       </Routes>
     </HashRouter>

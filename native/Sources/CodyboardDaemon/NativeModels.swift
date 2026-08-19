@@ -10,6 +10,7 @@ struct Command: Decodable {
 }
 
 struct CommandParams: Decodable {
+    let deviceId: String?
     let includeVirtual: Bool?
     let snapshot: CompiledProfileSet?
     let output: CompiledOutput?

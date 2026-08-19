@@ -174,6 +174,7 @@ async function resolveApplication(
 }
 
 function showSettings(route = '/'): void {
+  if (!route.startsWith('/midi')) void daemon.setMIDICapture().catch(() => undefined);
   const navigate = () => {
     void settingsWindow?.webContents.executeJavaScript(
       `window.location.hash = ${JSON.stringify(route)}`,
@@ -204,6 +205,7 @@ function showSettings(route = '/'): void {
       vibrancy: 'under-window',
       visualEffectState: 'active',
       webPreferences: {
+        autoplayPolicy: 'no-user-gesture-required',
         preload: path.join(currentDir, 'preload.cjs'),
         contextIsolation: true,
         nodeIntegration: false,
@@ -214,12 +216,16 @@ function showSettings(route = '/'): void {
       if (!isQuitting) {
         event.preventDefault();
         settingsWindow?.hide();
+        void daemon.setMIDICapture().catch(() => undefined);
         void daemon
           .setDiagnosticKeyboardType()
           .catch((error: unknown) =>
             console.error('Unable to stop diagnostics', error),
           );
       }
+    });
+    settingsWindow.webContents.on('render-process-gone', () => {
+      void daemon.setMIDICapture().catch(() => undefined);
     });
     settingsWindow.webContents.once('did-finish-load', navigate);
     if (isDevelopment)
@@ -311,6 +317,7 @@ async function buildTrayMenu(): Promise<Menu> {
 
   return Menu.buildFromTemplate([
     ...connectedDeviceGroup,
+    { label: 'Get Funky 🪩', click: () => showSettings('/midi') },
     { label: 'Open Codyboard…', click: () => showSettings('/') },
     { label: 'Manage Permissions…', click: () => showSettings('/permissions') },
     { type: 'separator' },
@@ -371,6 +378,11 @@ ipcMain.handle('diagnostics:set', async (_event, keyboardType?: number) => {
   const result = await daemon.setDiagnosticKeyboardType(keyboardType);
   console.info(`[diagnostics:set] listening=${result.listening} generation=${result.generation}`);
   return result;
+});
+ipcMain.handle('midi:set-exclusive-device', (_event, deviceId?: string) => {
+  if (deviceId !== undefined && (typeof deviceId !== 'string' || !deviceId.trim()))
+    throw new Error('Invalid MIDI capture device');
+  return daemon.setMIDICapture(deviceId);
 });
 ipcMain.handle('permissions:status', () => daemon.permissionStatus());
 ipcMain.handle(
@@ -442,6 +454,7 @@ void app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  void daemon.setMIDICapture().catch(() => undefined);
   daemon.stop();
 });
 app.on('window-all-closed', () => {

@@ -18,7 +18,7 @@
 
 ## Architecture
 
-- The desktop shell is Electron + React + TypeScript. It normally runs headless with a system tray; the tray menu contains Settings and Quit.
+- The desktop shell is Electron + React + TypeScript. It normally runs headless with a system tray; the tray menu contains Get Funky, Settings, permissions, and Quit.
 - macOS keyboard capture, matching, and rewriting belong in the long-lived Swift `CodyboardDaemon` process. Keep the Event Tap hot path free of file and cross-process lookups.
 - `CodyboardDaemonClient` owns the Swift subprocess and JSON-lines request/response transport. Do not put profile or HID domain policy back into this transport class.
 - `ProfileCoordinator` is the Electron main-process cold-path owner for YAML persistence, validation, compilation, atomic daemon snapshot replacement, and rollback.
@@ -33,7 +33,7 @@
 
 ## Renderer
 
-- The settings window opens centered at 16:10 within 75% of the primary display work area, then remains freely resizable without a locked aspect ratio. The renderer uses a single `index.html` entry with `HashRouter`: `/permissions` is the permission gate, `/` selects a connected device, and `/devices/:deviceId` shows its details.
+- The settings window opens centered at 16:10 within 75% of the primary display work area, then remains freely resizable without a locked aspect ratio. The renderer uses a single `index.html` entry with `HashRouter`: `/permissions` is the permission gate, `/` selects a connected device, `/devices/:deviceId` shows its details, and `/midi` hosts Get Funky.
 - Accessibility and Input Monitoring are hard gates for device routes. Read their actual state from Swift, never infer success in React; permission actions register the native request and open the corresponding macOS System Settings pane.
 - Use the macOS `hiddenInset` title-bar style: hide standard window chrome but keep the native traffic lights. The window and page surfaces are translucent. Appearance is an explicit sun/moon Light/Dark choice stored in `localStorage`; do not follow the system appearance and do not force a Tailwind `.dark` class.
 - The selection and detail pages share `AppToolbar`, with page identity on the left and the appearance switch on the right. Detail pages add their back navigation to the same toolbar.
@@ -43,8 +43,24 @@
 - Supported-device filtering is exact VID/PID matching: 小米蓝牙语音遥控器 is `0x2717/0x32B8`; Sweep Pro is `0x1D50/0x615E`.
 - `Device` is the TSX boundary for a physical-device view and receives a `keyboardType` prop for internal device behavior; do not display that implementation identifier in the device UI or hardcode it inside the remote renderer.
 - `XiaomiRemote` exposes `onKeyPress` for both `down` and `up` phases and must provide pressed/released visual feedback for pointer and real type-40 hardware events.
-- `SweepPro` currently uses the Xiaomi remote illustration as an explicit temporary placeholder; keep it as a separately named component so its future design can diverge.
+- `SweepPro` is the dedicated renderer for the 15-key board, side keys, and rotary control; keep its hardware mapping and visual behavior separate from `XiaomiRemote`.
 - The current React + Tailwind + shadcn-style settings UI is disposable and will be rewritten. Keep domain behavior outside visual components.
+
+## Get Funky MIDI
+
+- The tray item is always named `Get Funky 🪩` and opens `/midi`. This is a public feature, not an easter egg, and it must remain usable without connected hardware or macOS input permissions through the on-screen Sweep Pro.
+- MIDI renderer code lives under `src/renderer/features/midi/`: `MidiPage` owns feature lifecycle and hardware discovery, `MidiHud` owns readouts, `MidiVisualizer` owns Three.js, `audio-engine` owns scheduling/state, `audio-voices` owns Web Audio synthesis, and `midi-templates`, `harmony`, and `sequencer` contain data and pure domain logic.
+- Get Funky starts playing immediately when opened. Do not add a welcome/boot screen or require Enter, Space, or another gesture. The BrowserWindow uses `autoplayPolicy: "no-user-gesture-required"`; hiding or leaving the page must pause/dispose audio, timers, RAF callbacks, Three.js resources, and hardware capture.
+- `MidiPage` polls `listHIDs()` every two seconds for exact Sweep Pro VID/PID `0x1D50/0x615E`. It stays in virtual mode when absent or when permissions are missing, automatically captures a newly available device, and releases capture on disconnect, visibility loss, unmount, renderer failure, or window close.
+- The 15 letter keys are a 5-by-3 harmonic grid. Rows are natural-minor degrees `i`, `III`, `iv`, `v`, and `VI`; columns are up, down, and pulse arpeggios. Inputs update the HUD immediately but enter audio on the next beat, and only the four most recent chord choices loop.
+- Tab toggles playback; left Shift clears harmony; pressing the knob cycles `DRUM → BASS → TEMPO`. Knob rotation changes the selected drum template, bass template, or tempo in 2 BPM increments clamped to 60–180 BPM. Drum template changes also adopt that template's default BPM and swing on the next bar.
+- Built-in templates remain BAD, BILLIE, SMOOTH, and FUNK77. Drum and bass template selection are independent. Keep template data out of React components and preserve the 25 ms scheduler with a short Web Audio look-ahead.
+- `SweepPro` is shared by the settings and MIDI views. Hardware transition deduplication belongs in that component; do not add a second pressed-key cache in `MidiPage`. MIDI adds a minimum 220 ms selected-key highlight so short physical presses have visible feedback.
+- The MIDI visual is one full-window Three.js canvas with the 40vh Sweep Pro floating above its left side; it is not a two-column layout. The current left offset is `-4vw`. The HUD title is `Cody ∞ Loop` and the `∞` mark is a text glyph, not an emoji.
+- Preserve full-window translucency: the renderer and page background stay transparent, the canvas CSS opacity is `0.66`, and undrawn WebGL pixels must have alpha 0. `preserveBloomTransparency()` patches `UnrealBloomPass` blur alpha so bloom cannot turn empty pixels into opaque black. Do not set `scene.background`, add a black canvas background, or remove this alpha preservation when changing post-processing.
+- Renderer access to exclusive input is `codyboard.midi.setExclusiveDevice(deviceId?)`, bridged by `midi:set-exclusive-device` and the daemon `midi.capture` command. The state is transient and must never be persisted in YAML or settings.
+- `KeyboardController.setMIDICapture` starts the physical HID monitor and Event Tap without replacing the profile snapshot. New presses from the captured Sweep Pro resolve to suppress while still emitting diagnostic events to React; presses active before capture retain their original key-up action, other devices keep normal mappings, and stopping capture restores the existing profile immediately.
+- Keep harmony and sequencer behavior covered by Vitest under the MIDI feature directory, and keep native capture protocol/isolation tests in `ProfileRuntimeTests.swift`. Changes spanning input or scheduling require `pnpm lint`, `pnpm test`, `pnpm test:native`, and `pnpm build`.
 
 ## Profile storage
 

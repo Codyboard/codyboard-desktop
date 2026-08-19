@@ -74,6 +74,10 @@ export class CodyboardDaemonClient extends EventEmitter {
     return this.request("diagnostics.set", keyboardType === undefined ? {} : { keyboardType });
   }
 
+  setMIDICapture(deviceId?: string): Promise<{ generation: number; listening: boolean }> {
+    return this.request("midi.capture", deviceId === undefined ? {} : { deviceId });
+  }
+
   stop(): void {
     this.child?.kill("SIGTERM");
     this.child = undefined;

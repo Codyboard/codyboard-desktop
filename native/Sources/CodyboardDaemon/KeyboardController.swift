@@ -12,6 +12,7 @@ final class KeyboardController: @unchecked Sendable {
     private var frontmostBundleIdentifier: String?
     private var activationObserver: NSObjectProtocol?
     private var diagnosticKeyboardType: Int?
+    private var midiCaptureDeviceId: String?
     private var activeLaunchTriggers = Set<ActiveLaunchTrigger>()
     private var activeDevicePresses = ActiveDevicePressStore()
     private var profilesNeedRawHID = false
@@ -58,7 +59,7 @@ final class KeyboardController: @unchecked Sendable {
 
     func replaceProfiles(_ snapshot: CompiledProfileSet, promptForPermission: Bool) throws -> ReplaceResult {
         let needsRawHID = !snapshot.profiles.isEmpty
-        let needsPhysicalHID = !snapshot.profiles.isEmpty
+        let needsPhysicalHID = !snapshot.profiles.isEmpty || midiCaptureDeviceId != nil
         let rawHIDWasRunning = rawHIDMonitor.isRunning
         let physicalHIDWasRunning = physicalHIDMonitor.isRunning
         if needsRawHID { try rawHIDMonitor.start() }
@@ -74,8 +75,8 @@ final class KeyboardController: @unchecked Sendable {
             runtime.replace(snapshot)
             profilesNeedRawHID = false
             if diagnosticKeyboardType != RawHIDMonitor.keyboardType { rawHIDMonitor.stop() }
-            physicalHIDMonitor.stop()
-            if diagnosticKeyboardType == nil { stop() }
+            if midiCaptureDeviceId == nil { physicalHIDMonitor.stop() }
+            if diagnosticKeyboardType == nil && midiCaptureDeviceId == nil { stop() }
         } else if !start(promptForPermission: promptForPermission) {
             if !rawHIDWasRunning { rawHIDMonitor.stop() }
             if !physicalHIDWasRunning { physicalHIDMonitor.stop() }
@@ -128,7 +129,37 @@ final class KeyboardController: @unchecked Sendable {
         } else {
             diagnosticKeyboardType = nil
             if !profilesNeedRawHID { rawHIDMonitor.stop() }
-            if runtime.isEmpty { stop() }
+            if runtime.isEmpty && midiCaptureDeviceId == nil { stop() }
+        }
+        return ReplaceResult(generation: runtime.generation, listening: isListening)
+    }
+
+    func setMIDICapture(deviceId: String?) throws -> ReplaceResult {
+        if let deviceId {
+            guard !deviceId.isEmpty else {
+                throw NSError(
+                    domain: "app.codyboard.midi", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Invalid MIDI capture device"]
+                )
+            }
+            let physicalHIDWasRunning = physicalHIDMonitor.isRunning
+            do {
+                try physicalHIDMonitor.start()
+                guard start(promptForPermission: true) else {
+                    throw NSError(
+                        domain: "app.codyboard.permissions", code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Accessibility permission is required"]
+                    )
+                }
+                midiCaptureDeviceId = deviceId
+            } catch {
+                if !physicalHIDWasRunning && runtime.isEmpty { physicalHIDMonitor.stop() }
+                throw error
+            }
+        } else {
+            midiCaptureDeviceId = nil
+            if runtime.isEmpty { physicalHIDMonitor.stop() }
+            if diagnosticKeyboardType == nil && runtime.isEmpty { stop() }
         }
         return ReplaceResult(generation: runtime.generation, listening: isListening)
     }
@@ -302,7 +333,10 @@ final class KeyboardController: @unchecked Sendable {
             if let active = activeDevicePresses.action(for: input) {
                 action = active
             } else {
-                action = resolveDeviceAction(deviceId: input.deviceId, trigger: trigger)
+                action = resolveNewDevicePress(
+                    deviceId: input.deviceId,
+                    midiCaptureDeviceId: midiCaptureDeviceId
+                ) { resolveDeviceAction(deviceId: input.deviceId, trigger: trigger) }
                 activeDevicePresses.begin(input, action: action)
             }
         } else {
@@ -438,6 +472,14 @@ enum ActiveDeviceAction {
     case openURL(String)
     case typeText(String, Bool)
     case output(CompiledOutput)
+}
+
+func resolveNewDevicePress(
+    deviceId: String,
+    midiCaptureDeviceId: String?,
+    otherwise: () -> ActiveDeviceAction
+) -> ActiveDeviceAction {
+    deviceId == midiCaptureDeviceId ? .suppress : otherwise()
 }
 
 struct ActiveDevicePressStore {

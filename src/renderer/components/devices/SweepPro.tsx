@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type WheelEvent } from "react";
 
 import type { HIDDiagnosticEvent } from "../../../shared/hid";
 
@@ -54,6 +54,7 @@ export function SweepPro({
   selectedKey,
 }: SweepProProps) {
   const [hardwarePressed, setHardwarePressed] = useState<ReadonlySet<SweepProKey>>(new Set());
+  const hardwarePressedRef = useRef<ReadonlySet<SweepProKey>>(new Set());
   const [knobRotation, setKnobRotation] = useState(0);
   const [pointerPressed, setPointerPressed] = useState<ReadonlySet<SweepProKey>>(new Set());
 
@@ -62,11 +63,18 @@ export function SweepPro({
 
     const update = (key: SweepProKey | undefined, phase: "down" | "up", source: "hardware") => {
       if (!key) return;
-      setHardwarePressed((current) => changedSet(current, key, phase === "down"));
+      const isPressed = phase === "down";
+      if (hardwarePressedRef.current.has(key) === isPressed) return;
+      const next = changedSet(hardwarePressedRef.current, key, isPressed);
+      hardwarePressedRef.current = next;
+      setHardwarePressed(next);
       if (phase === "down") setKnobRotation((current) => current + sweepProKnobDelta(key));
       onKeyPress?.({ key, phase, source });
     };
-    const clearPressed = () => setHardwarePressed(new Set());
+    const clearPressed = () => {
+      hardwarePressedRef.current = new Set();
+      setHardwarePressed(new Set());
+    };
     const unsubscribeDiagnostics = window.codyboard?.diagnostics?.onKey((event) => {
       const key = sweepProKeyForDiagnostic(event, deviceId);
       const phase = event.eventType === "keyup" ? "up" : "down";
@@ -75,6 +83,7 @@ export function SweepPro({
 
     window.addEventListener("blur", clearPressed);
     return () => {
+      clearPressed();
       window.removeEventListener("blur", clearPressed);
       unsubscribeDiagnostics?.();
     };

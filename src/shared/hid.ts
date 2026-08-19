@@ -236,6 +236,9 @@ export interface CodyboardAPI {
     resolve(bundleId: string): Promise<CodyboardApplicationInfo | undefined>;
   };
   listHIDs(options?: HIDListOptions): Promise<HIDDeviceInfo[]>;
+  midi: {
+    setExclusiveDevice(deviceId?: string): Promise<{ generation: number; listening: boolean }>;
+  };
   keyboard: { send(output: CompiledOutput): Promise<void> };
   permissions: {
     status(): Promise<PermissionStatus>;

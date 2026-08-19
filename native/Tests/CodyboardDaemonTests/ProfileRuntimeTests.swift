@@ -140,6 +140,28 @@ final class ProfileRuntimeTests: XCTestCase {
         XCTAssertNil(presses.uniqueAction(kind: "keyboard", code: 17))
     }
 
+    func testMIDICaptureSuppressesOnlyTheSelectedDevice() {
+        let mapped = ActiveDeviceAction.output(globalOutput)
+        let captured = resolveNewDevicePress(
+            deviceId: "Sweep Pro", midiCaptureDeviceId: "Sweep Pro"
+        ) { mapped }
+        let other = resolveNewDevicePress(
+            deviceId: "Built-in Keyboard", midiCaptureDeviceId: "Sweep Pro"
+        ) { mapped }
+
+        guard case .suppress = captured else { return XCTFail("Expected MIDI capture to suppress the key") }
+        guard case .output(let output) = other else { return XCTFail("Expected other devices to keep their mapping") }
+        XCTAssertEqual(output.code, globalOutput.code)
+    }
+
+    func testMIDICaptureCommandDecodesDeviceIdentity() throws {
+        let data = Data(#"{"id":"7","method":"midi.capture","params":{"deviceId":"Sweep Pro"}}"#.utf8)
+        let command = try JSONDecoder().decode(Command.self, from: data)
+
+        XCTAssertEqual(command.method, "midi.capture")
+        XCTAssertEqual(command.params?.deviceId, "Sweep Pro")
+    }
+
     func testSyntheticModifiersRemainHeldUntilEveryChordReleasesThem() {
         var ledger = SyntheticModifierLedger()
 
