@@ -16,6 +16,7 @@ struct CommandParams: Decodable {
     let output: CompiledOutput?
     let keyboardType: Int?
     let permission: String?
+    let configuration: VoiceConfiguration?
 }
 
 struct PermissionStatus: Codable {
@@ -67,6 +68,50 @@ struct EmptyPayload: Codable {}
 struct ReplaceResult: Codable {
     let generation: Int
     let listening: Bool
+}
+
+struct VoiceConfiguration: Codable, Equatable {
+    let enabled: Bool
+    let targetIdentifier: String?
+    let gainDB: Double
+
+    static let disabled = VoiceConfiguration(
+        enabled: false, targetIdentifier: nil, gainDB: 0
+    )
+}
+
+enum VoiceBluetoothState: String, Codable {
+    case stopped
+    case unavailable
+    case scanning
+    case connecting
+    case discovering
+    case ready
+    case reconnecting
+    case failed
+}
+
+struct VoiceStatus: Codable, Equatable {
+    let state: VoiceBluetoothState
+    let enabled: Bool
+    let deviceIdentifier: String?
+    let deviceName: String?
+    let capabilities: ATVVCapabilities?
+    let streaming: Bool
+    let generation: UInt64?
+    let error: String?
+}
+
+struct VoiceStreamEvent: Codable, Equatable {
+    let generation: UInt64
+    let sessionID: UInt8
+}
+
+struct VoiceMetrics: Codable, Equatable {
+    let generation: UInt64
+    let sessionID: UInt8
+    let decodedFrames: Int
+    let decodedSamples: Int
 }
 
 struct DeviceInfo: Codable {

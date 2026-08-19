@@ -2,13 +2,13 @@
 
 ## 背景
 
-把小米遥控器的 BLE ATVV 音频接入 Codyboard，输出到本机回环音频设备，并支持 Fn、`Ctrl+Shift+D` 和安全的电源键映射。技术细节见 [可行性规格](/Users/henry/Desktop/codyboard-desktop/plan/remote-mic-migration-feasibility.md)。
+把小米遥控器的 BLE ATVV 音频接入 Codyboard，输出到本机回环音频设备，并支持 Fn 和 `Ctrl+Shift+D`。Power 已由用户独立完成，不属于本迁移。技术细节见 [可行性规格](/Users/henry/Desktop/codyboard-desktop/plan/remote-mic-migration-feasibility.md)。
 
 ## 方案
 
 每个 Phase 独立提交；目标测试和全量门禁通过后才进入下一 Phase。
 
-状态：Phase 0 完成；Phase 1 使用用户已完成的 Power 实现，不再修改。
+状态：Phase 0–2 完成；后续 Phase 不修改 Power。
 
 ### 0. 隔离工作区
 
@@ -59,8 +59,6 @@
 
 | 文件 | 变更 | 说明 |
 | --- | --- | --- |
-| `native/Sources/CodyboardDaemon/XiaomiHIDProtectionController.swift` | modify | 承接并完成现有 Power WIP |
-| `native/Sources/CodyboardDaemon/RawHIDMonitor.swift` | modify | protection gate 与 raw power |
 | `native/Sources/CodyboardDaemon/ATVVProtocol.swift` | add | 协议、decoder、framing |
 | `native/Sources/CodyboardDaemon/XiaomiVoiceBluetoothController.swift` | add | CoreBluetooth 生命周期 |
 | `native/Sources/CodyboardDaemon/VirtualAudioOutput.swift` | add | CoreAudio 输出与 drain |
@@ -73,6 +71,5 @@
 ## 验证
 
 - 每 Phase：相关单元测试，再运行 `pnpm lint && pnpm test && pnpm test:native && pnpm build`。
-- Phase 1：Power 动作执行且 macOS 不睡眠；退出恢复原 HID mapping。
 - Phase 2–4：RC003 首次短语音成功，QuickTime 有完整首尾音，Fn/快捷键严格成对。
 - Phase 6：断连重连、快速连续语音、权限撤销、睡眠唤醒、MIDI capture、60 秒长按全部真机验证。

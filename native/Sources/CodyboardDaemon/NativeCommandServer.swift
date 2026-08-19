@@ -1,13 +1,20 @@
 import Foundation
+import Darwin
 
 final class NativeCommandServer {
     private let decoder = JSONDecoder()
     private let devices: HIDDeviceManager
     private let keyboard: KeyboardController
+    private let voice: XiaomiVoiceBluetoothController
 
-    init(devices: HIDDeviceManager, keyboard: KeyboardController) {
+    init(
+        devices: HIDDeviceManager,
+        keyboard: KeyboardController,
+        voice: XiaomiVoiceBluetoothController
+    ) {
         self.devices = devices
         self.keyboard = keyboard
+        self.voice = voice
     }
 
     func start() {
@@ -26,7 +33,8 @@ final class NativeCommandServer {
         }
         DispatchQueue.main.async { [weak self] in
             self?.keyboard.shutdown()
-            CFRunLoopStop(CFRunLoopGetMain())
+            self?.voice.shutdown()
+            exit(EXIT_SUCCESS)
         }
     }
 
@@ -50,6 +58,17 @@ final class NativeCommandServer {
             case "midi.capture":
                 let result = try keyboard.setMIDICapture(deviceId: command.params?.deviceId)
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: result))
+            case "voice.configure":
+                guard let configuration = command.params?.configuration else {
+                    throw commandError("Missing voice configuration")
+                }
+                let result = try voice.configure(configuration)
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: result))
+            case "voice.status":
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: voice.status))
+            case "voice.stop":
+                voice.stop()
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: voice.status))
             case "permissions.status":
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: permissionStatus()))
             case "permissions.request":

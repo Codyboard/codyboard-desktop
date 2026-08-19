@@ -32,6 +32,9 @@ try {
     dir: stagedApplicationDirectory,
     electronVersion: "43.4.0",
     executableName: "Codyboard",
+    extendInfo: {
+      NSBluetoothAlwaysUsageDescription: "Codyboard connects to the Xiaomi voice remote to receive microphone audio.",
+    },
     extraResource: [
       path.join(projectDirectory, "resources", "bin"),
       path.join(projectDirectory, "resources", "default-config"),
