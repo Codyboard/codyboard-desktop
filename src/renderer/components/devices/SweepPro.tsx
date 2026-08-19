@@ -20,6 +20,23 @@ export type DeviceMappingPreview =
 
 export type SweepProMappingPreviews = Partial<Record<SweepProKey, DeviceMappingPreview>>;
 
+export interface KnobPulseGuard {
+  direction: number;
+  time: number;
+}
+
+export const IDLE_KNOB_PULSE_GUARD: KnobPulseGuard = {
+  direction: 0,
+  time: Number.NEGATIVE_INFINITY,
+};
+
+/**
+ * Releasing a turn makes the encoder emit one stray pulse the other way, landing well after the
+ * last real detent, so this window has to outlast the release rather than a single contact bounce.
+ * A reversal sooner than this after an accepted pulse is that stray, never a deliberate turn.
+ */
+export const KNOB_REVERSAL_MS = 250;
+
 export interface SweepProKeyPressEvent {
   key: SweepProKey;
   phase: "down" | "up";
@@ -56,6 +73,8 @@ export function SweepPro({
   const [hardwarePressed, setHardwarePressed] = useState<ReadonlySet<SweepProKey>>(new Set());
   const hardwarePressedRef = useRef<ReadonlySet<SweepProKey>>(new Set());
   const [knobRotation, setKnobRotation] = useState(0);
+  const knobGuard = useRef<KnobPulseGuard>(IDLE_KNOB_PULSE_GUARD);
+  const bouncedKnobKeys = useRef<Set<SweepProKey>>(new Set());
   const [pointerPressed, setPointerPressed] = useState<ReadonlySet<SweepProKey>>(new Set());
 
   useEffect(() => {
@@ -63,6 +82,19 @@ export function SweepPro({
 
     const update = (key: SweepProKey | undefined, phase: "down" | "up", source: "hardware") => {
       if (!key) return;
+      const rotation = sweepProKnobDelta(key);
+      if (rotation !== 0) {
+        if (phase === "up") {
+          if (bouncedKnobKeys.current.delete(key)) return;
+        } else {
+          const pulse = acceptKnobPulse(knobGuard.current, Math.sign(rotation), performance.now());
+          if (!pulse.accepted) {
+            bouncedKnobKeys.current.add(key);
+            return;
+          }
+          knobGuard.current = pulse.guard;
+        }
+      }
       const isPressed = phase === "down";
       if (hardwarePressedRef.current.has(key) === isPressed) return;
       const next = changedSet(hardwarePressedRef.current, key, isPressed);
@@ -73,6 +105,8 @@ export function SweepPro({
     };
     const clearPressed = () => {
       hardwarePressedRef.current = new Set();
+      bouncedKnobKeys.current = new Set();
+      knobGuard.current = IDLE_KNOB_PULSE_GUARD;
       setHardwarePressed(new Set());
     };
     const unsubscribeDiagnostics = window.codyboard?.diagnostics?.onKey((event) => {
@@ -215,6 +249,16 @@ export function sweepProKeyForDiagnostic(
 ): SweepProKey | undefined {
   if (event.deviceId !== deviceId) return undefined;
   return event.source === "keyCode" ? keyCodeToKey[event.code] : consumerUsageToKey[event.code];
+}
+
+export function acceptKnobPulse(
+  guard: KnobPulseGuard,
+  direction: number,
+  now: number,
+): { accepted: boolean; guard: KnobPulseGuard } {
+  const reversed = guard.direction !== 0 && guard.direction !== direction;
+  if (reversed && now - guard.time < KNOB_REVERSAL_MS) return { accepted: false, guard };
+  return { accepted: true, guard: { direction, time: now } };
 }
 
 export function sweepProKnobDelta(key: SweepProKey): number {

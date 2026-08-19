@@ -1,6 +1,6 @@
 {
   "name": "codyboard-desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "packageManager": "pnpm@11.5.0",
   "description": "Codyboard Presenter macropad desktop app",

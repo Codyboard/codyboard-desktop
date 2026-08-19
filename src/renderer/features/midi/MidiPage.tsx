@@ -1,5 +1,5 @@
 import { Eraser, Pause, Play } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { findSupportedDevices } from "../../../shared/device-catalog";
 import type { CodyboardPermission } from "../../../shared/hid";
@@ -11,19 +11,31 @@ import {
 } from "../../components/devices/SweepPro";
 
 import { MidiAudioEngine, type MidiEngineSnapshot } from "./audio-engine";
-import { chordLabel, isMidiPadKey, MIDI_PAD_CHOICES, MIDI_PAD_KEYS } from "./harmony";
+import {
+  consumeShift, FX_LABELS, FX_ORDER, IDLE_SHIFT_LAYER, padAction, shiftActive, shiftDown, shiftUp,
+  type ShiftLayerState,
+} from "./controls";
+import { chordLabel, isMidiPadKey, MIDI_PAD_KEYS, MIDI_PAD_SLOTS } from "./harmony";
+import { DRUM_FAMILIES } from "./midi-templates";
 import { MidiHud } from "./MidiHud";
 import { MidiVisualizer } from "./MidiVisualizer";
+import { MIDI_RIGS } from "./rigs";
 
 import "./midi.css";
+
+const RESET_HOLD_SECONDS = 3;
 
 export function MidiPage() {
   const [captureError, setCaptureError] = useState(false);
   const [engine, setEngine] = useState<MidiAudioEngine>();
   const [hardwareDeviceId, setHardwareDeviceId] = useState<string>();
   const [selectedKey, setSelectedKey] = useState<SweepProKey>();
+  const [resetCountdown, setResetCountdown] = useState<number>();
+  const [shifted, setShifted] = useState(false);
   const [snapshot, setSnapshot] = useState<MidiEngineSnapshot>();
   const selectedKeyTimeout = useRef<number | undefined>(undefined);
+  const shiftLayer = useRef<ShiftLayerState>(IDLE_SHIFT_LAYER);
+  const resetHold = useRef<{ consumed: boolean; timer?: number }>({ consumed: false });
 
   useEffect(() => {
     const nextEngine = new MidiAudioEngine();
@@ -96,19 +108,78 @@ export function MidiPage() {
     };
   }, []);
 
+  const endResetHold = useCallback(() => {
+    if (resetHold.current.timer !== undefined) window.clearInterval(resetHold.current.timer);
+    resetHold.current.timer = undefined;
+    setResetCountdown(undefined);
+  }, []);
+
   const onKeyPress = useCallback((event: SweepProKeyPressEvent) => {
     if (!engine) return;
+    const applyShift = (next: ShiftLayerState) => {
+      shiftLayer.current = next;
+      setShifted(shiftActive(next));
+    };
+
+    if (event.key === "tab" && event.phase === "up") {
+      const { consumed } = resetHold.current;
+      endResetHold();
+      if (!consumed) engine.togglePlayback();
+      return;
+    }
+    if (event.key === "leftShift") {
+      applyShift(event.phase === "down" ? shiftDown(shiftLayer.current) : shiftUp(shiftLayer.current));
+      if (event.phase === "up") return;
+    }
     if (event.phase === "up") return;
+
     setSelectedKey(event.key);
     if (selectedKeyTimeout.current !== undefined) window.clearTimeout(selectedKeyTimeout.current);
     selectedKeyTimeout.current = window.setTimeout(() => setSelectedKey(undefined), 220);
-    if (isMidiPadKey(event.key)) engine.addChord(MIDI_PAD_CHOICES[event.key]);
-    else if (event.key === "tab") engine.togglePlayback();
-    else if (event.key === "leftShift") engine.clearHarmony();
-    else if (event.key === "mute") engine.toggleLayer();
+    if (event.key === "leftShift") return;
+
+    if (isMidiPadKey(event.key)) {
+      const action = padAction(event.key, shiftActive(shiftLayer.current));
+      applyShift(consumeShift(shiftLayer.current));
+      if (action.kind === "chord") engine.addChord(action.slot);
+      else if (action.kind === "rig") engine.selectRig(action.index);
+      else if (action.kind === "drumFamily") engine.selectDrumFamily(action.family);
+      else engine.triggerFx(action.fx);
+    } else if (event.key === "tab") {
+      if (shiftActive(shiftLayer.current)) {
+        applyShift(consumeShift(shiftLayer.current));
+        resetHold.current.consumed = true;
+        engine.clearHarmony();
+      } else {
+        // Holding transport is the full reset; a short press falls through to play/pause on key-up.
+        resetHold.current.consumed = false;
+        endResetHold();
+        let remaining = RESET_HOLD_SECONDS;
+        setResetCountdown(remaining);
+        resetHold.current.timer = window.setInterval(() => {
+          remaining -= 1;
+          if (remaining > 0) {
+            setResetCountdown(remaining);
+            return;
+          }
+          endResetHold();
+          resetHold.current.consumed = true;
+          engine.reset();
+        }, 1_000);
+      }
+    } else if (event.key === "mute") engine.toggleLayer();
     else if (event.key === "volumeDown") engine.turnKnob(-1);
     else if (event.key === "volumeUp") engine.turnKnob(1);
-  }, [engine]);
+  }, [endResetHold, engine]);
+
+  useEffect(() => {
+    const cancel = () => endResetHold();
+    window.addEventListener("blur", cancel);
+    return () => {
+      window.removeEventListener("blur", cancel);
+      cancel();
+    };
+  }, [endResetHold]);
 
   useEffect(() => () => {
     if (selectedKeyTimeout.current !== undefined) window.clearTimeout(selectedKeyTimeout.current);
@@ -116,13 +187,29 @@ export function MidiPage() {
 
   const mappingPreviews = useMemo<SweepProMappingPreviews>(() => {
     const previews: SweepProMappingPreviews = {};
-    for (const key of MIDI_PAD_KEYS)
-      previews[key] = { compact: true, kind: "key", label: chordLabel(MIDI_PAD_CHOICES[key]) };
-    previews.leftShift = { icon: Eraser, kind: "key", label: "Clear" };
-    previews.tab = { icon: snapshot?.playing ? Pause : Play, kind: "key", label: snapshot?.playing ? "Pause" : "Play" };
-    previews.mute = { compact: true, kind: "key", label: snapshot?.activeLayer ?? "DRUM" };
+    MIDI_PAD_KEYS.forEach((key, index) => {
+      const row = Math.floor(index / 3);
+      const column = index % 3;
+      const label = !shifted
+        ? chordLabel(MIDI_PAD_SLOTS[key])
+        : column === 0
+          ? MIDI_RIGS[row].name
+          : column === 1 ? DRUM_FAMILIES[row] : FX_LABELS[FX_ORDER[row]];
+      previews[key] = { compact: true, kind: "key", label };
+    });
+    previews.leftShift = { compact: true, kind: "key", label: shifted ? "SHIFT" : "FN" };
+    previews.tab = resetCountdown !== undefined
+      ? { compact: true, kind: "key", label: `RESET ${resetCountdown}` }
+      : shifted
+        ? { icon: Eraser, kind: "key", label: "Clear" }
+        : {
+          icon: snapshot?.playing ? Pause : Play,
+          kind: "key",
+          label: snapshot?.playing ? "Pause" : "Play",
+        };
+    previews.mute = { compact: true, kind: "key", label: snapshot?.activeLayer ?? "RIG" };
     return previews;
-  }, [snapshot?.activeLayer, snapshot?.playing]);
+  }, [resetCountdown, shifted, snapshot?.activeLayer, snapshot?.playing]);
 
   const openPermission = (permission: CodyboardPermission) => {
     void window.codyboard.permissions.openSettings(permission);
@@ -131,8 +218,17 @@ export function MidiPage() {
   return (
     <main className="midi-page">
       <div className="midi-window-drag" />
-      <section className="midi-device-column" aria-label="Sweep Pro instrument">
-        <div className="midi-device-float">
+      <section
+        className={`midi-device-column ${shifted ? "is-shifted" : ""}`.trim()}
+        aria-label="Sweep Pro instrument"
+      >
+        <div
+          className="midi-device-float"
+          style={{
+            "--midi-beat": `${60 / (snapshot?.bpm ?? 104)}s`,
+            "--midi-transport": snapshot?.playing ? "running" : "paused",
+          } as CSSProperties}
+        >
           <SweepPro
             ariaLabel="Get Funky Sweep Pro"
             deviceId={hardwareDeviceId ?? "virtual-sweep-pro"}
@@ -142,12 +238,18 @@ export function MidiPage() {
             selectedKey={selectedKey}
           />
         </div>
-        <p className="midi-device-mode">{hardwareDeviceId ? "HARDWARE LINKED" : "VIRTUAL INSTRUMENT"}</p>
       </section>
 
       <section className="midi-loop-column">
         {engine && <MidiVisualizer engine={engine} />}
-        {snapshot && <MidiHud hardwareMode={Boolean(hardwareDeviceId)} snapshot={snapshot} />}
+        {snapshot && (
+          <MidiHud
+            hardwareMode={Boolean(hardwareDeviceId)}
+            resetCountdown={resetCountdown}
+            shifted={shifted}
+            snapshot={snapshot}
+          />
+        )}
       </section>
 
       {captureError && (

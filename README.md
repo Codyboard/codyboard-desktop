@@ -36,7 +36,17 @@ Codyboard detects supported physical HID devices, lets you assign actions to eve
 
 Choose **Get Funky 🪩** from the menu bar to open the built-in loop instrument. It starts immediately—there is no welcome screen or keyboard command to begin—and the on-screen Sweep Pro works even when no hardware is connected.
 
-The 15 pads play beat-quantized, in-key chord arpeggios. Tab plays or pauses, Shift clears the chord loop, and pressing the knob cycles through drum, bass, and tempo layers. Turn the knob to move through the built-in BAD, BILLIE, SMOOTH, and FUNK77 templates or adjust tempo from 60–180 BPM.
+The 15 pads are a performance grid. Rows are the five chords of the key, and the three columns are different ways of playing them: a comped chord stab, a chord decomposition arpeggio, and a lead riff. Everything is quantized and locked to the key, so any combination stays in tune. The four most recent pads loop as a two-bar progression.
+
+Hold or tap **Shift** to reach the second layer on the same 15 pads:
+
+| Shifted column | What it does |
+| --- | --- |
+| Left | Switch the rig — CLAV77, HORNS, RHODES, MOOG or NEON. One press swaps every instrument, the groove and the key on the spot, restarting the loop from the top. |
+| Middle | Jump to a drum style — FUNK, DISCO, HOUSE, HIPHOP or GLOBAL. Press again to walk that style's kits. |
+| Right | Fire a performance effect — FILTER, DROP, HALF, DBL or RISER. |
+
+Tab plays or pauses, Shift + Tab clears the loop, and holding Tab for three seconds resets everything back to the opening state. Pressing the knob cycles the rig, drum, bass and tempo layers; turning it browses 5 rigs, 16 drum kits and 16 bass patterns, or moves tempo from 60–180 BPM.
 
 When a physical Sweep Pro is connected and permissions are available, Codyboard temporarily gives the instrument exclusive control of its buttons. Existing profile actions and system-volume changes are suspended until you leave the page; other connected devices continue to work normally.
 
