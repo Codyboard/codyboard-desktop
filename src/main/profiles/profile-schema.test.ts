@@ -172,6 +172,27 @@ describe("profile schema", () => {
     });
   });
 
+  it("compiles a selected physical microphone UID", () => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0] = {
+      from: { kind: "voice" },
+      id: "voice-to-fn",
+      to: { kind: "modifier", key: "fn", modifiers: [] },
+    };
+    document.keyboards[0].profiles[0].groups[0].voiceAudioSource = "device:built-in-mic";
+
+    const compiled = compileProfiles(
+      document,
+      { version: 1, activeProfiles: { "device:0x100004baa": "presenter" } },
+      13,
+    );
+
+    expect(compiled.profiles[0].global[0].output).toMatchObject({
+      voiceAudioDeviceUID: "built-in-mic",
+      voiceAudioSource: "device",
+    });
+  });
+
   it("rejects duplicate normalized triggers in a group", () => {
     const invalid = structuredClone(validDocument);
     invalid.keyboards[0].profiles[0].groups[0].mappings.push({

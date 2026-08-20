@@ -101,6 +101,10 @@ export class CodyboardDaemonClient extends EventEmitter {
     return this.request("audio.devices.list");
   }
 
+  listAudioInputDevices(): Promise<AudioDeviceInfo[]> {
+    return this.request("audio.inputDevices.list");
+  }
+
   configureAudio(deviceUID: string): Promise<AudioOutputStatus> {
     return this.request("audio.configure", { deviceUID });
   }

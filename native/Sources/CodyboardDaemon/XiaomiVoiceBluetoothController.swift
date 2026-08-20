@@ -66,6 +66,7 @@ final class XiaomiVoiceBluetoothController: NSObject {
     var configuration = VoiceConfiguration.disabled
     var capabilitiesRequested = false
     var processor = ATVVVoiceStreamProcessor()
+    var levelMeter = VoiceAudioLevelMeter()
     var streamGeneration: UInt64?
     var microphoneOpened = false
     var deviceName: String?

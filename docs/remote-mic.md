@@ -113,14 +113,16 @@ Primary files:
 | `voice.status` | none | Current BLE/capability state |
 | `voice.stop` | none | Close mic, drain/reset stream and stop BLE |
 | `audio.devices.list` | none | Enumerate CoreAudio output-capable devices |
+| `audio.inputDevices.list` | none | Enumerate CoreAudio input-capable devices |
 | `audio.configure` | `deviceUID` | Bind future sessions to one device |
 | `audio.status` | none | Audio health and pending buffers |
 | `audio.testTone` | none | Schedule a one-second 440 Hz diagnostic tone |
 | `audio.stop` | none | Stop the runtime without clearing selection |
 
-Key events are `bluetoothStateChanged`, `voiceStreamStarted`, `voiceMetrics`,
-`voiceStreamStopped`, `voiceSessionStateChanged`, `audioStateChanged` and
-`audioTestToneFinished`. Never add PCM to JSON events.
+Key events are `bluetoothStateChanged`, `voiceStreamStarted`, `voiceAudioLevel`,
+`voiceMetrics`, `voiceStreamStopped`, `voiceSessionStateChanged`, `audioStateChanged` and
+`audioTestToneFinished`. `voiceAudioLevel` contains only throttled RMS/peak metrics for the settings
+dialog waveform. Never add PCM to JSON events.
 
 ## Voice key mapping
 
@@ -150,11 +152,15 @@ Each profile group independently resolves `voiceAudioSource`:
   the audio drain.
 - `system`: discard BLE PCM, hold/release the same shortcut immediately with the remote session, and
   leave microphone capture to the active application's own configuration.
+- `device:<CoreAudio UID>`: discard BLE PCM, temporarily select that physical microphone before
+  keyDown, then restore the previous default input after keyUp.
 
 Application groups inherit both the global shortcut and audio source unless they override either
-one. A remote-source keyDown leases the current default input UID and switches to the configured
-virtual microphone before posting the shortcut. After drain and shortcut keyUp, every normal,
-failure, disconnect and shutdown path restores the leased UID. System-source sessions do not switch.
+one. A remote- or device-source keyDown leases the current default input UID and switches to the
+resolved input before posting the shortcut. After shortcut keyUp (and, for remote audio, the audio
+drain), every normal, failure, disconnect and shutdown path restores the leased UID. System-source
+sessions do not switch. Applications that pin an input instead of following the macOS default may
+ignore these system-level changes.
 
 Recovery rules:
 
@@ -205,9 +211,9 @@ called both `audio.configure` and `voice.configure`; installation alone does not
   YAML; there is no voice-specific shortcut store.
 - Only paired keyboard/modifier outputs are accepted for voice. Passthrough/suppress means
   audio-only; one-shot application, URL, text and system actions are rejected.
-- The settings panel owns enable/disable, CoreAudio target and test tone. Runtime gain is fixed at
-  `0 dB`; legacy persisted values are normalized to zero. The panel never installs the driver;
-  temporary default-input switching belongs to the native voice-session transaction.
+- The device page keeps one summary row. Its dialog owns enable/disable, source selection, the fixed
+  virtual output, gain and a live RMS/peak meter. The dialog never installs the driver; temporary
+  default-input switching belongs to the native voice-session transaction.
 
 ## Boundaries for later phases
 

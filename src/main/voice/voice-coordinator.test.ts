@@ -31,6 +31,23 @@ const configuredAudio: AudioOutputStatus = {
 };
 
 describe("VoiceCoordinator", () => {
+  it("forwards ephemeral audio levels without changing the snapshot", async () => {
+    const runtime = new FakeVoiceRuntime();
+    const coordinator = new VoiceCoordinator(runtime, await settingsFile());
+    await coordinator.load();
+    const snapshot = coordinator.snapshot();
+    const events: unknown[] = [];
+    coordinator.on("event", (event) => events.push(event));
+
+    runtime.emit("voiceAudioLevel", { peak: 0.5, rms: 0.25, sequence: 7 });
+
+    expect(events).toEqual([{
+      type: "level",
+      level: { peak: 0.5, rms: 0.25, sequence: 7 },
+    }]);
+    expect(coordinator.snapshot()).toEqual(snapshot);
+  });
+
   it("loads settings and configures audio before BLE", async () => {
     const file = await settingsFile();
     await writeFile(file, [
@@ -49,12 +66,13 @@ describe("VoiceCoordinator", () => {
 
     expect(runtime.calls).toEqual([
       "devices",
+      "input-devices",
       "audio:CodyboardVirtualMicrophone2ch_UID",
-      "voice:true:0",
+      "voice:true:4",
       "session",
     ]);
     expect(snapshot.settings.enabled).toBe(true);
-    expect(snapshot.settings.gainDB).toBe(0);
+    expect(snapshot.settings.gainDB).toBe(4);
   });
 
   it("persists voice without replacing profile settings", async () => {
@@ -74,7 +92,7 @@ describe("VoiceCoordinator", () => {
     expect(document.voice).toEqual({
       audioDeviceUID: "CodyboardVirtualMicrophone2ch_UID",
       enabled: true,
-      gainDB: 0,
+      gainDB: -3,
     });
   });
 
@@ -104,6 +122,7 @@ describe("VoiceCoordinator", () => {
 
     expect(runtime.calls).toEqual([
       "devices",
+      "input-devices",
       "audio:CodyboardVirtualMicrophone2ch_UID",
       "voice:true:0",
       "session",
@@ -136,6 +155,17 @@ class FakeVoiceRuntime extends EventEmitter implements VoiceRuntimeClient {
   listAudioDevices() {
     this.calls.push("devices");
     return Promise.resolve([configuredAudio.selectedDevice!]);
+  }
+
+  listAudioInputDevices() {
+    this.calls.push("input-devices");
+    return Promise.resolve([{
+      id: 102,
+      inputChannels: 1,
+      name: "MacBook Microphone",
+      outputChannels: 0,
+      uid: "built-in-mic",
+    }]);
   }
 
   testAudioTone(): Promise<AudioOutputStatus> { return Promise.resolve(configuredAudio); }

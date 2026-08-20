@@ -84,6 +84,10 @@ final class NativeCommandServer {
                 NativeOutput.shared.send(SuccessResponse(
                     id: command.id, data: CoreAudioDeviceCatalog.outputDevices()
                 ))
+            case "audio.inputDevices.list":
+                NativeOutput.shared.send(SuccessResponse(
+                    id: command.id, data: CoreAudioDeviceCatalog.inputDevices()
+                ))
             case "audio.configure":
                 guard !voiceSession.isBusy else {
                     throw commandError("Cannot reconfigure audio during a voice session")

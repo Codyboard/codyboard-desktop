@@ -66,11 +66,19 @@ export interface VoiceSessionStatus {
 export interface VoiceSnapshot {
   audio: AudioOutputStatus;
   audioDevices: AudioDeviceInfo[];
+  inputDevices: AudioDeviceInfo[];
   session: VoiceSessionStatus;
   settings: VoiceSettings;
   voice: VoiceStatus;
 }
 
+export interface VoiceAudioLevel {
+  peak: number;
+  rms: number;
+  sequence: number;
+}
+
 export type VoiceEvent =
   | { type: "changed"; snapshot: VoiceSnapshot }
+  | { type: "level"; level: VoiceAudioLevel }
   | { type: "error"; message: string };

@@ -16,7 +16,25 @@ export interface TypeTextOutput { kind: "typeText"; pressEnter: boolean; text: s
 export type MappingOutput = KeyboardOutput | LaunchApplicationOutput | ModifierOutput | OpenURLOutput | SystemOutput | TypeTextOutput | { kind: "passthrough" } | { kind: "suppress" };
 
 export interface KeyMapping { id: string; from: MappingInput; to: MappingOutput; }
-export type VoiceAudioSource = "remote" | "system";
+const VOICE_AUDIO_DEVICE_PREFIX = "device:";
+
+export type VoiceAudioSource = "remote" | "system" | `device:${string}`;
+
+export function isVoiceAudioSource(value: unknown): value is VoiceAudioSource {
+  return value === "remote" || value === "system"
+    || (typeof value === "string" && value.startsWith(VOICE_AUDIO_DEVICE_PREFIX)
+      && value.length > VOICE_AUDIO_DEVICE_PREFIX.length);
+}
+
+export function voiceAudioDeviceSource(deviceUID: string): VoiceAudioSource {
+  return `${VOICE_AUDIO_DEVICE_PREFIX}${deviceUID}`;
+}
+
+export function voiceAudioDeviceUID(source: VoiceAudioSource): string | undefined {
+  return source.startsWith(VOICE_AUDIO_DEVICE_PREFIX)
+    ? source.slice(VOICE_AUDIO_DEVICE_PREFIX.length)
+    : undefined;
+}
 export type MappingScope = { kind: "global" } | { kind: "application"; bundleId: string };
 export interface KeyMappingGroup {
   id: string;
@@ -48,7 +66,8 @@ export interface CompiledOutput {
   pressEnter?: boolean;
   text?: string;
   url?: string;
-  voiceAudioSource?: VoiceAudioSource;
+  voiceAudioDeviceUID?: string;
+  voiceAudioSource?: "device" | "remote" | "system";
 }
 export interface CompiledMapping { id: string; trigger: CompiledTrigger; output: CompiledOutput; }
 export interface CompiledActiveProfile {

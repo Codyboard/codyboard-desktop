@@ -53,6 +53,13 @@ extension XiaomiVoiceBluetoothController {
             now: ProcessInfo.processInfo.systemUptime
         )
         if decoded.startedImplicitly { beginStream(generation: generation) }
+        for chunk in decoded.chunks {
+            if let level = levelMeter.append(
+                samples: chunk, now: ProcessInfo.processInfo.systemUptime
+            ) {
+                NativeOutput.shared.send(NativeEvent(event: "voiceAudioLevel", data: level))
+            }
+        }
         guard streamOutputReady else { return }
         for chunk in decoded.chunks where onPCM?(chunk) != true {
             streamOutputReady = false
@@ -63,6 +70,7 @@ extension XiaomiVoiceBluetoothController {
     func beginStream(generation: UInt64) {
         guard streamGeneration == nil else { return }
         streamGeneration = generation
+        levelMeter.reset()
         streamOutputReady = onStreamStarted?() == true
         publishState()
         NativeOutput.shared.send(NativeEvent(
@@ -78,6 +86,7 @@ extension XiaomiVoiceBluetoothController {
             decodedFrames: processor.decodedFrames, decodedSamples: processor.decodedSamples
         )
         processor.stop(now: now)
+        levelMeter.reset()
         microphoneOpened = false
         self.streamGeneration = nil
         NativeOutput.shared.send(NativeEvent(event: "voiceMetrics", data: metrics))

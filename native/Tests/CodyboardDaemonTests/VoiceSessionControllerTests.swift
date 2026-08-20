@@ -199,6 +199,30 @@ final class VoiceSessionControllerTests: XCTestCase {
         XCTAssertEqual(controller.status.state, .idle)
     }
 
+    func testSelectedMicrophoneSwitchesInputWithoutRoutingBLEAudio() {
+        let output = CompiledOutput(
+            kind: "keyboard", code: 2, modifiers: ["control", "shift"],
+            voiceAudioDeviceUID: "usb-mic", voiceAudioSource: "device"
+        )
+        let audio = FakeVoiceAudio()
+        let inputDevice = FakeVoiceInputDevice()
+        let controller = makeController(
+            audio: audio, keyboard: FakeVoiceKeyboard(), resolution: .output(output),
+            inputDevice: inputDevice
+        )
+
+        XCTAssertTrue(controller.startSession())
+        XCTAssertEqual(inputDevice.started, ["usb-mic"])
+        XCTAssertEqual(audio.startCount, 0)
+
+        controller.finishSession()
+
+        XCTAssertEqual(inputDevice.restored, [
+            .init(previousDeviceUID: "built-in-mic", targetDeviceUID: "usb-mic"),
+        ])
+        XCTAssertEqual(controller.status.state, .idle)
+    }
+
     func testRemoteSourceRestoresPreviousDefaultInputAfterDrain() {
         let audio = FakeVoiceAudio()
         let inputDevice = FakeVoiceInputDevice()

@@ -93,11 +93,24 @@ final class VoiceSessionController {
         let bundleIdentifier = frontmostBundleIdentifier()
         let output: CompiledOutput?
         var routesAudio = true
+        var selectedInputDeviceUID: String?
         switch resolveTrigger(bundleIdentifier) {
         case .none:
             output = nil
         case .output(let resolved):
-            routesAudio = resolved.voiceAudioSource != "system"
+            switch resolved.voiceAudioSource {
+            case "system":
+                routesAudio = false
+            case "device":
+                routesAudio = false
+                guard let deviceUID = resolved.voiceAudioDeviceUID, !deviceUID.isEmpty else {
+                    fail("Selected microphone is not configured")
+                    return false
+                }
+                selectedInputDeviceUID = deviceUID
+            default:
+                routesAudio = true
+            }
             if resolved.kind == "passthrough" || resolved.kind == "suppress" {
                 output = nil
             } else if Self.canHold(resolved) {
@@ -115,15 +128,15 @@ final class VoiceSessionController {
             return false
         }
         var inputLease: DefaultAudioInputLease?
-        if routesAudio {
-            guard let targetUID = targetInputDeviceUID() else {
-                fail("Remote microphone input device is not configured")
+        if routesAudio || selectedInputDeviceUID != nil {
+            guard let targetUID = selectedInputDeviceUID ?? targetInputDeviceUID() else {
+                fail("Audio input device is not configured")
                 return false
             }
             do {
                 inputLease = try inputDevice.beginOverride(targetDeviceUID: targetUID)
             } catch {
-                fail("Unable to select remote microphone: \(error.localizedDescription)")
+                fail("Unable to select audio input: \(error.localizedDescription)")
                 return false
             }
         }

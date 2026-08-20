@@ -5,6 +5,7 @@ import path from "node:path";
 import type {
   AudioDeviceInfo,
   AudioOutputStatus,
+  VoiceAudioLevel,
   VoiceConfiguration,
   VoiceEvent,
   VoiceSessionStatus,
@@ -20,6 +21,7 @@ export interface VoiceRuntimeClient extends EventEmitter {
   configureAudio(deviceUID: string): Promise<AudioOutputStatus>;
   configureVoice(configuration: VoiceConfiguration): Promise<VoiceStatus>;
   listAudioDevices(): Promise<AudioDeviceInfo[]>;
+  listAudioInputDevices(): Promise<AudioDeviceInfo[]>;
   testAudioTone(): Promise<AudioOutputStatus>;
   voiceSessionStatus(): Promise<VoiceSessionStatus>;
   voiceStatus(): Promise<VoiceStatus>;
@@ -42,6 +44,7 @@ const emptySession: VoiceSessionStatus = { state: "idle" };
 export class VoiceCoordinator extends EventEmitter {
   private audio: AudioOutputStatus = emptyAudio;
   private audioDevices: AudioDeviceInfo[] = [];
+  private inputDevices: AudioDeviceInfo[] = [];
   private queue: Promise<unknown> = Promise.resolve();
   private session: VoiceSessionStatus = emptySession;
   private settings: VoiceSettings = defaultVoiceSettings;
@@ -70,12 +73,18 @@ export class VoiceCoordinator extends EventEmitter {
       this.session = status;
       this.publish();
     });
+    runtime.on("voiceAudioLevel", (level: VoiceAudioLevel) => {
+      this.emit("event", { type: "level", level } satisfies VoiceEvent);
+    });
   }
 
   load(): Promise<VoiceSnapshot> {
     return this.enqueue(async () => {
       this.settings = await this.store.load();
-      this.audioDevices = await this.runtime.listAudioDevices();
+      [this.audioDevices, this.inputDevices] = await Promise.all([
+        this.runtime.listAudioDevices(),
+        this.runtime.listAudioInputDevices(),
+      ]);
       await this.applyRuntime(this.settings);
       return this.publish();
     });
@@ -83,7 +92,10 @@ export class VoiceCoordinator extends EventEmitter {
 
   recoverRuntime(): Promise<VoiceSnapshot> {
     return this.enqueue(async () => {
-      this.audioDevices = await this.runtime.listAudioDevices();
+      [this.audioDevices, this.inputDevices] = await Promise.all([
+        this.runtime.listAudioDevices(),
+        this.runtime.listAudioInputDevices(),
+      ]);
       await this.applyRuntime(this.settings);
       return this.publish();
     });
@@ -120,6 +132,7 @@ export class VoiceCoordinator extends EventEmitter {
     return {
       audio: this.audio,
       audioDevices: this.audioDevices,
+      inputDevices: this.inputDevices,
       session: this.session,
       settings: this.settings,
       voice: this.voice,

@@ -62,9 +62,11 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 export const SelectContent = forwardRef<
   ElementRef<typeof SelectPrimitive.Content>,
-  ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ children, className, position = "popper", sideOffset = 6, ...props }, ref) => (
-  <SelectPrimitive.Portal>
+  ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
+    portalContainer?: HTMLElement | null;
+  }
+>(({ children, className, portalContainer, position = "popper", sideOffset = 6, ...props }, ref) => (
+  <SelectPrimitive.Portal container={portalContainer ?? undefined}>
     <SelectPrimitive.Content
       className={cn("cody-select-content", className)}
       position={position}

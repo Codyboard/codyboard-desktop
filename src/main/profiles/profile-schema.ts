@@ -10,9 +10,14 @@ import type {
   ProfileDocument,
   ProfileDomain,
   ProfileDraft,
-  ProfileStateDocument
+  ProfileStateDocument,
+  VoiceAudioSource,
 } from "../../shared/hid.js";
-import { profileDomainKey } from "../../shared/hid.js";
+import {
+  isVoiceAudioSource,
+  profileDomainKey,
+  voiceAudioDeviceUID,
+} from "../../shared/hid.js";
 import { mappingInputSignature } from "../../shared/profile-mappings.js";
 
 import { KEY_CODES, MODIFIER_KEY_CODES, SYSTEM_KEY_CODES, normalizeModifiers } from "./key-codes.js";
@@ -90,7 +95,9 @@ const outputSchema = z.union([
 ]);
 
 const mappingSchema = z.object({ id: idSchema, from: inputSchema, to: outputSchema }).strict();
-const voiceAudioSourceSchema = z.enum(["remote", "system"]);
+const voiceAudioSourceSchema = z.custom<VoiceAudioSource>(isVoiceAudioSource, {
+  message: "Invalid voice audio source",
+});
 const scopeSchema = z.union([
   z.object({ kind: z.literal("global") }).strict(),
   z.object({ kind: z.literal("application"), bundleId: z.string().min(1) }).strict()
@@ -194,7 +201,7 @@ function compileOutput(output: MappingOutput): CompiledMapping["output"] {
 
 function compileMapping(
   mapping: KeyMapping,
-  voiceAudioSource: "remote" | "system" = "remote",
+  voiceAudioSource: VoiceAudioSource = "remote",
 ): CompiledMapping {
   const input = mapping.from;
   const code = input.kind === "voice" ? 0
@@ -211,9 +218,18 @@ function compileMapping(
     },
     output: {
       ...compileOutput(mapping.to),
-      ...(input.kind === "voice" ? { voiceAudioSource } : {}),
+      ...(input.kind === "voice" ? compileVoiceAudioSource(voiceAudioSource) : {}),
     },
   };
+}
+
+function compileVoiceAudioSource(source: VoiceAudioSource): Pick<
+  CompiledMapping["output"], "voiceAudioDeviceUID" | "voiceAudioSource"
+> {
+  const deviceUID = voiceAudioDeviceUID(source);
+  return deviceUID
+    ? { voiceAudioDeviceUID: deviceUID, voiceAudioSource: "device" }
+    : { voiceAudioSource: source === "system" ? "system" : "remote" };
 }
 
 export function compileProfiles(document: ProfileDocument, state: ProfileStateDocument, generation: number): CompiledProfileSet {

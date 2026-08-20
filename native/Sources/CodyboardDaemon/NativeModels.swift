@@ -116,6 +116,12 @@ struct VoiceMetrics: Codable, Equatable {
     let decodedSamples: Int
 }
 
+struct VoiceAudioLevel: Codable, Equatable {
+    let rms: Double
+    let peak: Double
+    let sequence: UInt64
+}
+
 enum AudioOutputState: String, Codable {
     case unconfigured
     case configured
@@ -216,12 +222,14 @@ struct CompiledOutput: Codable, Equatable {
     let pressEnter: Bool?
     let text: String?
     let url: String?
+    let voiceAudioDeviceUID: String?
     let voiceAudioSource: String?
 
     init(
         kind: String, code: Int?, modifiers: [String], bundleId: String? = nil,
         modifier: String? = nil, pressEnter: Bool? = nil, text: String? = nil,
-        url: String? = nil, voiceAudioSource: String? = nil
+        url: String? = nil, voiceAudioDeviceUID: String? = nil,
+        voiceAudioSource: String? = nil
     ) {
         self.kind = kind
         self.code = code
@@ -231,6 +239,7 @@ struct CompiledOutput: Codable, Equatable {
         self.pressEnter = pressEnter
         self.text = text
         self.url = url
+        self.voiceAudioDeviceUID = voiceAudioDeviceUID
         self.voiceAudioSource = voiceAudioSource
     }
 }
