@@ -26,6 +26,7 @@
 | Remote mic BLE/ATVV | `native/.../XiaomiVoiceBluetoothController.swift` | `ATVVProtocol.swift`, `BluetoothLifecycle.swift` |
 | Remote mic audio output | `native/.../VirtualAudioOutput.swift` | `CoreAudioDeviceCatalog.swift`, `AudioPlaybackState.swift` |
 | Remote mic key session | `native/.../VoiceSessionController.swift` | `ProfileRuntime.swift`, `KeyboardSimulator.swift` |
+| Remote mic settings/runtime | `src/main/voice/voice-coordinator.ts` | `voice-settings-store.ts`, `src/shared/voice-types.ts` |
 | Virtual microphone driver | `scripts/build-virtual-microphone.sh` | `third_party/blackhole/`, `scripts/install-virtual-microphone.sh` |
 | Device catalog/VID-PID | `src/shared/device-catalog.ts` | `HIDDeviceManager.swift` |
 | Device mapping UI | `DeviceButtonMappings.tsx` | `use-device-mappings.ts`, `DeviceMappingRow.tsx`, `MappingValueControls.tsx` |
@@ -56,9 +57,11 @@ Paths beginning `native/...` mean `native/Sources/CodyboardDaemon/`; renderer co
 - Read `docs/remote-mic.md` before changing BLE voice capture, ATVV decoding, CoreAudio routing or the HAL driver.
 - PCM remains inside Swift; IPC exposes state/metrics only. Production audio is 16 kHz mono.
 - Virtual device identity is fixed: `Codyboard Virtual Microphone`, UID `CodyboardVirtualMicrophone2ch_UID`, bundle ID `com.codyboard.VirtualMicrophone`.
-- Bind CoreAudio output by UID/device ID. Never change the system default input as part of streaming.
+- Bind CoreAudio output by UID/device ID. For remote-source sessions, lease the current macOS default input, switch to the configured virtual microphone before keyDown, and restore it after keyUp on every exit path.
 - Start audio per voice session and drain `.dataPlayedBack` buffers before stopping or releasing a trigger.
 - Voice is the synthetic profile trigger `{ kind: "voice", code: 0 }`; resolve it through the existing `ProfileRuntime` global/application fallback.
+- Voice BLE/audio preferences live in `settings.yaml`; voice shortcuts live in the existing device profile groups. Do not add a second mapping store or editor.
+- Voice audio source is independently inherited/overridden per profile group: `remote` routes BLE PCM to Codyboard Virtual Microphone; `system` discards BLE PCM and leaves the active app's microphone untouched.
 - BLE mic start maps to output keyDown; after audio drain, the same pinned output maps to keyUp. Do not add tap/toggle semantics.
 - CoreBluetooth callbacks must remain generation-safe; stale reconnect/session callbacks do no work.
 - Voice trigger implementation stays generic; no product-specific app names or detection in native code.

@@ -111,6 +111,7 @@ export function DeviceDetailPage({ deviceId }: { deviceId: string }) {
                   controls={XIAOMI_REMOTE_CONTROLS}
                   profileDomain={profileDomain}
                   onSelectKey={setSelectedXiaomiKey}
+                  remoteMicrophoneSettings
                   selectedKey={selectedXiaomiKey}
                 />
               )}

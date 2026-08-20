@@ -125,4 +125,22 @@ describe("ProfileCoordinator", () => {
     const persisted = parse(await readFile(profilePath, "utf8")) as ProfileDraft;
     expect(persisted.groups[1].mappings.map(({ id }) => id)).toEqual(["codex-right"]);
   });
+
+  it("adds the remote microphone default to an existing Xiaomi default profile", async () => {
+    const temporary = await mkdtemp(path.join(tmpdir(), "codyboard-voice-profile-test-"));
+    const root = path.join(temporary, ".codyboard", "profiles");
+    const profilePath = path.join(root, "device-小米蓝牙语音遥控器", "default.yaml");
+    await mkdir(path.dirname(profilePath), { recursive: true });
+    await writeFile(profilePath, stringify({ ...draft, id: "default" }));
+
+    const snapshot = await new ProfileCoordinator(new FakeDaemon(), root).load();
+    const profile = snapshot.keyboards["device:小米蓝牙语音遥控器"].profiles[0];
+
+    expect(profile.groups[0].mappings.at(-1)).toEqual({
+      from: { kind: "voice" },
+      id: "global-voice",
+      to: { key: "fn", kind: "modifier", modifiers: [] },
+    });
+    expect(await readFile(profilePath, "utf8")).toContain("kind: voice");
+  });
 });

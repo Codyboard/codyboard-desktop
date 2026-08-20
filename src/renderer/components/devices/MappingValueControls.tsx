@@ -24,8 +24,12 @@ export function ActionSelect<Key extends string>({ control, disabled, isApplicat
     <SelectContent>
       {isApplicationScope && <SelectItem value="unchanged">Unchanged</SelectItem>}
       {isApplicationScope && <SelectSeparator />}
-      <SelectItem value="keystroke">Key Press</SelectItem><SelectItem value="launch">Launch Application</SelectItem>
-      <SelectItem value="open-url">Open URL</SelectItem><SelectItem value="type-text">Type Text</SelectItem>
+      <SelectItem value="keystroke">Key Press</SelectItem>
+      {control.input.kind !== "voice" && <>
+        <SelectItem value="launch">Launch Application</SelectItem>
+        <SelectItem value="open-url">Open URL</SelectItem>
+        <SelectItem value="type-text">Type Text</SelectItem>
+      </>}
     </SelectContent>
   </Select></div>;
 }

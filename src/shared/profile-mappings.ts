@@ -13,6 +13,7 @@ export interface ResolvedProfileMapping {
 }
 
 export function mappingInputSignature(input: MappingInput): string {
+  if (input.kind === "voice") return "voice";
   if (input.kind === "system") return `system:${input.key ?? input.systemCode}`;
   if (input.kind === "hidUsage") return `hidUsage:${input.usage}`;
   const modifiers = [...(input.modifiers ?? [])].sort().join("+");

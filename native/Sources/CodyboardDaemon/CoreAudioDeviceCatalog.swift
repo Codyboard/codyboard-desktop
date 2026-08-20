@@ -18,8 +18,55 @@ enum CoreAudioDeviceCatalog {
         return allDevices().filter { $0.outputChannels > 0 }
     }
 
+    static func inputDevices() -> [AudioDeviceInfo] {
+        lock.lock()
+        defer { lock.unlock() }
+        return allDevices().filter { $0.inputChannels > 0 }
+    }
+
     static func device(uid: String) -> AudioDeviceInfo? {
         outputDevices().first { $0.uid == uid }
+    }
+
+    static func inputDevice(uid: String) -> AudioDeviceInfo? {
+        inputDevices().first { $0.uid == uid }
+    }
+
+    static func defaultInputDevice() -> AudioDeviceInfo? {
+        lock.lock()
+        defer { lock.unlock() }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var id = AudioDeviceID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &id
+        ) == noErr else { return nil }
+        return makeDevice(id)
+    }
+
+    static func setDefaultInputDevice(uid: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let device = inputDevice(uid: uid) else {
+            throw audioDeviceError("Input device is unavailable: \(uid)")
+        }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var id = AudioDeviceID(device.id)
+        let result = AudioObjectSetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil,
+            UInt32(MemoryLayout<AudioDeviceID>.size), &id
+        )
+        guard result == noErr, defaultInputDevice()?.uid == uid else {
+            throw audioDeviceError("Unable to select input device (\(result))")
+        }
     }
 
     private static func allDevices() -> [AudioDeviceInfo] {
@@ -96,4 +143,11 @@ enum CoreAudioDeviceCatalog {
             raw.assumingMemoryBound(to: AudioBufferList.self)
         ).reduce(0) { $0 + Int($1.mNumberChannels) }
     }
+}
+
+private func audioDeviceError(_ message: String) -> NSError {
+    NSError(
+        domain: "app.codyboard.audio-input", code: 1,
+        userInfo: [NSLocalizedDescriptionKey: message]
+    )
 }

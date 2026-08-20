@@ -124,6 +124,14 @@ html[data-theme="light"] {
     background-size: 72px 100%, auto, auto;
   }
   .mapping-console { color: rgba(16, 21, 19, 0.94); }
+  .remote-mic-settings { border-bottom-color: rgba(20, 25, 23, 0.09); background: rgba(255, 255, 255, 0.13); color: rgba(18, 24, 21, 0.78); }
+  .remote-mic-heading > span { color: rgba(15, 21, 18, 0.9); }
+  .remote-mic-state, .remote-mic-controls > label > span { color: rgba(24, 31, 28, 0.48); }
+  .cody-switch { border-color: rgba(20, 25, 23, 0.14); background: rgba(20, 25, 23, 0.12); }
+  .cody-switch[data-state="checked"] { border-color: rgba(25, 143, 96, 0.35); background: rgba(42, 161, 113, 0.72); }
+  .cody-switch-thumb { background: rgba(255, 255, 255, 0.9); box-shadow: 0 1px 4px rgba(29, 40, 35, 0.22); }
+  .remote-mic-controls select, .remote-mic-test { border-color: rgba(20, 25, 23, 0.1); background: rgba(255, 255, 255, 0.26); color: rgba(15, 21, 18, 0.86); }
+  .remote-mic-test-hint { color: rgba(24, 31, 28, 0.4); }
   .app-toolbar-device-title:focus-visible { color: rgba(20, 27, 24, 0.72); }
   .cody-tooltip-content { border-color: rgba(20, 25, 23, 0.14); background: rgba(244, 246, 245, 0.84); box-shadow: 0 14px 38px rgba(46, 56, 52, 0.18), inset 0 1px rgba(255, 255, 255, 0.78); color: rgba(25, 31, 29, 0.52); }
   .cody-tooltip-content code { color: rgba(18, 124, 82, 0.86); }

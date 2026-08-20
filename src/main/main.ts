@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import { app, BrowserWindow } from 'electron';
 
-import type { ProfileEvent } from '../shared/hid.js';
+import type { ProfileEvent, VoiceEvent } from '../shared/hid.js';
 
 import { registerIPCHandlers } from './app/ipc-handlers.js';
 import { SettingsWindowController } from './app/settings-window.js';
@@ -11,6 +11,7 @@ import { TrayController } from './app/tray-controller.js';
 import { CodyboardDaemonClient } from './daemon/codyboard-daemon-client.js';
 import { MIDICaptureController } from './daemon/midi-capture-controller.js';
 import { ProfileCoordinator } from './profiles/profile-coordinator.js';
+import { VoiceCoordinator } from './voice/voice-coordinator.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const resourcePath = (...segments: string[]): string =>
@@ -20,6 +21,7 @@ const resourcePath = (...segments: string[]): string =>
 
 const daemon = new CodyboardDaemonClient(resourcePath('bin', 'CodyboardDaemon'));
 const midiCapture = new MIDICaptureController(daemon);
+const voice = new VoiceCoordinator(daemon);
 const profiles = new ProfileCoordinator(
   daemon,
   undefined,
@@ -43,6 +45,7 @@ registerIPCHandlers({
   midiCapture,
   profiles,
   settingsWindow: () => settings.browserWindow,
+  voice,
 });
 connectNativeEvents();
 
@@ -50,6 +53,13 @@ void app.whenReady().then(async () => {
   app.dock?.hide();
   daemon.start();
   tray.start();
+  await voice.load().catch((error: unknown) => {
+    console.error('Unable to load remote microphone settings', error);
+    publishVoiceEvent({
+      type: 'error',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  });
   try {
     const permissions = await daemon.permissionStatus();
     if (permissions.accessibility && permissions.inputMonitoring)
@@ -71,6 +81,7 @@ app.on('window-all-closed', () => {
 
 function connectNativeEvents(): void {
   profiles.on('event', publishProfileEvent);
+  voice.on('event', publishVoiceEvent);
   daemon.on('error', (payload: { message: string }) =>
     publishProfileEvent({
       type: 'runtimeError',
@@ -81,6 +92,11 @@ function connectNativeEvents(): void {
     for (const window of BrowserWindow.getAllWindows())
       window.webContents.send('diagnostics:key', payload);
   });
+}
+
+function publishVoiceEvent(event: VoiceEvent): void {
+  for (const window of BrowserWindow.getAllWindows())
+    window.webContents.send('voice:event', event);
 }
 
 function publishProfileEvent(event: ProfileEvent): void {

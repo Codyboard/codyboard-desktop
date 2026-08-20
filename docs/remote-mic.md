@@ -85,7 +85,8 @@ password and restarts `coreaudiod`. Do not rename or overwrite another project's
 
 `VirtualAudioOutput` accepts 16 kHz mono `Int16`, converts it to non-interleaved float PCM, and lets
 AVAudioEngine convert to the device's live format. It explicitly binds the output audio unit with
-`kAudioOutputUnitProperty_CurrentDevice`; changing the system default is not required.
+`kAudioOutputUnitProperty_CurrentDevice`. Remote-source sessions also temporarily select the matching
+macOS default input so newly triggered dictation clients read Codyboard Virtual Microphone.
 
 Lifecycle:
 
@@ -142,6 +143,18 @@ active device profile containing a voice mapping is ambiguous and fails closed; 
 not supported. A passthrough/suppress voice mapping means audio-only and requires no Accessibility
 permission.
 
+Each profile group independently resolves `voiceAudioSource`:
+
+- `remote` (default): route BLE PCM to Codyboard Virtual Microphone, then release the shortcut after
+  the audio drain.
+- `system`: discard BLE PCM, hold/release the same shortcut immediately with the remote session, and
+  leave microphone capture to the active application's own configuration.
+
+Application groups inherit both the global shortcut and audio source unless they override either
+one. A remote-source keyDown leases the current default input UID and switches to the configured
+virtual microphone before posting the shortcut. After drain and shortcut keyUp, every normal,
+failure, disconnect and shutdown path restores the leased UID. System-source sessions do not switch.
+
 Primary files:
 
 - `native/Sources/CodyboardDaemon/VoiceSessionController.swift`
@@ -157,20 +170,35 @@ Verified on 2026-08-19 with the Xiaomi Bluetooth voice remote:
 - One representative voice session decoded 194 frames / 46,560 samples, about 2.91 seconds.
 - QuickTime playback was confirmed by the user as “loud and clear”.
 - Repeated start/stop sessions drained to zero pending buffers.
+- On 2026-08-20, a real Sublime Text session resolved the global Fn mapping, decoded
+  124 frames / 29,760 samples, and completed `active -> draining -> idle` with paired key events.
+- On 2026-08-20, a real Codex session temporarily switched the default input from AirPods to
+  `CodyboardVirtualMicrophone2ch_UID`, decoded 155 frames / 37,200 samples, restored AirPods after
+  drain, and entered the dictated text in Codex successfully.
 
 QuickTime does not live-monitor microphone input. Start recording, speak through the remote, stop,
 then play the recording. A visible device with silence usually means the running daemon has not yet
 called both `audio.configure` and `voice.configure`; installation alone does not start routing.
 
+## Electron settings and profiles
+
+- `VoiceCoordinator` serializes runtime updates and persists BLE/audio preferences under `voice` in
+  `~/.codyboard/settings.yaml`. Its settings-file lock is shared with profile persistence so profile
+  activation and voice updates cannot overwrite each other.
+- The Xiaomi device page exposes the synthetic voice input and its independently inheritable audio
+  source through the existing global/application mapping editor. Mapping groups remain in profile
+  YAML; there is no voice-specific shortcut store.
+- Only paired keyboard/modifier outputs are accepted for voice. Passthrough/suppress means
+  audio-only; one-shot application, URL, text and system actions are rejected.
+- The settings panel owns enable/disable, CoreAudio target, gain and test tone. It never installs the
+  driver; temporary default-input switching belongs to the native voice-session transaction.
+
 ## Boundaries for later phases
 
-- Phases 3–4 are native-only. Electron persistence/UI wiring is Phase 5.
-- Phase 5 exposes the synthetic voice input through the existing device-profile mapping UI; mapping
-  groups remain in profile YAML, while BLE/audio preferences remain in settings YAML.
 - Trigger logic is generic Fn or configurable key-chord state, never product-specific native code.
-- Do not add default-input switching, driver auto-install, application detection, battery handling or
-  multi-remote support unless a later requirement explicitly needs it.
-- MIDI capture must eventually suspend voice triggering without mutating the saved voice config.
+- Do not add persistent default-input changes, driver auto-install, application detection, battery
+  handling or multi-remote support unless a later requirement explicitly needs it.
+- MIDI capture suspends voice triggering without mutating the saved voice config; audio remains live.
 - Preserve stop ordering when triggers arrive: stop PCM intake, drain audio, then release the trigger.
 - Keep Power implementation and profile mapping behavior untouched.
 

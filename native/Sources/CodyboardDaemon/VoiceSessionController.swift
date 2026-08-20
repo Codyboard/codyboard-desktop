@@ -14,6 +14,8 @@ struct VoiceSessionStatus: Codable, Equatable {
     let activeBundleIdentifier: String?
     let activeOutput: CompiledOutput?
     let error: String?
+    let previousInputDeviceUID: String?
+    let activeInputDeviceUID: String?
 }
 
 protocol VoiceAudioRouting: AnyObject {
@@ -34,6 +36,8 @@ private struct ActiveVoiceSession {
     let generation: UInt64
     let bundleIdentifier: String?
     let output: CompiledOutput?
+    let routesAudio: Bool
+    let inputLease: DefaultAudioInputLease?
 }
 
 final class VoiceSessionController {
@@ -42,6 +46,8 @@ final class VoiceSessionController {
     private let frontmostBundleIdentifier: () -> String?
     private let resolveTrigger: (String?) -> MappingResolution
     private let canPostKeyboardEvents: () -> Bool
+    private let inputDevice: VoiceInputDeviceRouting
+    private let targetInputDeviceUID: () -> String?
     private let publishesEvents: Bool
     private var activeSession: ActiveVoiceSession?
     private var generation: UInt64 = 0
@@ -54,6 +60,8 @@ final class VoiceSessionController {
         frontmostBundleIdentifier: @escaping () -> String?,
         resolveTrigger: @escaping (String?) -> MappingResolution,
         canPostKeyboardEvents: @escaping () -> Bool,
+        inputDevice: VoiceInputDeviceRouting,
+        targetInputDeviceUID: @escaping () -> String?,
         publishesEvents: Bool = true
     ) {
         self.audio = audio
@@ -61,6 +69,8 @@ final class VoiceSessionController {
         self.frontmostBundleIdentifier = frontmostBundleIdentifier
         self.resolveTrigger = resolveTrigger
         self.canPostKeyboardEvents = canPostKeyboardEvents
+        self.inputDevice = inputDevice
+        self.targetInputDeviceUID = targetInputDeviceUID
         self.publishesEvents = publishesEvents
     }
 
@@ -71,7 +81,9 @@ final class VoiceSessionController {
             state: state,
             activeBundleIdentifier: activeSession?.bundleIdentifier,
             activeOutput: activeSession?.output,
-            error: lastError
+            error: lastError,
+            previousInputDeviceUID: activeSession?.inputLease?.previousDeviceUID,
+            activeInputDeviceUID: activeSession?.inputLease?.targetDeviceUID
         )
     }
 
@@ -80,10 +92,12 @@ final class VoiceSessionController {
         if activeSession != nil { stopSession() }
         let bundleIdentifier = frontmostBundleIdentifier()
         let output: CompiledOutput?
+        var routesAudio = true
         switch resolveTrigger(bundleIdentifier) {
         case .none:
             output = nil
         case .output(let resolved):
+            routesAudio = resolved.voiceAudioSource != "system"
             if resolved.kind == "passthrough" || resolved.kind == "suppress" {
                 output = nil
             } else if Self.canHold(resolved) {
@@ -100,20 +114,35 @@ final class VoiceSessionController {
             fail("Accessibility permission is required for the voice mapping")
             return false
         }
-        guard audio.startVoiceSession() else {
+        var inputLease: DefaultAudioInputLease?
+        if routesAudio {
+            guard let targetUID = targetInputDeviceUID() else {
+                fail("Remote microphone input device is not configured")
+                return false
+            }
+            do {
+                inputLease = try inputDevice.beginOverride(targetDeviceUID: targetUID)
+            } catch {
+                fail("Unable to select remote microphone: \(error.localizedDescription)")
+                return false
+            }
+        }
+        if routesAudio, !audio.startVoiceSession() {
+            if let inputLease { inputDevice.restore(inputLease) }
             fail("Unable to start voice audio output")
             return false
         }
 
         generation &+= 1
         let session = ActiveVoiceSession(
-            generation: generation, bundleIdentifier: bundleIdentifier, output: output
+            generation: generation, bundleIdentifier: bundleIdentifier,
+            output: output, routesAudio: routesAudio, inputLease: inputLease
         )
         activeSession = session
         do {
             if let output { try keyboard.post(output, pressed: true, autorepeat: false) }
         } catch {
-            audio.stop()
+            if routesAudio { audio.stop() }
             releaseActiveSession(
                 finalState: .failed,
                 error: "Unable to press voice mapping: \(error.localizedDescription)"
@@ -126,7 +155,8 @@ final class VoiceSessionController {
 
     @discardableResult
     func enqueue(samples: [Int16]) -> Bool {
-        guard activeSession != nil else { return false }
+        guard let session = activeSession else { return false }
+        if !session.routesAudio { return true }
         guard audio.enqueue(samples: samples) else {
             abortSession(message: "Voice audio output failed")
             return false
@@ -136,6 +166,10 @@ final class VoiceSessionController {
 
     func finishSession() {
         guard let session = activeSession else { return }
+        if !session.routesAudio {
+            releaseActiveSession(finalState: .idle, error: nil)
+            return
+        }
         update(state: .draining, error: nil)
         audio.drainAndStop(maximumDelay: 0.75) { [weak self] in
             guard let self, self.activeSession?.generation == session.generation else { return }
@@ -145,7 +179,7 @@ final class VoiceSessionController {
 
     func stopSession() {
         generation &+= 1
-        audio.stop()
+        if activeSession?.routesAudio == true { audio.stop() }
         releaseActiveSession(finalState: .idle, error: nil)
     }
 
@@ -169,13 +203,16 @@ final class VoiceSessionController {
 
     private func abortSession(message: String) {
         generation &+= 1
-        audio.stop()
+        if activeSession?.routesAudio == true { audio.stop() }
         releaseActiveSession(finalState: .failed, error: message)
     }
 
     private func releaseActiveSession(finalState: VoiceSessionState, error: String?) {
         let session = activeSession
         activeSession = nil
+        defer {
+            if let lease = session?.inputLease { inputDevice.restore(lease) }
+        }
         do {
             if let output = session?.output {
                 try keyboard.post(output, pressed: false, autorepeat: false)

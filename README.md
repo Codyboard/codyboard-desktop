@@ -21,6 +21,11 @@ Codyboard detects supported physical HID devices, lets you assign actions to eve
 - Open **Get Funky 🪩** from the menu bar and make a quantized loop with the on-screen or physical Sweep Pro.
 - Keep capture active while Get Funky is minimized or behind other apps; closing its window stops playback and releases the keyboard.
 - Store configuration locally as readable YAML files.
+- Route Xiaomi remote speech into **Codyboard Virtual Microphone** and map its microphone button
+  globally or per application like any other control.
+- Per application, choose between Xiaomi remote audio and the application's existing microphone.
+  Remote sessions temporarily select the configured virtual microphone and restore the previous
+  macOS default input when the button is released.
 
 ## Screenshots
 
@@ -66,6 +71,7 @@ Device detection uses exact vendor and product identifiers. Virtual keyboards ar
 - Apple Silicon for the prebuilt release package
 - Accessibility permission
 - Input Monitoring permission
+- Bluetooth permission for Xiaomi remote voice capture
 
 Accessibility allows Codyboard to send mapped shortcuts and text. Input Monitoring allows it to read device-only controls such as Power and Back. Permission state is read directly from macOS, and input data stays on the Mac.
 
@@ -99,6 +105,13 @@ Create a production build:
 
 ```bash
 pnpm build
+```
+
+For local remote-microphone development, build and install the Codyboard audio device once:
+
+```bash
+pnpm build:virtual-mic
+pnpm install:virtual-mic
 ```
 
 Package an Apple Silicon macOS application:
@@ -151,7 +164,8 @@ Codyboard keeps user configuration under `~/.codyboard/`:
         └── {profile-id}.yaml
 ```
 
-`settings.yaml` records the active profile. Each profile is stored separately and can contain global mappings plus application-specific overrides.
+`settings.yaml` records active profiles plus BLE/audio preferences. Each profile is stored separately
+and can contain global mappings plus application-specific overrides, including the remote microphone.
 
 ## Contributing
 

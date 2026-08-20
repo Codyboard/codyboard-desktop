@@ -215,11 +215,12 @@ struct CompiledOutput: Codable, Equatable {
     let pressEnter: Bool?
     let text: String?
     let url: String?
+    let voiceAudioSource: String?
 
     init(
         kind: String, code: Int?, modifiers: [String], bundleId: String? = nil,
         modifier: String? = nil, pressEnter: Bool? = nil, text: String? = nil,
-        url: String? = nil
+        url: String? = nil, voiceAudioSource: String? = nil
     ) {
         self.kind = kind
         self.code = code
@@ -229,5 +230,6 @@ struct CompiledOutput: Codable, Equatable {
         self.pressEnter = pressEnter
         self.text = text
         self.url = url
+        self.voiceAudioSource = voiceAudioSource
     }
 }

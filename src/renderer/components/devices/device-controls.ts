@@ -6,6 +6,7 @@ import {
   CornerDownLeft,
   Home,
   Menu,
+  Mic,
   Minus,
   Plus,
   Power,
@@ -33,6 +34,13 @@ export interface DeviceControl<Key extends string> {
 
 export const XIAOMI_REMOTE_CONTROLS: readonly DeviceControl<XiaomiRemoteKey>[] = [
   { icon: Power, input: { kind: "hidUsage", usage: 0x66 }, key: "power", label: "Power" },
+  {
+    defaultOutput: { key: "fn", kind: "modifier", modifiers: [] },
+    icon: Mic,
+    input: { kind: "voice" },
+    key: "voice",
+    label: "Microphone",
+  },
   { icon: ChevronUp, input: { kind: "keyboard", key: "arrowUp", modifiers: ["fn"] }, key: "up", label: "Up" },
   { icon: ChevronDown, input: { kind: "keyboard", key: "arrowDown", modifiers: ["fn"] }, key: "down", label: "Down" },
   { icon: ChevronLeft, input: { kind: "keyboard", key: "arrowLeft", modifiers: ["fn"] }, key: "left", label: "Left" },
@@ -102,7 +110,7 @@ export const SWEEP_PRO_DEFAULT_PROFILE = defaultProfile(
 export const XIAOMI_REMOTE_DEFAULT_PROFILE = defaultProfile(
   "小米蓝牙语音遥控器 Default",
   XIAOMI_REMOTE_CONTROLS,
-  () => ({ kind: "passthrough" }),
+  (control) => control.defaultOutput ?? { kind: "passthrough" },
 );
 
 function defaultProfile<Key extends string>(

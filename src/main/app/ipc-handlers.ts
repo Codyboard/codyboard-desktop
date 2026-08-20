@@ -13,10 +13,12 @@ import type {
   HIDListOptions,
   ProfileDomain,
   ProfileDraft,
+  VoiceSettings,
 } from '../../shared/hid.js';
 import type { CodyboardDaemonClient } from '../daemon/codyboard-daemon-client.js';
 import type { MIDICaptureController } from '../daemon/midi-capture-controller.js';
 import type { ProfileCoordinator } from '../profiles/profile-coordinator.js';
+import type { VoiceCoordinator } from '../voice/voice-coordinator.js';
 
 import { applicationInfoAt, resolveApplication } from './application-catalog.js';
 
@@ -25,6 +27,7 @@ export interface IPCHandlerDependencies {
   midiCapture: MIDICaptureController;
   profiles: ProfileCoordinator;
   settingsWindow: () => BrowserWindow | undefined;
+  voice: VoiceCoordinator;
 }
 
 export function registerIPCHandlers({
@@ -32,6 +35,7 @@ export function registerIPCHandlers({
   midiCapture,
   profiles,
   settingsWindow,
+  voice,
 }: IPCHandlerDependencies): void {
   ipcMain.handle('hid:list', (_event, options?: HIDListOptions) =>
     daemon.listDevices(options),
@@ -109,6 +113,11 @@ export function registerIPCHandlers({
   ipcMain.handle('profiles:deactivate', (_event, domain: ProfileDomain) =>
     profiles.deactivate(domain),
   );
+  ipcMain.handle('voice:snapshot', () => voice.snapshot());
+  ipcMain.handle('voice:update', (_event, settings: VoiceSettings) =>
+    voice.update(settings),
+  );
+  ipcMain.handle('voice:test-tone', () => voice.testTone());
 }
 
 async function openPermissionSettings(

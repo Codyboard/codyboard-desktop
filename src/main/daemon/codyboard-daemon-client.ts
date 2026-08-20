@@ -10,6 +10,11 @@ import type {
   HIDListOptions,
   NativeError,
   PermissionStatus,
+  AudioDeviceInfo,
+  AudioOutputStatus,
+  VoiceConfiguration,
+  VoiceSessionStatus,
+  VoiceStatus,
 } from "../../shared/hid.js";
 
 interface NativeMessage {
@@ -77,6 +82,28 @@ export class CodyboardDaemonClient extends EventEmitter {
   setMIDICapture(deviceId?: string): Promise<{ generation: number; listening: boolean }> {
     return this.request("midi.capture", deviceId === undefined ? {} : { deviceId });
   }
+
+  configureVoice(configuration: VoiceConfiguration): Promise<VoiceStatus> {
+    return this.request("voice.configure", { configuration });
+  }
+
+  voiceStatus(): Promise<VoiceStatus> { return this.request("voice.status"); }
+
+  voiceSessionStatus(): Promise<VoiceSessionStatus> {
+    return this.request("voice.session.status");
+  }
+
+  listAudioDevices(): Promise<AudioDeviceInfo[]> {
+    return this.request("audio.devices.list");
+  }
+
+  configureAudio(deviceUID: string): Promise<AudioOutputStatus> {
+    return this.request("audio.configure", { deviceUID });
+  }
+
+  audioStatus(): Promise<AudioOutputStatus> { return this.request("audio.status"); }
+
+  testAudioTone(): Promise<AudioOutputStatus> { return this.request("audio.testTone"); }
 
   stop(): void {
     this.child?.kill("SIGTERM");

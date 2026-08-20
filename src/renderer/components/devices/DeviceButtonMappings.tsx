@@ -3,6 +3,7 @@ import type { ProfileDomain } from "../../../shared/hid";
 import type { DeviceControl } from "./device-controls";
 import { DeviceMappingRow } from "./DeviceMappingRow";
 import { MappingScopeHeader } from "./MappingScopeHeader";
+import { RemoteMicrophoneSettings } from "./RemoteMicrophoneSettings";
 import type { DeviceMappingPreview } from "./SweepPro";
 import { useDeviceMappings } from "./use-device-mappings";
 
@@ -21,6 +22,7 @@ export {
 
 interface DeviceButtonMappingsProps<Key extends string> {
   controls: readonly DeviceControl<Key>[];
+  remoteMicrophoneSettings?: boolean;
   profileDomain?: ProfileDomain;
   onPreviewChange?: (previews: Partial<Record<Key, DeviceMappingPreview>>) => void;
   onSelectKey?: (key: Key) => void;
@@ -32,6 +34,7 @@ export function DeviceButtonMappings<Key extends string>({
   profileDomain,
   onPreviewChange,
   onSelectKey,
+  remoteMicrophoneSettings,
   selectedKey,
 }: DeviceButtonMappingsProps<Key>) {
   const state = useDeviceMappings(controls, profileDomain, onPreviewChange);
@@ -59,6 +62,16 @@ export function DeviceButtonMappings<Key extends string>({
         <PanelNotice>Activate a profile to edit its buttons.</PanelNotice>
       )}
       {state.error && <PanelNotice tone="error">{state.error}</PanelNotice>}
+      {remoteMicrophoneSettings && (
+        <RemoteMicrophoneSettings
+          applicationScope={isApplicationScope}
+          inherited={state.voiceAudioSourceInherited}
+          onSourceChange={state.changeVoiceAudioSource}
+          savingScope={state.savingScope}
+          source={state.voiceAudioSource}
+          sourceDisabled={!state.activeProfile || !state.selectedGroup}
+        />
+      )}
       <div className="mapping-list">
         {state.mappings.map(({ control, resolution }) => (
           <DeviceMappingRow

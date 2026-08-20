@@ -7,6 +7,7 @@ let applicationLauncher = ApplicationLauncher()
 let keyboard = KeyboardController(runtime: runtime, simulator: simulator, applicationLauncher: applicationLauncher)
 let voice = XiaomiVoiceBluetoothController()
 let audio = VirtualAudioOutput()
+let defaultAudioInput = DefaultAudioInputController()
 let voiceSession = VoiceSessionController(
     audio: audio,
     keyboard: simulator,
@@ -17,7 +18,9 @@ let voiceSession = VoiceSessionController(
             trigger: voiceSessionTrigger, bundleIdentifier: bundleIdentifier
         )
     },
-    canPostKeyboardEvents: { keyboard.requestPermission(prompt: false) }
+    canPostKeyboardEvents: { keyboard.requestPermission(prompt: false) },
+    inputDevice: defaultAudioInput,
+    targetInputDeviceUID: { audio.status.selectedDevice?.uid }
 )
 voice.onStreamStarted = { voiceSession.startSession() }
 voice.onPCM = { samples in voiceSession.enqueue(samples: samples) }

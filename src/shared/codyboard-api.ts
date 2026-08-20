@@ -14,6 +14,7 @@ import type {
   ProfileEvent,
   ProfilesSnapshot,
 } from "./profile-types";
+import type { VoiceEvent, VoiceSettings, VoiceSnapshot } from "./voice-types";
 
 export interface RawProfilesAPI {
   load(): Promise<ProfilesSnapshot>;
@@ -41,6 +42,12 @@ export interface CodyboardAPI {
     openSettings(permission: CodyboardPermission): Promise<void>;
   };
   profiles: RawProfilesAPI;
+  voice: {
+    snapshot(): Promise<VoiceSnapshot>;
+    testTone(): Promise<VoiceSnapshot>;
+    update(settings: VoiceSettings): Promise<VoiceSnapshot>;
+    onEvent(handler: (event: VoiceEvent) => void): () => void;
+  };
   diagnostics: {
     setKeyboardType(keyboardType?: number): Promise<{ generation: number; listening: boolean }>;
     onKey(handler: (event: HIDDiagnosticEvent) => void): () => void;

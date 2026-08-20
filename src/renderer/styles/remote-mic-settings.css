@@ -1,0 +1,69 @@
+.remote-mic-settings {
+  display: grid;
+  gap: 11px;
+  padding: 14px 26px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(85, 205, 158, 0.025);
+  color: rgba(235, 241, 238, 0.8);
+  font: 550 11px/1.2 "Avenir Next", "Helvetica Neue", sans-serif;
+}
+
+.remote-mic-settings.is-loading { min-height: 70px; align-content: center; color: rgba(220, 228, 224, 0.42); }
+.remote-mic-heading, .remote-mic-heading > span, .remote-mic-state, .remote-mic-controls { display: flex; align-items: center; }
+.remote-mic-heading { justify-content: space-between; gap: 16px; }
+.remote-mic-heading > span { gap: 8px; color: rgba(241, 246, 244, 0.9); font-size: 12px; }
+.remote-mic-heading svg { width: 15px; height: 15px; color: rgba(111, 224, 179, 0.72); }
+.remote-mic-state { gap: 9px; color: rgba(187, 198, 193, 0.58); text-transform: capitalize; }
+.cody-switch {
+  position: relative;
+  display: inline-flex;
+  width: 34px;
+  height: 19px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  outline: none;
+  background: rgba(12, 15, 14, 0.28);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.cody-switch[data-state="checked"] { border-color: rgba(91, 211, 164, 0.52); background: rgba(71, 189, 142, 0.72); }
+.cody-switch:focus-visible { box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.1); }
+.cody-switch:disabled { cursor: default; opacity: 0.42; }
+.cody-switch-thumb {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: rgba(232, 238, 235, 0.72);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transform: translateX(1px);
+  transition: background 160ms ease, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cody-switch[data-state="checked"] .cody-switch-thumb { background: #f7fbf9; transform: translateX(16px); }
+.remote-mic-controls { min-width: 0; flex-wrap: wrap; gap: 10px; }
+.remote-mic-controls > label { display: grid; min-width: 0; gap: 5px; }
+.remote-mic-controls > label { flex: 1; }
+.remote-mic-controls > label:first-child { min-width: 150px; }
+.remote-mic-controls > label:nth-child(2) { flex: 1.35; }
+.remote-mic-controls > label > span { color: rgba(195, 205, 201, 0.42); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; }
+.remote-mic-controls select, .remote-mic-test {
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 8px;
+  background: rgba(18, 22, 21, 0.18);
+  color: rgba(238, 243, 241, 0.84);
+  font: inherit;
+}
+.remote-mic-controls select { width: 100%; padding: 0 9px; }
+.remote-mic-gain { flex: 1; }
+.remote-mic-gain span { display: flex; justify-content: space-between; gap: 8px; }
+.remote-mic-gain b { color: rgba(129, 218, 182, 0.68); font-weight: 650; letter-spacing: 0; text-transform: none; }
+.remote-mic-gain input { width: 100%; margin: 3px 0 0; accent-color: rgb(85, 197, 153); }
+.remote-mic-test { display: flex; align-items: center; align-self: end; gap: 6px; padding: 0 11px; cursor: pointer; }
+.remote-mic-test svg { width: 13px; height: 13px; }
+.remote-mic-test:disabled, .remote-mic-controls select:disabled { cursor: default; opacity: 0.42; }
+.remote-mic-test-hint { margin: -2px 0 0; color: rgba(190, 201, 196, 0.38); font-size: 9px; }
+.remote-mic-error { margin: 0; color: rgba(255, 154, 154, 0.88); font-size: 10px; }

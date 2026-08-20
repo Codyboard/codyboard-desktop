@@ -155,6 +155,53 @@ final class VoiceSessionControllerTests: XCTestCase {
         XCTAssertEqual(controller.status.state, .idle)
     }
 
+    func testSystemMicrophoneSourceHoldsShortcutWithoutRoutingBLEAudio() {
+        let output = CompiledOutput(
+            kind: "keyboard", code: 2, modifiers: ["control", "shift"],
+            voiceAudioSource: "system"
+        )
+        let audio = FakeVoiceAudio()
+        let keyboard = FakeVoiceKeyboard()
+        let inputDevice = FakeVoiceInputDevice()
+        let controller = makeController(
+            audio: audio, keyboard: keyboard, resolution: .output(output),
+            inputDevice: inputDevice
+        )
+
+        XCTAssertTrue(controller.startSession())
+        XCTAssertTrue(controller.enqueue(samples: [1, 2, 3]))
+        controller.finishSession()
+
+        XCTAssertEqual(audio.startCount, 0)
+        XCTAssertTrue(inputDevice.started.isEmpty)
+        XCTAssertEqual(keyboard.events, [
+            .init(output: output, pressed: true),
+            .init(output: output, pressed: false),
+        ])
+        XCTAssertEqual(controller.status.state, .idle)
+    }
+
+    func testRemoteSourceRestoresPreviousDefaultInputAfterDrain() {
+        let audio = FakeVoiceAudio()
+        let inputDevice = FakeVoiceInputDevice()
+        let controller = makeController(
+            audio: audio, keyboard: FakeVoiceKeyboard(), resolution: .output(fn),
+            inputDevice: inputDevice, targetInputDeviceUID: { "virtual-mic" }
+        )
+
+        XCTAssertTrue(controller.startSession())
+        XCTAssertEqual(inputDevice.started, ["virtual-mic"])
+        XCTAssertTrue(inputDevice.restored.isEmpty)
+
+        controller.finishSession()
+        XCTAssertTrue(inputDevice.restored.isEmpty)
+        audio.completeDrain(at: 0)
+
+        XCTAssertEqual(inputDevice.restored, [
+            .init(previousDeviceUID: "built-in-mic", targetDeviceUID: "virtual-mic"),
+        ])
+    }
+
     func testMissingAccessibilityFailsBeforeAudioStarts() {
         let audio = FakeVoiceAudio()
         let controller = makeController(
@@ -188,7 +235,9 @@ final class VoiceSessionControllerTests: XCTestCase {
         resolution: MappingResolution = .none,
         frontmostBundleIdentifier: @escaping () -> String? = { nil },
         resolveTrigger: ((String?) -> MappingResolution)? = nil,
-        canPostKeyboardEvents: @escaping () -> Bool = { true }
+        canPostKeyboardEvents: @escaping () -> Bool = { true },
+        inputDevice: FakeVoiceInputDevice = FakeVoiceInputDevice(),
+        targetInputDeviceUID: @escaping () -> String? = { "virtual-mic" }
     ) -> VoiceSessionController {
         VoiceSessionController(
             audio: audio,
@@ -196,9 +245,25 @@ final class VoiceSessionControllerTests: XCTestCase {
             frontmostBundleIdentifier: frontmostBundleIdentifier,
             resolveTrigger: resolveTrigger ?? { _ in resolution },
             canPostKeyboardEvents: canPostKeyboardEvents,
+            inputDevice: inputDevice,
+            targetInputDeviceUID: targetInputDeviceUID,
             publishesEvents: false
         )
     }
+}
+
+private final class FakeVoiceInputDevice: VoiceInputDeviceRouting {
+    private(set) var restored: [DefaultAudioInputLease] = []
+    private(set) var started: [String] = []
+
+    func beginOverride(targetDeviceUID: String) throws -> DefaultAudioInputLease {
+        started.append(targetDeviceUID)
+        return .init(
+            previousDeviceUID: "built-in-mic", targetDeviceUID: targetDeviceUID
+        )
+    }
+
+    func restore(_ lease: DefaultAudioInputLease) { restored.append(lease) }
 }
 
 private final class FakeVoiceAudio: VoiceAudioRouting {

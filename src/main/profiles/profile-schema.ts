@@ -49,7 +49,8 @@ const keyboardInputSchema = z.object({ kind: z.literal("keyboard"), ...keyRefere
 const modifierInputSchema = z.object({ kind: z.literal("modifier"), key: z.enum(["command", "control", "option", "shift", "fn", "capsLock"]), modifiers: modifiersSchema }).strict();
 const systemInputSchema = z.object({ kind: z.literal("system"), ...systemReference }).strict().superRefine(exactlyOneSystem);
 const hidUsageInputSchema = z.object({ kind: z.literal("hidUsage"), usage: z.number().int().min(1).max(0xFFFF) }).strict();
-const inputSchema = z.union([keyboardInputSchema, modifierInputSchema, systemInputSchema, hidUsageInputSchema]);
+const voiceInputSchema = z.object({ kind: z.literal("voice") }).strict();
+const inputSchema = z.union([keyboardInputSchema, modifierInputSchema, systemInputSchema, hidUsageInputSchema, voiceInputSchema]);
 
 const keyboardOutputSchema = z.object({ kind: z.literal("keyboard"), ...keyReference, modifiers: modifiersSchema }).strict().superRefine(exactlyOne);
 const modifierOutputSchema = z.object({
@@ -89,11 +90,17 @@ const outputSchema = z.union([
 ]);
 
 const mappingSchema = z.object({ id: idSchema, from: inputSchema, to: outputSchema }).strict();
+const voiceAudioSourceSchema = z.enum(["remote", "system"]);
 const scopeSchema = z.union([
   z.object({ kind: z.literal("global") }).strict(),
   z.object({ kind: z.literal("application"), bundleId: z.string().min(1) }).strict()
 ]);
-const groupSchema = z.object({ id: idSchema, scope: scopeSchema, mappings: z.array(mappingSchema) }).strict();
+const groupSchema = z.object({
+  id: idSchema,
+  mappings: z.array(mappingSchema),
+  scope: scopeSchema,
+  voiceAudioSource: voiceAudioSourceSchema.optional(),
+}).strict();
 export const profileDraftSchema = z.object({ id: idSchema, name: z.string().min(1), groups: z.array(groupSchema).min(1) }).strict();
 const profileCollectionSchema = z.object({ deviceId: profileDomainSchema, profiles: z.array(profileDraftSchema) }).strict();
 const profileDocumentSchema = z.object({
@@ -124,6 +131,11 @@ function validateProfile(profile: ProfileDraft): void {
   ensureUnique(profile.groups.flatMap(({ mappings }) => mappings.map(({ id }) => id)), `mapping id in profile ${profile.id}`);
   for (const group of profile.groups) {
     ensureUnique(group.mappings.map(({ from }) => triggerKey(from)), `trigger in group ${group.id}`);
+    for (const mapping of group.mappings) {
+      if (mapping.from.kind === "voice"
+        && !["keyboard", "modifier", "passthrough", "suppress"].includes(mapping.to.kind))
+        throw new Error("Voice mappings must be a keyboard key or modifier");
+    }
   }
 }
 
@@ -180,9 +192,13 @@ function compileOutput(output: MappingOutput): CompiledMapping["output"] {
   return { kind: "keyboard", code: resolveKey(output), modifiers: normalizeModifiers(output.modifiers) };
 }
 
-function compileMapping(mapping: KeyMapping): CompiledMapping {
+function compileMapping(
+  mapping: KeyMapping,
+  voiceAudioSource: "remote" | "system" = "remote",
+): CompiledMapping {
   const input = mapping.from;
-  const code = input.kind === "system" ? resolveSystem(input)
+  const code = input.kind === "voice" ? 0
+    : input.kind === "system" ? resolveSystem(input)
     : input.kind === "hidUsage" ? input.usage
     : input.kind === "modifier" ? MODIFIER_KEY_CODES[input.key]
       : resolveKey(input);
@@ -193,7 +209,10 @@ function compileMapping(mapping: KeyMapping): CompiledMapping {
       code,
       modifiers: normalizeModifiers(input.kind === "keyboard" || input.kind === "modifier" ? input.modifiers : undefined)
     },
-    output: compileOutput(mapping.to)
+    output: {
+      ...compileOutput(mapping.to),
+      ...(input.kind === "voice" ? { voiceAudioSource } : {}),
+    },
   };
 }
 
@@ -207,13 +226,21 @@ export function compileProfiles(document: ProfileDocument, state: ProfileStateDo
     if (!profile) continue;
     const global = profile.groups.find(({ scope }) => scope.kind === "global")!;
     const applications: Record<string, CompiledMapping[]> = {};
+    const globalVoiceSource = global.voiceAudioSource ?? "remote";
+    const globalVoiceMapping = global.mappings.find(({ from }) => from.kind === "voice");
     for (const group of profile.groups) {
-      if (group.scope.kind === "application") applications[group.scope.bundleId] = group.mappings.map(compileMapping);
+      if (group.scope.kind !== "application") continue;
+      const source = group.voiceAudioSource ?? globalVoiceSource;
+      const mappings = group.mappings.map((mapping) => compileMapping(mapping, source));
+      if (group.voiceAudioSource && globalVoiceMapping
+        && !group.mappings.some(({ from }) => from.kind === "voice"))
+        mappings.push(compileMapping(globalVoiceMapping, source));
+      applications[group.scope.bundleId] = mappings;
     }
     profiles.push({
       deviceId: domain,
       profileId: profile.id,
-      global: global.mappings.map(compileMapping),
+      global: global.mappings.map((mapping) => compileMapping(mapping, globalVoiceSource)),
       applications
     });
   }

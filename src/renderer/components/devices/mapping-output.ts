@@ -99,7 +99,8 @@ export function mappingPreviewForControl<Key extends string>(
   if (output.kind === "typeText")
     return { icon: TextCursorInput, kind: "key", label: output.text };
   if (output.kind === "passthrough") {
-    if (control.input.kind === "hidUsage") return undefined;
+    if (control.input.kind === "hidUsage" || control.input.kind === "voice")
+      return undefined;
     return keyPreview(control.input);
   }
   return keyPreview(output);

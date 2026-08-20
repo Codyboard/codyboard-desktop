@@ -4,6 +4,7 @@ import path from "node:path";
 import { parse, stringify } from "yaml";
 import { z } from "zod";
 
+import { SUPPORTED_DEVICES } from "../../shared/device-catalog.js";
 import type {
   ProfileDocument,
   ProfileDomain,
@@ -12,6 +13,7 @@ import type {
 } from "../../shared/hid.js";
 import { profileDomainKey } from "../../shared/hid.js";
 import { normalizeApplicationMappings } from "../../shared/profile-mappings.js";
+import { withSettingsFileLock } from "../settings/settings-file-lock.js";
 
 import {
   parseProfileDocument,
@@ -80,6 +82,16 @@ export class ProfileStore {
     document: ProfileDocument,
     state: ProfileStateDocument,
   ): Promise<void> {
+    return withSettingsFileLock(this.settingsPath, () =>
+      this.persistUnlocked(previous, document, state),
+    );
+  }
+
+  private async persistUnlocked(
+    previous: ProfileDocument,
+    document: ProfileDocument,
+    state: ProfileStateDocument,
+  ): Promise<void> {
     const domains = new Set([...previous.keyboards, ...document.keyboards].map(profileDomain));
     const originals = new Map<string, string | undefined>();
     try {
@@ -135,7 +147,7 @@ export class ProfileStore {
       const profilePath = path.join(directory, file.name);
       const original = await readFile(profilePath, "utf8");
       const parsed = profileDraftSchema.parse(parse(original));
-      const profile = normalizeApplicationMappings(parsed);
+      const profile = normalizeStoredProfile(domain, parsed);
       if (profile.id !== match[1])
         throw new Error(`${file.name}: profile id must match its filename`);
       if (JSON.stringify(parsed) !== JSON.stringify(profile))
@@ -214,6 +226,26 @@ export class ProfileStore {
     if (contents === undefined) await unlinkIfPresent(file);
     else await this.writeAtomic(file, contents);
   }
+}
+
+function normalizeStoredProfile(
+  domain: ProfileDomain,
+  profile: ProfileDraft,
+): ProfileDraft {
+  const draft = normalizeApplicationMappings(profile);
+  const xiaomiDomain = SUPPORTED_DEVICES.find(
+    ({ model }) => model === "xiaomi-presenter",
+  )?.name;
+  if (domain !== xiaomiDomain || draft.id !== "default") return draft;
+  const global = draft.groups.find(({ scope }) => scope.kind === "global");
+  if (!global || global.mappings.some(({ from }) => from.kind === "voice"))
+    return draft;
+  global.mappings.push({
+    from: { kind: "voice" },
+    id: "global-voice",
+    to: { key: "fn", kind: "modifier", modifiers: [] },
+  });
+  return draft;
 }
 
 function removeMissingActiveProfiles(

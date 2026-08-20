@@ -123,6 +123,55 @@ describe("profile schema", () => {
     });
   });
 
+  it("compiles the synthetic voice trigger for normal profile fallback", () => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0] = {
+      from: { kind: "voice" },
+      id: "voice-to-fn",
+      to: { kind: "modifier", key: "fn", modifiers: [] },
+    };
+    const compiled = compileProfiles(
+      document,
+      { version: 1, activeProfiles: { "device:0x100004baa": "presenter" } },
+      11,
+    );
+    expect(compiled.profiles[0].global[0].trigger).toEqual({
+      code: 0,
+      kind: "voice",
+      modifiers: [],
+    });
+    expect(compiled.profiles[0].global[0].output.voiceAudioSource).toBe("remote");
+  });
+
+  it("inherits a global voice shortcut with an application audio-source override", () => {
+    const document = structuredClone(validDocument);
+    document.keyboards[0].profiles[0].groups[0].mappings[0] = {
+      from: { kind: "voice" },
+      id: "voice-to-fn",
+      to: { kind: "modifier", key: "fn", modifiers: [] },
+    };
+    document.keyboards[0].profiles[0].groups[1].mappings = [];
+    document.keyboards[0].profiles[0].groups[1].voiceAudioSource = "system";
+
+    const compiled = compileProfiles(
+      document,
+      { version: 1, activeProfiles: { "device:0x100004baa": "presenter" } },
+      12,
+    );
+
+    expect(compiled.profiles[0].applications["com.openai.codex"][0]).toEqual({
+      id: "voice-to-fn",
+      output: {
+        code: 63,
+        kind: "modifier",
+        modifier: "fn",
+        modifiers: [],
+        voiceAudioSource: "system",
+      },
+      trigger: { code: 0, kind: "voice", modifiers: [] },
+    });
+  });
+
   it("rejects duplicate normalized triggers in a group", () => {
     const invalid = structuredClone(validDocument);
     invalid.keyboards[0].profiles[0].groups[0].mappings.push({

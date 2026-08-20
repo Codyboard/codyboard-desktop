@@ -33,6 +33,16 @@ const api: CodyboardAPI = {
       return () => ipcRenderer.removeListener("profiles:event", listener);
     }
   },
+  voice: {
+    snapshot: () => ipcRenderer.invoke("voice:snapshot"),
+    update: (settings) => ipcRenderer.invoke("voice:update", settings),
+    testTone: () => ipcRenderer.invoke("voice:test-tone"),
+    onEvent: (handler) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: Parameters<typeof handler>[0]) => handler(value);
+      ipcRenderer.on("voice:event", listener);
+      return () => ipcRenderer.removeListener("voice:event", listener);
+    },
+  },
   diagnostics: {
     setKeyboardType: (keyboardType) => ipcRenderer.invoke("diagnostics:set", keyboardType),
     onKey: (handler) => {

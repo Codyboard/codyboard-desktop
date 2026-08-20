@@ -4,7 +4,8 @@ export interface KeyboardInput { kind: "keyboard"; key?: string; keyCode?: numbe
 export interface ModifierInput { kind: "modifier"; key: HIDModifier | "capsLock"; modifiers?: HIDModifier[]; }
 export interface SystemInput { kind: "system"; key?: string; systemCode?: number; }
 export interface HIDUsageInput { kind: "hidUsage"; usage: number; }
-export type MappingInput = KeyboardInput | ModifierInput | SystemInput | HIDUsageInput;
+export interface VoiceInput { kind: "voice"; }
+export type MappingInput = KeyboardInput | ModifierInput | SystemInput | HIDUsageInput | VoiceInput;
 
 export interface KeyboardOutput { kind: "keyboard"; key?: string; keyCode?: number; modifiers?: HIDModifier[]; }
 export interface ModifierOutput { kind: "modifier"; key: HIDModifier | "capsLock"; modifiers?: HIDModifier[]; }
@@ -15,8 +16,14 @@ export interface TypeTextOutput { kind: "typeText"; pressEnter: boolean; text: s
 export type MappingOutput = KeyboardOutput | LaunchApplicationOutput | ModifierOutput | OpenURLOutput | SystemOutput | TypeTextOutput | { kind: "passthrough" } | { kind: "suppress" };
 
 export interface KeyMapping { id: string; from: MappingInput; to: MappingOutput; }
+export type VoiceAudioSource = "remote" | "system";
 export type MappingScope = { kind: "global" } | { kind: "application"; bundleId: string };
-export interface KeyMappingGroup { id: string; scope: MappingScope; mappings: KeyMapping[]; }
+export interface KeyMappingGroup {
+  id: string;
+  scope: MappingScope;
+  mappings: KeyMapping[];
+  voiceAudioSource?: VoiceAudioSource;
+}
 export interface ProfileDraft { id: string; name: string; groups: KeyMappingGroup[]; }
 export type ProfileDomain = string;
 export interface ProfileCollection { deviceId: string; profiles: ProfileDraft[]; }
@@ -28,7 +35,7 @@ export interface ProfilesSnapshot { generation: number; keyboards: Record<string
 export function profileDomainKey(domain: ProfileDomain): string { return `device:${domain}`; }
 
 export interface CompiledTrigger {
-  kind: "keyboard" | "modifier" | "system" | "hidUsage";
+  kind: "keyboard" | "modifier" | "system" | "hidUsage" | "voice";
   code: number;
   modifiers: HIDModifier[];
 }
@@ -41,6 +48,7 @@ export interface CompiledOutput {
   pressEnter?: boolean;
   text?: string;
   url?: string;
+  voiceAudioSource?: VoiceAudioSource;
 }
 export interface CompiledMapping { id: string; trigger: CompiledTrigger; output: CompiledOutput; }
 export interface CompiledActiveProfile {

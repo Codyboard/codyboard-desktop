@@ -5,6 +5,7 @@ import type {
   MappingOutput,
   ProfileDomain,
   ProfilesSnapshot,
+  VoiceAudioSource,
 } from "../../../shared/hid";
 import { profileDomainKey } from "../../../shared/hid";
 import {
@@ -61,6 +62,12 @@ export function useDeviceMappings<Key extends string>(
   );
   const selectedGroup = activeProfile?.groups.find(({ id }) => id === selectedScopeId)
     ?? activeProfile?.groups.find(({ scope }) => scope.kind === "global");
+  const globalVoiceAudioSource = activeProfile?.groups.find(
+    ({ scope }) => scope.kind === "global",
+  )?.voiceAudioSource ?? "remote";
+  const voiceAudioSource = selectedGroup?.voiceAudioSource ?? globalVoiceAudioSource;
+  const voiceAudioSourceInherited = selectedGroup?.scope.kind === "application"
+    && selectedGroup.voiceAudioSource === undefined;
   const scopePendingRemoval = activeProfile?.groups.find(({ id }) => id === scopePendingRemovalId);
   const mappings = useMemo(() => {
     if (!activeProfile || !selectedGroup) return [];
@@ -202,15 +209,32 @@ export function useDeviceMappings<Key extends string>(
       else setRecordingKey(control.key);
     });
   };
+  const changeVoiceAudioSource = async (source: VoiceAudioSource | "inherit") => {
+    if (!activeProfile || !selectedGroup) return;
+    setError(undefined);
+    setSavingScope(true);
+    try {
+      const draft = structuredClone(activeProfile);
+      const group = draft.groups.find(({ id }) => id === selectedGroup.id)!;
+      if (source === "inherit") delete group.voiceAudioSource;
+      else group.voiceAudioSource = source;
+      await updateProfile(draft);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setSavingScope(false);
+    }
+  };
 
   return {
     activeProfile, applicationGroups, applicationInfo, changeAction, changeScope,
+    changeVoiceAudioSource,
     chooseApplication,
     editingTextKey, editingURLKey, error, mappings, recordingKey, removeScope,
     saveOutput, savingKey, savingScope, scopeMenuOpen, scopePendingRemoval,
     selectedGroup, selectedScopeId, setEditingTextKey, setEditingURLKey, setError,
     setRecordingKey, setScopeMenuOpen, setScopePendingRemovalId, setURLDraft,
-    snapshot, urlDraft,
+    snapshot, urlDraft, voiceAudioSource, voiceAudioSourceInherited,
   };
 }
 

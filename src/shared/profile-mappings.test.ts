@@ -99,4 +99,23 @@ describe("sparse application mappings", () => {
     const withEnter = { ...plain, pressEnter: true } as const;
     expect(mappingOutputSignature(plain)).not.toBe(mappingOutputSignature(withEnter));
   });
+
+  it("uses the same sparse application override logic for voice", () => {
+    const voiceProfile = structuredClone(profile);
+    voiceProfile.groups[0].mappings = [{
+      from: { kind: "voice" },
+      id: "global-voice",
+      to: { key: "fn", kind: "modifier", modifiers: [] },
+    }];
+    const inherited = resolveProfileMapping(
+      voiceProfile,
+      voiceProfile.groups[1],
+      { kind: "voice" },
+    );
+    expect(inherited.effective?.to).toEqual({
+      key: "fn",
+      kind: "modifier",
+      modifiers: [],
+    });
+  });
 });
