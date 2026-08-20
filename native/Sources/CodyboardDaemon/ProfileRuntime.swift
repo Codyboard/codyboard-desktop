@@ -36,6 +36,14 @@ final class ProfileRuntime {
             .map(MappingResolution.output) ?? .none
     }
 
+    func resolveUnique(trigger: CompiledTrigger, bundleIdentifier: String?) -> MappingResolution {
+        let matches = deviceProfiles.values.compactMap {
+            output(in: $0, trigger: trigger, bundleIdentifier: bundleIdentifier)
+        }
+        guard matches.count <= 1 else { return .ambiguous }
+        return matches.first.map(MappingResolution.output) ?? .none
+    }
+
     private func output(in profile: RuntimeProfile, trigger: CompiledTrigger, bundleIdentifier: String?) -> CompiledOutput? {
         if let bundleIdentifier, let applicationOutput = profile.applications[bundleIdentifier]?[trigger] {
             return applicationOutput

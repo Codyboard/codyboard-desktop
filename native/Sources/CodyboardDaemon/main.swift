@@ -7,17 +7,31 @@ let applicationLauncher = ApplicationLauncher()
 let keyboard = KeyboardController(runtime: runtime, simulator: simulator, applicationLauncher: applicationLauncher)
 let voice = XiaomiVoiceBluetoothController()
 let audio = VirtualAudioOutput()
-voice.onStreamStarted = { audio.startVoiceSession() }
-voice.onPCM = { samples in audio.enqueue(samples: samples) }
-voice.onStreamStopped = { audio.drainAndStop() }
+let voiceSession = VoiceSessionController(
+    audio: audio,
+    keyboard: simulator,
+    frontmostBundleIdentifier: { keyboard.frontmostBundleIdentifier },
+    resolveTrigger: { bundleIdentifier in
+        guard keyboard.midiCaptureDeviceId == nil else { return .none }
+        return runtime.resolveUnique(
+            trigger: voiceSessionTrigger, bundleIdentifier: bundleIdentifier
+        )
+    },
+    canPostKeyboardEvents: { keyboard.requestPermission(prompt: false) }
+)
+voice.onStreamStarted = { voiceSession.startSession() }
+voice.onPCM = { samples in voiceSession.enqueue(samples: samples) }
+voice.onStreamStopped = { voiceSession.finishSession() }
 let server = NativeCommandServer(
-    devices: HIDDeviceManager(), keyboard: keyboard, voice: voice, audio: audio
+    devices: HIDDeviceManager(), keyboard: keyboard, voice: voice,
+    audio: audio, voiceSession: voiceSession
 )
 signal(SIGTERM, SIG_IGN)
 let terminationSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
 terminationSource.setEventHandler {
     keyboard.shutdown()
     voice.shutdown()
+    voiceSession.shutdown()
     audio.shutdown()
     exit(EXIT_SUCCESS)
 }

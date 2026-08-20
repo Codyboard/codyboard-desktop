@@ -117,7 +117,36 @@ Primary files:
 | `audio.stop` | none | Stop the runtime without clearing selection |
 
 Key events are `bluetoothStateChanged`, `voiceStreamStarted`, `voiceMetrics`,
-`voiceStreamStopped`, `audioStateChanged` and `audioTestToneFinished`. Never add PCM to JSON events.
+`voiceStreamStopped`, `voiceSessionStateChanged`, `audioStateChanged` and
+`audioTestToneFinished`. Never add PCM to JSON events.
+
+## Voice key mapping
+
+Voice key mapping reuses the normal profile pipeline. Its synthetic input is
+`CompiledTrigger(kind: "voice", code: 0, modifiers: [])`. `ProfileRuntime.resolveUnique` applies the
+same application override and global fallback as physical buttons. There is no second voice-mapping
+store or native application catalog.
+
+Session semantics are strictly paired:
+
+```text
+ATVV stream start -> resolve frontmost bundle once -> mapped output keyDown
+ATVV stream stop  -> drain audio -> the same mapped output keyUp
+```
+
+Only keyboard and modifier outputs can be held. Fn uses the existing modifier output; a chord uses
+the existing keyboard output plus its modifier ledger. The resolved output is pinned for the whole
+session even if the foreground application changes. Audio failure, shutdown and overlapping sessions
+attempt immediate keyUp. A stale drain generation cannot release a newer session. More than one
+active device profile containing a voice mapping is ambiguous and fails closed; multi-remote voice is
+not supported. A passthrough/suppress voice mapping means audio-only and requires no Accessibility
+permission.
+
+Primary files:
+
+- `native/Sources/CodyboardDaemon/VoiceSessionController.swift`
+- `native/Sources/CodyboardDaemon/ProfileRuntime.swift`
+- `native/Sources/CodyboardDaemon/KeyboardSimulator.swift`
 
 ## Verified baseline
 
@@ -135,7 +164,9 @@ called both `audio.configure` and `voice.configure`; installation alone does not
 
 ## Boundaries for later phases
 
-- Phase 3 is native-only. Electron persistence/UI wiring is Phase 5.
+- Phases 3–4 are native-only. Electron persistence/UI wiring is Phase 5.
+- Phase 5 exposes the synthetic voice input through the existing device-profile mapping UI; mapping
+  groups remain in profile YAML, while BLE/audio preferences remain in settings YAML.
 - Trigger logic is generic Fn or configurable key-chord state, never product-specific native code.
 - Do not add default-input switching, driver auto-install, application detection, battery handling or
   multi-remote support unless a later requirement explicitly needs it.
@@ -143,5 +174,6 @@ called both `audio.configure` and `voice.configure`; installation alone does not
 - Preserve stop ordering when triggers arrive: stop PCM intake, drain audio, then release the trigger.
 - Keep Power implementation and profile mapping behavior untouched.
 
-Tests live in `ATVVProtocolTests.swift` and `VirtualAudioOutputTests.swift`. Before handoff run the
-repository's full gate from `AGENTS.md` plus `pnpm build:virtual-mic` when driver files change.
+Tests live in `ATVVProtocolTests.swift`, `VirtualAudioOutputTests.swift` and
+`VoiceSessionControllerTests.swift`. Before handoff run the repository's full gate from `AGENTS.md`
+plus `pnpm build:virtual-mic` when driver files change.

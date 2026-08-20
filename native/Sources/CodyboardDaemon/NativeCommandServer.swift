@@ -7,17 +7,20 @@ final class NativeCommandServer {
     private let keyboard: KeyboardController
     private let voice: XiaomiVoiceBluetoothController
     private let audio: VirtualAudioOutput
+    private let voiceSession: VoiceSessionController
 
     init(
         devices: HIDDeviceManager,
         keyboard: KeyboardController,
         voice: XiaomiVoiceBluetoothController,
-        audio: VirtualAudioOutput
+        audio: VirtualAudioOutput,
+        voiceSession: VoiceSessionController
     ) {
         self.devices = devices
         self.keyboard = keyboard
         self.voice = voice
         self.audio = audio
+        self.voiceSession = voiceSession
     }
 
     func start() {
@@ -37,6 +40,7 @@ final class NativeCommandServer {
         DispatchQueue.main.async { [weak self] in
             self?.keyboard.shutdown()
             self?.voice.shutdown()
+            self?.voiceSession.shutdown()
             self?.audio.shutdown()
             exit(EXIT_SUCCESS)
         }
@@ -73,11 +77,16 @@ final class NativeCommandServer {
             case "voice.stop":
                 voice.stop()
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: voice.status))
+            case "voice.session.status":
+                NativeOutput.shared.send(SuccessResponse(id: command.id, data: voiceSession.status))
             case "audio.devices.list":
                 NativeOutput.shared.send(SuccessResponse(
                     id: command.id, data: CoreAudioDeviceCatalog.outputDevices()
                 ))
             case "audio.configure":
+                guard !voiceSession.isBusy else {
+                    throw commandError("Cannot reconfigure audio during a voice session")
+                }
                 guard let deviceUID = command.params?.deviceUID else {
                     throw commandError("Missing CoreAudio device UID")
                 }
@@ -86,12 +95,12 @@ final class NativeCommandServer {
             case "audio.status":
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: audio.status))
             case "audio.testTone":
-                guard audio.playTestTone() else {
+                guard !voiceSession.isBusy, audio.playTestTone() else {
                     throw commandError("Unable to play CoreAudio test tone")
                 }
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: audio.status))
             case "audio.stop":
-                audio.stop()
+                voiceSession.stopSession()
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: audio.status))
             case "permissions.status":
                 NativeOutput.shared.send(SuccessResponse(id: command.id, data: permissionStatus()))

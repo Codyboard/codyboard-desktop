@@ -25,6 +25,7 @@
 | Remote mic architecture | `docs/remote-mic.md` | BLE, ATVV, CoreAudio, driver identity, verification |
 | Remote mic BLE/ATVV | `native/.../XiaomiVoiceBluetoothController.swift` | `ATVVProtocol.swift`, `BluetoothLifecycle.swift` |
 | Remote mic audio output | `native/.../VirtualAudioOutput.swift` | `CoreAudioDeviceCatalog.swift`, `AudioPlaybackState.swift` |
+| Remote mic key session | `native/.../VoiceSessionController.swift` | `ProfileRuntime.swift`, `KeyboardSimulator.swift` |
 | Virtual microphone driver | `scripts/build-virtual-microphone.sh` | `third_party/blackhole/`, `scripts/install-virtual-microphone.sh` |
 | Device catalog/VID-PID | `src/shared/device-catalog.ts` | `HIDDeviceManager.swift` |
 | Device mapping UI | `DeviceButtonMappings.tsx` | `use-device-mappings.ts`, `DeviceMappingRow.tsx`, `MappingValueControls.tsx` |
@@ -57,6 +58,8 @@ Paths beginning `native/...` mean `native/Sources/CodyboardDaemon/`; renderer co
 - Virtual device identity is fixed: `Codyboard Virtual Microphone`, UID `CodyboardVirtualMicrophone2ch_UID`, bundle ID `com.codyboard.VirtualMicrophone`.
 - Bind CoreAudio output by UID/device ID. Never change the system default input as part of streaming.
 - Start audio per voice session and drain `.dataPlayedBack` buffers before stopping or releasing a trigger.
+- Voice is the synthetic profile trigger `{ kind: "voice", code: 0 }`; resolve it through the existing `ProfileRuntime` global/application fallback.
+- BLE mic start maps to output keyDown; after audio drain, the same pinned output maps to keyUp. Do not add tap/toggle semantics.
 - CoreBluetooth callbacks must remain generation-safe; stale reconnect/session callbacks do no work.
 - Voice trigger implementation stays generic; no product-specific app names or detection in native code.
 - Remote microphone changes must not touch Power handling.
@@ -83,6 +86,6 @@ Paths beginning `native/...` mean `native/Sources/CodyboardDaemon/`; renderer co
 ## Tests/docs/releases
 
 - Mapping/profile pure logic: adjacent Vitest files. MIDI scheduler: `audio-engine.test.ts` with `audio-engine-test-fixture.ts`. Native input/capture isolation: `ProfileRuntimeTests.swift`.
-- Remote mic protocol/audio: `ATVVProtocolTests.swift` and `VirtualAudioOutputTests.swift`; rebuild the driver with `pnpm build:virtual-mic` when its patch or scripts change.
+- Remote mic protocol/audio/session: `ATVVProtocolTests.swift`, `VirtualAudioOutputTests.swift`, and `VoiceSessionControllerTests.swift`; rebuild the driver with `pnpm build:virtual-mic` when its patch or scripts change.
 - Update README only for user-visible behavior, commands, permissions, hardware, or storage. Store screenshots in `docs/screenshots/`; use repo-relative links and inspect them before commit.
 - Version from `package.json` using semver. `pnpm package:mac` is ad-hoc signed, not notarized. Release artifacts under `release/` are generated and never committed.

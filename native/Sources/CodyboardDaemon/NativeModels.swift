@@ -206,7 +206,7 @@ struct CompiledTrigger: Codable, Hashable {
     let modifiers: [String]
 }
 
-struct CompiledOutput: Codable {
+struct CompiledOutput: Codable, Equatable {
     let kind: String
     let code: Int?
     let bundleId: String?

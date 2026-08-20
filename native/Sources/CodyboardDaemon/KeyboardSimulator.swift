@@ -46,16 +46,21 @@ final class KeyboardSimulator {
     func post(_ output: CompiledOutput, pressed: Bool, autorepeat: Bool) throws {
         switch output.kind {
         case "keyboard":
-            guard let code = output.code,
-                  let event = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: pressed) else {
+            guard let code = output.code else {
                 throw simulationError("Unable to create keyboard event")
             }
+            let releasesModifiers = !pressed
+            defer {
+                if releasesModifiers { release(output.modifiers.reversed()) }
+            }
+            guard let event = CGEvent(
+                keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: pressed
+            ) else { throw simulationError("Unable to create keyboard event") }
             if pressed && !autorepeat { acquire(output.modifiers) }
             event.flags = flags(modifierLedger.activeModifiers)
             event.setIntegerValueField(.keyboardEventAutorepeat, value: autorepeat ? 1 : 0)
             event.setIntegerValueField(.eventSourceUserData, value: syntheticEventMarker)
             event.post(tap: .cghidEventTap)
-            if !pressed { release(output.modifiers.reversed()) }
         case "modifier":
             guard let modifier = output.modifier else { throw simulationError("Missing modifier name") }
             if pressed {

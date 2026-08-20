@@ -94,6 +94,47 @@ final class ProfileRuntimeTests: XCTestCase {
         XCTAssertEqual(output.code, 37)
     }
 
+    func testUniqueVoiceMappingUsesExistingApplicationOverride() {
+        let runtime = ProfileRuntime()
+        runtime.replace(CompiledProfileSet(generation: 1, profiles: [
+            CompiledActiveProfile(
+                deviceId: "xiaomi", profileId: "default",
+                global: [CompiledMapping(
+                    id: "voice-global", trigger: voiceSessionTrigger, output: globalOutput
+                )],
+                applications: ["com.example.chat": [CompiledMapping(
+                    id: "voice-chat", trigger: voiceSessionTrigger, output: appOutput
+                )]]
+            )
+        ]))
+
+        guard case .output(let output) = runtime.resolveUnique(
+            trigger: voiceSessionTrigger, bundleIdentifier: "com.example.chat"
+        ) else { return XCTFail("Expected the application voice mapping") }
+        XCTAssertEqual(output, appOutput)
+    }
+
+    func testVoiceMappingAcrossMultipleDeviceProfilesIsAmbiguous() {
+        let mapping = CompiledMapping(
+            id: "voice", trigger: voiceSessionTrigger, output: globalOutput
+        )
+        let runtime = ProfileRuntime()
+        runtime.replace(CompiledProfileSet(generation: 1, profiles: [
+            CompiledActiveProfile(
+                deviceId: "xiaomi-a", profileId: "default",
+                global: [mapping], applications: [:]
+            ),
+            CompiledActiveProfile(
+                deviceId: "xiaomi-b", profileId: "default",
+                global: [mapping], applications: [:]
+            ),
+        ]))
+
+        guard case .ambiguous = runtime.resolveUnique(
+            trigger: voiceSessionTrigger, bundleIdentifier: nil
+        ) else { return XCTFail("Expected ambiguous voice mappings") }
+    }
+
     func testDeviceProfileResolvesByDeviceId() {
         let runtime = ProfileRuntime()
         runtime.replace(CompiledProfileSet(generation: 1, profiles: [

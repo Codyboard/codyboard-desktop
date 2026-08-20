@@ -8,7 +8,7 @@
 
 每个 Phase 独立提交；目标测试和全量门禁通过后才进入下一 Phase。
 
-状态：Phase 0–3 完成，QuickTime 已验证 loud and clear。后续 Phase 不修改 Power。
+状态：Phase 0–4 完成；真实快捷键映射随 Phase 5 UI 接线后验收。后续 Phase 不修改 Power。
 
 ### 0. 隔离工作区
 
@@ -37,16 +37,17 @@
 
 ### 4. 语音触发状态机
 
-- 新增 `VoiceSessionController`，实现 Fn 和可配置组合键的按下、点按及切换语义。
+- 新增 `VoiceSessionController`；BLE mic start 对映射输出 keyDown，stop 在 drain 后对同一输出 keyUp。
+- voice 作为 synthetic trigger 复用 `ProfileRuntime` 的 global/application 覆盖，不建立第二套 mapping store。
 - 复用 `KeyboardSimulator` 的 modifier ledger；所有失败、断连和退出路径成对释放按键。
 - stop 顺序固定为：停止接收 → drain → 结束 trigger。
-- native 层不包含产品名、应用识别或产品专属预设。
+- native 只读取前台 bundle ID 做通用 profile 匹配，不包含产品名或产品专属预设。
 
 ### 5. Electron 配置与 UI
 
 - 新增 `VoiceCoordinator`，扩展 daemon client、IPC、preload 和 shared types。
-- 在 `~/.codyboard/settings.yaml` 持久化 voice/audio 配置，不进入 profile YAML。
-- 小米设备页增加 BLE 状态、输出设备、测试音、增益和 trigger mode；voice 保持专用，Power 继续使用 profile mapping。
+- 在 `~/.codyboard/settings.yaml` 持久化 BLE/audio 配置；voice key mapping 进入现有 profile YAML。
+- 小米设备页增加 BLE 状态、输出设备、测试音和增益；voice 使用现有 global/application mapping UI，Power 保持不变。
 - MIDI capture 期间暂停 voice trigger，释放后恢复原配置。
 
 ### 6. 恢复与验收
