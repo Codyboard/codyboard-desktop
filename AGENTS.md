@@ -58,6 +58,8 @@ Paths beginning `native/...` mean `native/Sources/CodyboardDaemon/`; renderer co
 - PCM remains inside Swift; IPC exposes state/metrics only. Production audio is 16 kHz mono.
 - Virtual device identity is fixed: `Codyboard Virtual Microphone`, UID `CodyboardVirtualMicrophone2ch_UID`, bundle ID `com.codyboard.VirtualMicrophone`.
 - Bind CoreAudio output by UID/device ID. For remote-source sessions, lease the current macOS default input, switch to the configured virtual microphone before keyDown, and restore it after keyUp on every exit path.
+- Persist an active default-input lease only in `~/.codyboard/runtime/default-audio-input.json`; daemon startup conditionally recovers it if the virtual microphone is still selected. Never overwrite a newer user selection.
+- Sleep stops the active session and BLE connection; wake reconnects from the unchanged saved configuration. SIGTERM, SIGINT and SIGHUP use the same synchronous shutdown path.
 - Start audio per voice session and drain `.dataPlayedBack` buffers before stopping or releasing a trigger.
 - Voice is the synthetic profile trigger `{ kind: "voice", code: 0 }`; resolve it through the existing `ProfileRuntime` global/application fallback.
 - Voice BLE/audio preferences live in `settings.yaml`; voice shortcuts live in the existing device profile groups. Do not add a second mapping store or editor.

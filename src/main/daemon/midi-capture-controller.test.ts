@@ -34,6 +34,16 @@ describe("MIDICaptureController", () => {
     expect(client.calls).toEqual(["sweep-a", undefined]);
   });
 
+  it("restores an active capture after daemon restart", async () => {
+    const client = new FakeCaptureClient();
+    const capture = new MIDICaptureController(client);
+    await capture.claim("sweep-a", "page-a");
+
+    await capture.recover();
+
+    expect(client.calls).toEqual(["sweep-a", "sweep-a"]);
+  });
+
   it("validates owner and device identity before changing native state", async () => {
     const client = new FakeCaptureClient();
     const capture = new MIDICaptureController(client);

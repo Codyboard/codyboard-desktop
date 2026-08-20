@@ -25,7 +25,8 @@ Codyboard detects supported physical HID devices, lets you assign actions to eve
   globally or per application like any other control.
 - Per application, choose between Xiaomi remote audio and the application's existing microphone.
   Remote sessions temporarily select the configured virtual microphone and restore the previous
-  macOS default input when the button is released.
+  macOS default input when the button is released. Sleep, normal daemon termination, CoreAudio
+  failure and automatic daemon restart also unwind or recover this temporary selection.
 
 ## Screenshots
 

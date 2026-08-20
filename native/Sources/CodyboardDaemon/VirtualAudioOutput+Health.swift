@@ -47,6 +47,7 @@ extension VirtualAudioOutput {
     func fail(_ message: String) {
         lastError = message
         stopRuntime(nextState: .failed)
+        onRuntimeFailure?(message)
     }
 
     func publishStatus() {

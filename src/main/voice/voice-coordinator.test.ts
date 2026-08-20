@@ -83,6 +83,31 @@ describe("VoiceCoordinator", () => {
     await expect(coordinator.update({ enabled: true, gainDB: 0 }))
       .rejects.toThrow(/audio output device/);
   });
+
+  it("rehydrates audio and BLE after daemon restart", async () => {
+    const file = await settingsFile();
+    await writeFile(file, [
+      "version: 1",
+      "voice:",
+      "  enabled: true",
+      "  gainDB: 0",
+      "  audioDeviceUID: CodyboardVirtualMicrophone2ch_UID",
+      "",
+    ].join("\n"));
+    const runtime = new FakeVoiceRuntime();
+    const coordinator = new VoiceCoordinator(runtime, file);
+    await coordinator.load();
+    runtime.calls.length = 0;
+
+    await coordinator.recoverRuntime();
+
+    expect(runtime.calls).toEqual([
+      "devices",
+      "audio:CodyboardVirtualMicrophone2ch_UID",
+      "voice:true:0",
+      "session",
+    ]);
+  });
 });
 
 class FakeVoiceRuntime extends EventEmitter implements VoiceRuntimeClient {

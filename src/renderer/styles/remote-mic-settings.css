@@ -47,7 +47,7 @@
 .remote-mic-controls > label { display: grid; min-width: 0; gap: 5px; }
 .remote-mic-controls > label { flex: 1; }
 .remote-mic-controls > label:first-child { min-width: 150px; }
-.remote-mic-controls > label:nth-child(2) { flex: 1.35; }
+.remote-mic-controls > .remote-mic-gain { flex: 1.65; }
 .remote-mic-controls > label > span { color: rgba(195, 205, 201, 0.42); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; }
 .remote-mic-controls select, .remote-mic-test {
   height: 32px;
@@ -58,7 +58,6 @@
   font: inherit;
 }
 .remote-mic-controls select { width: 100%; padding: 0 9px; }
-.remote-mic-gain { flex: 1; }
 .remote-mic-gain span { display: flex; justify-content: space-between; gap: 8px; }
 .remote-mic-gain b { color: rgba(129, 218, 182, 0.68); font-weight: 650; letter-spacing: 0; text-transform: none; }
 .remote-mic-gain input { width: 100%; margin: 3px 0 0; accent-color: rgb(85, 197, 153); }

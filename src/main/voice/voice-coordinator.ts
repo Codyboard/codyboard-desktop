@@ -81,6 +81,14 @@ export class VoiceCoordinator extends EventEmitter {
     });
   }
 
+  recoverRuntime(): Promise<VoiceSnapshot> {
+    return this.enqueue(async () => {
+      this.audioDevices = await this.runtime.listAudioDevices();
+      await this.applyRuntime(this.settings);
+      return this.publish();
+    });
+  }
+
   snapshot(): VoiceSnapshot { return structuredClone(this.currentSnapshot); }
 
   update(settings: VoiceSettings): Promise<VoiceSnapshot> {

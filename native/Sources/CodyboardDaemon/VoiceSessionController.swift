@@ -185,6 +185,11 @@ final class VoiceSessionController {
 
     func shutdown() { stopSession() }
 
+    func audioRuntimeFailed(_ message: String) {
+        guard activeSession != nil else { return }
+        abortSession(message: message)
+    }
+
     private static func canHold(_ output: CompiledOutput) -> Bool {
         let modifiers = Set(["command", "control", "option", "shift", "fn"])
         guard Set(output.modifiers).count == output.modifiers.count,

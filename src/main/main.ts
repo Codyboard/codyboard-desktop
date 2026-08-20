@@ -39,6 +39,8 @@ const tray = new TrayController({
   profiles,
   showSettings: (route) => settings.show(route),
 });
+let quitting = false;
+let recoveryPromise: Promise<void> | undefined;
 
 registerIPCHandlers({
   daemon,
@@ -71,6 +73,7 @@ void app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  quitting = true;
   settings.beginQuit();
   void midiCapture.release().catch(() => undefined);
   daemon.stop();
@@ -92,6 +95,36 @@ function connectNativeEvents(): void {
     for (const window of BrowserWindow.getAllWindows())
       window.webContents.send('diagnostics:key', payload);
   });
+  daemon.on('exit', ({ expected }: { expected: boolean }) => {
+    if (!expected && !quitting && !recoveryPromise) {
+      recoveryPromise = recoverNativeRuntime().finally(() => {
+        recoveryPromise = undefined;
+      });
+    }
+  });
+}
+
+async function recoverNativeRuntime(): Promise<void> {
+  const retryDelays = [250, 1_000, 3_000];
+  let lastError: unknown;
+  for (const delay of retryDelays) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    if (quitting) return;
+    try {
+      daemon.start();
+      await voice.recoverRuntime();
+      const permissions = await daemon.permissionStatus();
+      if (permissions.accessibility && permissions.inputMonitoring)
+        await profiles.reload();
+      await midiCapture.recover();
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  const message = lastError instanceof Error ? lastError.message : String(lastError);
+  console.error('Unable to recover Codyboard daemon', lastError);
+  publishVoiceEvent({ type: 'error', message });
 }
 
 function publishVoiceEvent(event: VoiceEvent): void {

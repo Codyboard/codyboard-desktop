@@ -75,6 +75,7 @@ final class XiaomiVoiceBluetoothController: NSObject {
     var onStreamStarted: (() -> Bool)?
     var onStreamStopped: (() -> Void)?
     var streamOutputReady = false
+    private(set) var suspendedForSystemSleep = false
 
     var state: VoiceBluetoothState = .stopped {
         didSet {
@@ -138,8 +139,22 @@ final class XiaomiVoiceBluetoothController: NSObject {
     }
 
     func shutdown() {
+        suspendedForSystemSleep = false
         stopConnection(publishStopped: false)
         configuration = .disabled
+    }
+
+    func suspendForSystemSleep() {
+        guard !suspendedForSystemSleep else { return }
+        suspendedForSystemSleep = true
+        stopConnection(publishStopped: false)
+        state = .stopped
+    }
+
+    func resumeAfterSystemWake() {
+        guard suspendedForSystemSleep else { return }
+        suspendedForSystemSleep = false
+        if configuration.enabled { start() }
     }
 
     func discoverOrScan(_ manager: CBCentralManager, generation: UInt64) {

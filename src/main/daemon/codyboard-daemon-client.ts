@@ -34,6 +34,7 @@ interface PendingRequest {
 /** Typed, request-response client for the long-lived Swift daemon. */
 export class CodyboardDaemonClient extends EventEmitter {
   private child?: ChildProcessWithoutNullStreams;
+  private readonly expectedExits = new WeakSet<ChildProcessWithoutNullStreams>();
   private sequence = 0;
   private readonly pending = new Map<string, PendingRequest>();
 
@@ -50,8 +51,11 @@ export class CodyboardDaemonClient extends EventEmitter {
     createInterface({ input: child.stderr }).on("line", (line) => this.emit("error", { message: line }));
     child.once("error", (error) => this.fail(error));
     child.once("exit", (code, signal) => {
-      this.child = undefined;
-      this.fail(new Error(`Codyboard daemon exited (${signal ?? code ?? "unknown"})`));
+      if (this.child === child) this.child = undefined;
+      const expected = this.expectedExits.has(child);
+      const error = new Error(`Codyboard daemon exited (${signal ?? code ?? "unknown"})`);
+      this.fail(error, !expected);
+      this.emit("exit", { expected });
     });
   }
 
@@ -106,8 +110,11 @@ export class CodyboardDaemonClient extends EventEmitter {
   testAudioTone(): Promise<AudioOutputStatus> { return this.request("audio.testTone"); }
 
   stop(): void {
-    this.child?.kill("SIGTERM");
-    this.child = undefined;
+    const child = this.child;
+    if (!child) return;
+    this.expectedExits.add(child);
+    child.kill("SIGTERM");
+    if (this.child === child) this.child = undefined;
   }
 
   request<T = void>(method: string, params: Record<string, unknown> = {}): Promise<T> {
@@ -158,12 +165,12 @@ export class CodyboardDaemonClient extends EventEmitter {
     }
   }
 
-  private fail(error: Error): void {
+  private fail(error: Error, publish = true): void {
     for (const request of this.pending.values()) {
       clearTimeout(request.timeout);
       request.reject(error);
     }
     this.pending.clear();
-    this.emit("error", { message: error.message });
+    if (publish) this.emit("error", { message: error.message });
   }
 }

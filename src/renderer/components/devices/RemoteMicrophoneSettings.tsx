@@ -128,22 +128,6 @@ export function RemoteMicrophoneSettings({
             <option value="system">Current app microphone</option>
           </select>
         </label>
-        <label>
-          <span>Remote output</span>
-          <select
-            disabled={saving || snapshot.settings.enabled || source === "system"}
-            onChange={(event) => void update({
-              ...snapshot.settings,
-              audioDeviceUID: event.currentTarget.value || undefined,
-            })}
-            value={snapshot.settings.audioDeviceUID ?? ""}
-          >
-            <option value="">Select device…</option>
-            {snapshot.audioDevices.map((device) => (
-              <option key={device.uid} value={device.uid}>{device.name}</option>
-            ))}
-          </select>
-        </label>
         <label className="remote-mic-gain">
           <span>Gain <b>{gain > 0 ? "+" : ""}{gain} dB</b></span>
           <input

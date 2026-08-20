@@ -95,7 +95,8 @@ Lifecycle:
 3. PCM buffers use `.dataPlayedBack` completion and increment/decrement the drain counter.
 4. ATVV stream stop drains queued buffers before stopping the engine; timeout is fail-safe only.
 5. Health requires a selected device, running engine, playing node and exact live device-ID binding.
-6. Route/configuration changes fail closed. Recovery policy belongs in Phase 6, not the audio callback.
+6. Route/configuration changes fail closed and synchronously abort the owning voice session, which
+   releases its shortcut and restores its input lease.
 
 Primary files:
 
@@ -155,6 +156,18 @@ one. A remote-source keyDown leases the current default input UID and switches t
 virtual microphone before posting the shortcut. After drain and shortcut keyUp, every normal,
 failure, disconnect and shutdown path restores the leased UID. System-source sessions do not switch.
 
+Recovery rules:
+
+- Input override is ordered `persist lease -> switch input -> start audio -> keyDown`. The target
+  default and live audio engine are therefore ready before dictation is triggered.
+- Normal stop, BLE disconnect, CoreAudio failure, sleep, SIGTERM, SIGINT, SIGHUP and stdin EOF all
+  unwind the session. Sleep preserves configuration and reconnects BLE after wake.
+- The active input lease lives at `~/.codyboard/runtime/default-audio-input.json`. After a hard daemon
+  crash, Electron restarts the daemon; startup restores the old device only when the current default
+  still equals the leased target. A user's newer manual input selection wins.
+- Electron then rehydrates audio, BLE, profiles and any active MIDI capture. Recovery retries are
+  bounded; configuration files remain the source of truth.
+
 Primary files:
 
 - `native/Sources/CodyboardDaemon/VoiceSessionController.swift`
@@ -175,6 +188,8 @@ Verified on 2026-08-19 with the Xiaomi Bluetooth voice remote:
 - On 2026-08-20, a real Codex session temporarily switched the default input from AirPods to
   `CodyboardVirtualMicrophone2ch_UID`, decoded 155 frames / 37,200 samples, restored AirPods after
   drain, and entered the dictated text in Codex successfully.
+- On 2026-08-20, the user verified a 60-second remote session and a post-sleep/wake short session.
+  Both completed normally; the runtime recovery lease was absent afterward.
 
 QuickTime does not live-monitor microphone input. Start recording, speak through the remote, stop,
 then play the recording. A visible device with silence usually means the running daemon has not yet
@@ -202,6 +217,7 @@ called both `audio.configure` and `voice.configure`; installation alone does not
 - Preserve stop ordering when triggers arrive: stop PCM intake, drain audio, then release the trigger.
 - Keep Power implementation and profile mapping behavior untouched.
 
-Tests live in `ATVVProtocolTests.swift`, `VirtualAudioOutputTests.swift` and
-`VoiceSessionControllerTests.swift`. Before handoff run the repository's full gate from `AGENTS.md`
-plus `pnpm build:virtual-mic` when driver files change.
+Tests live in `ATVVProtocolTests.swift`, `VirtualAudioOutputTests.swift`,
+`VoiceSessionControllerTests.swift`, `DefaultAudioInputControllerTests.swift` and
+`SystemLifecycleControllerTests.swift`. Before handoff run the repository's full gate from
+`AGENTS.md` plus `pnpm build:virtual-mic` when driver files change.

@@ -20,6 +20,7 @@ final class VirtualAudioOutput {
     private(set) var selectedDevice: AudioDeviceInfo?
     private(set) var testToneActive = false
     var lastError: String?
+    var onRuntimeFailure: ((String) -> Void)?
 
     var state: AudioOutputState = .unconfigured {
         didSet {

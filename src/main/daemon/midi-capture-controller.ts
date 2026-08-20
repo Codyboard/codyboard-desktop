@@ -3,25 +3,36 @@ export interface MIDICaptureClient {
 }
 
 export class MIDICaptureController {
+  private deviceId?: string;
   private ownerId?: string;
 
   constructor(private readonly client: MIDICaptureClient) {}
 
   async claim(deviceId: string, ownerId: string): Promise<void> {
     validateCaptureRequest(deviceId, ownerId);
+    this.deviceId = deviceId;
     this.ownerId = ownerId;
     try {
       await this.client.setMIDICapture(deviceId);
     } catch (error) {
-      if (this.ownerId === ownerId) this.ownerId = undefined;
+      if (this.ownerId === ownerId) {
+        this.deviceId = undefined;
+        this.ownerId = undefined;
+      }
       throw error;
     }
   }
 
   async release(ownerId?: string): Promise<void> {
     if (ownerId !== undefined && this.ownerId !== ownerId) return;
+    this.deviceId = undefined;
     this.ownerId = undefined;
     await this.client.setMIDICapture();
+  }
+
+  async recover(): Promise<void> {
+    if (this.deviceId && this.ownerId)
+      await this.client.setMIDICapture(this.deviceId);
   }
 }
 

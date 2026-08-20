@@ -121,6 +121,24 @@ final class VoiceSessionControllerTests: XCTestCase {
         XCTAssertEqual(controller.status.state, .failed)
     }
 
+    func testRouteFailureDuringDrainReleasesMappingAndRestoresInput() {
+        let audio = FakeVoiceAudio()
+        let keyboard = FakeVoiceKeyboard()
+        let inputDevice = FakeVoiceInputDevice()
+        let controller = makeController(
+            audio: audio, keyboard: keyboard, resolution: .output(fn),
+            inputDevice: inputDevice
+        )
+        XCTAssertTrue(controller.startSession())
+        controller.finishSession()
+
+        controller.audioRuntimeFailed("CoreAudio route changed")
+
+        XCTAssertEqual(keyboard.events.last, .init(output: fn, pressed: false))
+        XCTAssertEqual(inputDevice.restored.count, 1)
+        XCTAssertEqual(controller.status.state, .failed)
+    }
+
     func testStaleDrainCannotReleaseNewSession() {
         let audio = FakeVoiceAudio()
         let keyboard = FakeVoiceKeyboard()
@@ -202,6 +220,24 @@ final class VoiceSessionControllerTests: XCTestCase {
         ])
     }
 
+    func testRemoteInputAndAudioAreReadyBeforeShortcutKeyDown() {
+        var events: [String] = []
+        let audio = FakeVoiceAudio()
+        audio.onStart = { events.append("audio") }
+        let keyboard = FakeVoiceKeyboard()
+        keyboard.onPost = { if $1 { events.append("keyDown") } }
+        let inputDevice = FakeVoiceInputDevice()
+        inputDevice.onBegin = { events.append("input") }
+        let controller = makeController(
+            audio: audio, keyboard: keyboard, resolution: .output(fn),
+            inputDevice: inputDevice
+        )
+
+        XCTAssertTrue(controller.startSession())
+
+        XCTAssertEqual(events, ["input", "audio", "keyDown"])
+    }
+
     func testMissingAccessibilityFailsBeforeAudioStarts() {
         let audio = FakeVoiceAudio()
         let controller = makeController(
@@ -255,8 +291,10 @@ final class VoiceSessionControllerTests: XCTestCase {
 private final class FakeVoiceInputDevice: VoiceInputDeviceRouting {
     private(set) var restored: [DefaultAudioInputLease] = []
     private(set) var started: [String] = []
+    var onBegin: (() -> Void)?
 
     func beginOverride(targetDeviceUID: String) throws -> DefaultAudioInputLease {
+        onBegin?()
         started.append(targetDeviceUID)
         return .init(
             previousDeviceUID: "built-in-mic", targetDeviceUID: targetDeviceUID
@@ -271,8 +309,10 @@ private final class FakeVoiceAudio: VoiceAudioRouting {
     private(set) var startCount = 0
     private(set) var stopCount = 0
     private var drainCompletions: [(() -> Void)?] = []
+    var onStart: (() -> Void)?
 
     func startVoiceSession() -> Bool {
+        onStart?()
         startCount += 1
         return true
     }
@@ -296,12 +336,14 @@ private struct FakeKeyboardEvent: Equatable {
 private final class FakeVoiceKeyboard: VoiceKeyboardRouting {
     private(set) var events: [FakeKeyboardEvent] = []
     var failNextKeyDown = false
+    var onPost: ((CompiledOutput, Bool) -> Void)?
 
     func post(_ output: CompiledOutput, pressed: Bool, autorepeat: Bool) throws {
         if pressed, failNextKeyDown {
             failNextKeyDown = false
             throw FakeVoiceKeyboardError.keyDown
         }
+        onPost?(output, pressed)
         events.append(.init(output: output, pressed: pressed))
     }
 }
