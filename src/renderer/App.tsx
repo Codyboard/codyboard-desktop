@@ -6,15 +6,15 @@ import type { PermissionStatus } from "../shared/hid";
 import { MidiPage } from "./features/midi/MidiPage";
 import { DeviceDetailPage } from "./pages/DeviceDetailPage";
 import { DeviceSelectionPage } from "./pages/DeviceSelectionPage";
-import { PermissionsPage } from "./pages/PermissionsPage";
+import { SetupPage } from "./pages/SetupPage";
 
 export default function App() {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/permissions" element={<PermissionsPage />} />
+        <Route path="/setup" element={<SetupPage />} />
         <Route path="/midi" element={<MidiPage />} />
-        <Route path="/*" element={<PermissionGuard><DeviceRouteStack /></PermissionGuard>} />
+        <Route path="/*" element={<SetupGuard><DeviceRouteStack /></SetupGuard>} />
       </Routes>
     </HashRouter>
   );
@@ -42,7 +42,7 @@ function DeviceRouteStack() {
   );
 }
 
-function PermissionGuard({ children }: { children: ReactNode }) {
+function SetupGuard({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [status, setStatus] = useState<PermissionStatus>();
 
@@ -51,14 +51,18 @@ function PermissionGuard({ children }: { children: ReactNode }) {
     void window.codyboard.permissions.status().then((nextStatus) => {
       if (mounted) setStatus(nextStatus);
     }).catch(() => {
-      if (mounted) setStatus({ accessibility: false, inputMonitoring: false });
+      if (mounted) setStatus({
+        accessibility: false,
+        bluetooth: "notDetermined",
+        inputMonitoring: false,
+      });
     });
     return () => { mounted = false; };
   }, []);
 
-  if (!status) return <div className="permission-route-loading" aria-label="Checking permissions" />;
+  if (!status) return <div className="setup-route-loading" aria-label="Checking setup" />;
   if (!status.accessibility || !status.inputMonitoring) {
-    return <Navigate replace state={{ returnTo: `${location.pathname}${location.search}` }} to="/permissions" />;
+    return <Navigate replace state={{ returnTo: `${location.pathname}${location.search}` }} to="/setup" />;
   }
   return children;
 }

@@ -1,17 +1,21 @@
-import { Accessibility, ArrowRight, ArrowUpRight, Check, Keyboard } from "lucide-react";
+import { Accessibility, ArrowRight, ArrowUpRight, Bluetooth, Check, Keyboard } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import type { CodyboardPermission, PermissionStatus } from "../../shared/hid";
 import { AppToolbar } from "../components/layout/AppToolbar";
 
-const EMPTY_STATUS: PermissionStatus = { accessibility: false, inputMonitoring: false };
+const EMPTY_STATUS: PermissionStatus = {
+  accessibility: false,
+  bluetooth: "notDetermined",
+  inputMonitoring: false,
+};
 
-interface PermissionRouteState {
+interface SetupRouteState {
   returnTo?: string;
 }
 
-export function PermissionsPage() {
+export function SetupPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [status, setStatus] = useState<PermissionStatus>(EMPTY_STATUS);
@@ -48,7 +52,7 @@ export function PermissionsPage() {
   };
 
   const ready = status.accessibility && status.inputMonitoring;
-  const returnTo = (location.state as PermissionRouteState | null)?.returnTo ?? "/";
+  const returnTo = (location.state as SetupRouteState | null)?.returnTo ?? "/";
   const continueToApp = async () => {
     if (!ready) return;
     setIsContinuing(true);
@@ -61,13 +65,13 @@ export function PermissionsPage() {
   };
 
   return (
-    <main className="permissions-page">
-      <AppToolbar title="Permissions" />
-      <section className="permissions-content">
-        <header className="permissions-heading">
-          <p className="permissions-kicker">System access</p>
-          <h1>Two permissions.<br />Nothing more.</h1>
-          <p>Codyboard needs access to hear your controller and send the shortcuts you assign. Input never leaves this Mac.</p>
+    <main className="setup-page">
+      <AppToolbar title="Setup" />
+      <section className="setup-content">
+        <header className="setup-heading">
+          <p className="setup-kicker">Device access</p>
+          <h1>Connect your<br />controls.</h1>
+          <p>Core access powers every Codyboard mapping. Bluetooth is only needed for Xiaomi remote speech. Input never leaves this Mac.</p>
         </header>
 
         <div className="permission-list" aria-busy={isChecking}>
@@ -87,10 +91,19 @@ export function PermissionsPage() {
             name="Input Monitoring"
             onRequest={() => void requestAccess("inputMonitoring")}
           />
+          <PermissionRow
+            allowed={status.bluetooth === "allowed"}
+            description="Connect to the Xiaomi voice remote and receive its BLE audio stream."
+            icon={<Bluetooth />}
+            isRequesting={requesting === "bluetooth"}
+            name="Bluetooth"
+            onRequest={() => void requestAccess("bluetooth")}
+            optional
+          />
         </div>
 
-        <footer className="permissions-footer">
-          <span>{ready ? "Codyboard is ready." : "After granting access, return here to continue."}</span>
+        <footer className="setup-footer">
+          <span>{ready ? "Core controls are ready. Bluetooth is optional." : "Grant core access to continue."}</span>
           <button disabled={!ready || isContinuing} onClick={() => void continueToApp()} type="button">
             {isContinuing ? "Starting…" : "Continue"} <ArrowRight />
           </button>
@@ -107,6 +120,7 @@ function PermissionRow({
   isRequesting,
   name,
   onRequest,
+  optional = false,
 }: {
   allowed: boolean;
   description: string;
@@ -114,6 +128,7 @@ function PermissionRow({
   isRequesting: boolean;
   name: string;
   onRequest: () => void;
+  optional?: boolean;
 }) {
   return (
     <article className={`permission-row ${allowed ? "is-allowed" : ""}`}>
@@ -122,7 +137,7 @@ function PermissionRow({
       </span>
       <span className="permission-icon" aria-hidden="true">{icon}</span>
       <span className="permission-copy">
-        <strong>{name}</strong>
+        <strong>{name}{optional && <em>Optional</em>}</strong>
         <small>{description}</small>
       </span>
       <span className="permission-actions">

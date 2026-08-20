@@ -35,12 +35,12 @@ export class VoiceSettingsStore {
   async load(): Promise<VoiceSettings> {
     return withSettingsFileLock(this.file, async () => {
       const document = await this.readDocument();
-      return structuredClone(document.voice);
+      return { ...structuredClone(document.voice), gainDB: 0 };
     });
   }
 
   async persist(settings: VoiceSettings): Promise<void> {
-    const parsed = voiceSettingsSchema.parse(settings);
+    const parsed = voiceSettingsSchema.parse({ ...settings, gainDB: 0 });
     await withSettingsFileLock(this.file, async () => {
       const document = await this.readDocument();
       await this.writeAtomic(stringify({ ...document, voice: parsed }));

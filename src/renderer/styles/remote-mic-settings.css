@@ -1,19 +1,55 @@
 .remote-mic-settings {
+  position: relative;
   display: grid;
-  gap: 11px;
-  padding: 14px 26px;
+  gap: 8px;
+  padding: 16px 26px 15px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.075);
-  background: rgba(85, 205, 158, 0.025);
+  background:
+    linear-gradient(90deg, rgba(83, 204, 157, 0.045), transparent 30%),
+    rgba(10, 14, 13, 0.055);
   color: rgba(235, 241, 238, 0.8);
   font: 550 11px/1.2 "Avenir Next", "Helvetica Neue", sans-serif;
 }
 
 .remote-mic-settings.is-loading { min-height: 70px; align-content: center; color: rgba(220, 228, 224, 0.42); }
-.remote-mic-heading, .remote-mic-heading > span, .remote-mic-state, .remote-mic-controls { display: flex; align-items: center; }
-.remote-mic-heading { justify-content: space-between; gap: 16px; }
-.remote-mic-heading > span { gap: 8px; color: rgba(241, 246, 244, 0.9); font-size: 12px; }
-.remote-mic-heading svg { width: 15px; height: 15px; color: rgba(111, 224, 179, 0.72); }
-.remote-mic-state { gap: 9px; color: rgba(187, 198, 193, 0.58); text-transform: capitalize; }
+.remote-mic-layout {
+  display: grid;
+  min-width: 0;
+  align-items: end;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(210px, 1.65fr) auto auto;
+  gap: clamp(14px, 1.7vw, 24px);
+}
+.remote-mic-identity { display: flex; min-width: 0; align-items: center; gap: 12px; align-self: center; }
+.remote-mic-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(105, 220, 175, 0.18);
+  border-radius: 12px;
+  background: radial-gradient(circle at 35% 25%, rgba(105, 220, 175, 0.16), rgba(105, 220, 175, 0.035));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
+  color: rgba(119, 229, 186, 0.82);
+}
+.remote-mic-icon svg { width: 17px; height: 17px; stroke-width: 1.8; }
+.remote-mic-title { display: grid; min-width: 0; gap: 5px; }
+.remote-mic-title strong { overflow: hidden; color: rgba(244, 248, 246, 0.92); font-size: 13px; font-weight: 600; letter-spacing: -0.015em; text-overflow: ellipsis; white-space: nowrap; }
+.remote-mic-state { display: flex; align-items: center; gap: 6px; color: rgba(187, 198, 193, 0.5); font-size: 9px; text-transform: capitalize; }
+.remote-mic-state i { width: 5px; height: 5px; border-radius: 50%; background: rgba(105, 220, 175, 0.74); box-shadow: 0 0 0 3px rgba(105, 220, 175, 0.07); }
+.remote-mic-source,
+.remote-mic-test-control,
+.remote-mic-power { display: grid; min-width: 0; gap: 6px; }
+.remote-mic-source > span,
+.remote-mic-test-control > span,
+.remote-mic-power > span {
+  color: rgba(195, 205, 201, 0.39);
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.remote-mic-power { justify-items: end; }
 .cody-switch {
   position: relative;
   display: inline-flex;
@@ -43,26 +79,42 @@
   transition: background 160ms ease, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .cody-switch[data-state="checked"] .cody-switch-thumb { background: #f7fbf9; transform: translateX(16px); }
-.remote-mic-controls { min-width: 0; flex-wrap: wrap; gap: 10px; }
-.remote-mic-controls > label { display: grid; min-width: 0; gap: 5px; }
-.remote-mic-controls > label { flex: 1; }
-.remote-mic-controls > label:first-child { min-width: 150px; }
-.remote-mic-controls > .remote-mic-gain { flex: 1.65; }
-.remote-mic-controls > label > span { color: rgba(195, 205, 201, 0.42); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; }
-.remote-mic-controls select, .remote-mic-test {
-  height: 32px;
+.remote-mic-source select, .remote-mic-test {
+  box-sizing: border-box;
+  height: 38px;
   border: 1px solid rgba(255, 255, 255, 0.085);
-  border-radius: 8px;
-  background: rgba(18, 22, 21, 0.18);
+  border-radius: 10px;
+  outline: none;
+  background: rgba(18, 22, 21, 0.2);
   color: rgba(238, 243, 241, 0.84);
   font: inherit;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
-.remote-mic-controls select { width: 100%; padding: 0 9px; }
-.remote-mic-gain span { display: flex; justify-content: space-between; gap: 8px; }
-.remote-mic-gain b { color: rgba(129, 218, 182, 0.68); font-weight: 650; letter-spacing: 0; text-transform: none; }
-.remote-mic-gain input { width: 100%; margin: 3px 0 0; accent-color: rgb(85, 197, 153); }
-.remote-mic-test { display: flex; align-items: center; align-self: end; gap: 6px; padding: 0 11px; cursor: pointer; }
-.remote-mic-test svg { width: 13px; height: 13px; }
-.remote-mic-test:disabled, .remote-mic-controls select:disabled { cursor: default; opacity: 0.42; }
-.remote-mic-test-hint { margin: -2px 0 0; color: rgba(190, 201, 196, 0.38); font-size: 9px; }
+.remote-mic-source select { width: 100%; padding: 0 32px 0 12px; cursor: pointer; }
+.remote-mic-source select:hover,
+.remote-mic-test:hover { border-color: rgba(111, 224, 179, 0.22); background: rgba(27, 36, 32, 0.3); }
+.remote-mic-source select:focus-visible,
+.remote-mic-test:focus-visible { border-color: rgba(111, 224, 179, 0.46); box-shadow: 0 0 0 4px rgba(90, 211, 163, 0.07); }
+.remote-mic-test { display: flex; min-width: 82px; align-items: center; justify-content: center; gap: 7px; padding: 0 13px; cursor: pointer; }
+.remote-mic-test svg { width: 14px; height: 14px; color: rgba(136, 224, 188, 0.76); stroke-width: 1.8; }
+.remote-mic-test:disabled, .remote-mic-source select:disabled { cursor: default; opacity: 0.42; }
+.remote-mic-test:disabled:hover, .remote-mic-source select:disabled:hover { border-color: rgba(255, 255, 255, 0.085); background: rgba(18, 22, 21, 0.2); }
+.remote-mic-test-hint { grid-column: 2 / 4; margin: 0; color: rgba(190, 201, 196, 0.34); font-size: 9px; line-height: 1.35; }
 .remote-mic-error { margin: 0; color: rgba(255, 154, 154, 0.88); font-size: 10px; }
+
+@media (max-width: 900px) {
+  .remote-mic-layout { grid-template-columns: minmax(180px, 0.8fr) minmax(180px, 1.4fr) auto; }
+  .remote-mic-power { position: absolute; top: 16px; right: 26px; }
+  .remote-mic-identity { padding-right: 64px; }
+  .remote-mic-test-hint { grid-column: 2 / 4; }
+}
+
+@media (max-width: 680px) {
+  .remote-mic-settings { padding-inline: 18px; }
+  .remote-mic-layout { align-items: end; grid-template-columns: minmax(0, 1fr) auto; }
+  .remote-mic-identity { grid-column: 1 / -1; }
+  .remote-mic-source { grid-column: 1; }
+  .remote-mic-test-control { grid-column: 2; }
+  .remote-mic-test-hint { grid-column: 1 / -1; }
+  .remote-mic-power { right: 18px; }
+}

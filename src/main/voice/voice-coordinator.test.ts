@@ -50,10 +50,11 @@ describe("VoiceCoordinator", () => {
     expect(runtime.calls).toEqual([
       "devices",
       "audio:CodyboardVirtualMicrophone2ch_UID",
-      "voice:true:4",
+      "voice:true:0",
       "session",
     ]);
     expect(snapshot.settings.enabled).toBe(true);
+    expect(snapshot.settings.gainDB).toBe(0);
   });
 
   it("persists voice without replacing profile settings", async () => {
@@ -73,7 +74,7 @@ describe("VoiceCoordinator", () => {
     expect(document.voice).toEqual({
       audioDeviceUID: "CodyboardVirtualMicrophone2ch_UID",
       enabled: true,
-      gainDB: -3,
+      gainDB: 0,
     });
   });
 

@@ -22,6 +22,7 @@ struct CommandParams: Decodable {
 
 struct PermissionStatus: Codable {
     let accessibility: Bool
+    let bluetooth: String
     let inputMonitoring: Bool
 }
 

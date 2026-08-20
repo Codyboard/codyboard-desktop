@@ -74,7 +74,10 @@ Device detection uses exact vendor and product identifiers. Virtual keyboards ar
 - Input Monitoring permission
 - Bluetooth permission for Xiaomi remote voice capture
 
-Accessibility allows Codyboard to send mapped shortcuts and text. Input Monitoring allows it to read device-only controls such as Power and Back. Permission state is read directly from macOS, and input data stays on the Mac.
+The Setup page reads these states directly from macOS. Accessibility allows Codyboard to send
+mapped shortcuts and text. Input Monitoring reads device-only controls such as Power and Back.
+Bluetooth is optional unless Xiaomi remote voice capture is used; Codyboard does not require macOS
+Microphone permission. Input data stays on the Mac.
 
 The virtual **Get Funky 🪩** instrument does not require either permission. Permissions are only needed to play it from a physical Sweep Pro.
 

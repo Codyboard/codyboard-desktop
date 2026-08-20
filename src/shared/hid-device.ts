@@ -1,6 +1,7 @@
 export type HIDModifier = "command" | "control" | "option" | "shift" | "fn";
 export type CodyboardTheme = "dark" | "light";
-export type CodyboardPermission = "accessibility" | "inputMonitoring";
+export type BluetoothPermissionStatus = "allowed" | "denied" | "notDetermined" | "restricted";
+export type CodyboardPermission = "accessibility" | "bluetooth" | "inputMonitoring";
 
 export interface HIDDeviceInfo {
   id: string;
@@ -29,6 +30,7 @@ export interface CodyboardApplicationInfo {
 
 export interface PermissionStatus {
   accessibility: boolean;
+  bluetooth: BluetoothPermissionStatus;
   inputMonitoring: boolean;
 }
 

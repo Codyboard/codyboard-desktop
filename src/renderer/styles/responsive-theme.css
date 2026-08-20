@@ -85,16 +85,16 @@ html[data-theme="light"] {
   .device-empty-state > button { border-color: rgba(20, 25, 23, 0.12); background: rgba(255, 255, 255, 0.5); color: rgba(18, 23, 21, 0.88); }
   .device-empty-state > button:hover { border-color: rgba(20, 25, 23, 0.2); background: rgba(255, 255, 255, 0.8); }
 
-  .permission-route-loading { background: rgba(224, 227, 225, 0.72); }
-  .permissions-page {
+  .setup-route-loading { background: rgba(224, 227, 225, 0.72); }
+  .setup-page {
     background:
       radial-gradient(circle at 78% 22%, rgba(255, 255, 255, 0.62), transparent 28%),
       radial-gradient(circle at 14% 82%, rgba(124, 134, 130, 0.11), transparent 34%),
       rgba(224, 227, 225, 0.72);
   }
-  .permissions-kicker { color: rgba(27, 106, 75, 0.65); }
-  .permissions-heading h1 { color: rgba(15, 19, 18, 0.94); }
-  .permissions-heading > p:last-child { color: rgba(27, 33, 31, 0.53); }
+  .setup-kicker { color: rgba(27, 106, 75, 0.65); }
+  .setup-heading h1 { color: rgba(15, 19, 18, 0.94); }
+  .setup-heading > p:last-child { color: rgba(27, 33, 31, 0.53); }
   .permission-list,
   .permission-row { border-color: rgba(20, 25, 23, 0.09); }
   .permission-status { border-color: rgba(24, 30, 28, 0.22); }
@@ -102,11 +102,11 @@ html[data-theme="light"] {
   .permission-copy strong { color: rgba(18, 23, 21, 0.9); }
   .permission-copy small { color: rgba(28, 34, 32, 0.45); }
   .permission-actions button,
-  .permissions-footer button { border-color: rgba(20, 25, 23, 0.11); background: rgba(255, 255, 255, 0.45); color: rgba(18, 23, 21, 0.86); }
+  .setup-footer button { border-color: rgba(20, 25, 23, 0.11); background: rgba(255, 255, 255, 0.45); color: rgba(18, 23, 21, 0.86); }
   .permission-actions button:hover { border-color: rgba(20, 25, 23, 0.2); background: rgba(255, 255, 255, 0.72); }
   .permission-granted { color: rgba(22, 119, 81, 0.7); }
-  .permissions-footer { color: rgba(28, 34, 32, 0.4); }
-  .permissions-footer button { border-color: rgba(29, 126, 88, 0.22); background: rgba(37, 142, 101, 0.08); }
+  .setup-footer { color: rgba(28, 34, 32, 0.4); }
+  .setup-footer button { border-color: rgba(29, 126, 88, 0.22); background: rgba(37, 142, 101, 0.08); }
 
   .device-stage.remote-stage {
     background:
@@ -125,12 +125,16 @@ html[data-theme="light"] {
   }
   .mapping-console { color: rgba(16, 21, 19, 0.94); }
   .remote-mic-settings { border-bottom-color: rgba(20, 25, 23, 0.09); background: rgba(255, 255, 255, 0.13); color: rgba(18, 24, 21, 0.78); }
-  .remote-mic-heading > span { color: rgba(15, 21, 18, 0.9); }
-  .remote-mic-state, .remote-mic-controls > label > span { color: rgba(24, 31, 28, 0.48); }
+  .remote-mic-title strong { color: rgba(15, 21, 18, 0.9); }
+  .remote-mic-icon { border-color: rgba(24, 139, 94, 0.16); background: rgba(47, 153, 112, 0.07); color: rgba(18, 124, 82, 0.82); }
+  .remote-mic-state,
+  .remote-mic-source > span,
+  .remote-mic-test-control > span,
+  .remote-mic-power > span { color: rgba(24, 31, 28, 0.48); }
   .cody-switch { border-color: rgba(20, 25, 23, 0.14); background: rgba(20, 25, 23, 0.12); }
   .cody-switch[data-state="checked"] { border-color: rgba(25, 143, 96, 0.35); background: rgba(42, 161, 113, 0.72); }
   .cody-switch-thumb { background: rgba(255, 255, 255, 0.9); box-shadow: 0 1px 4px rgba(29, 40, 35, 0.22); }
-  .remote-mic-controls select, .remote-mic-test { border-color: rgba(20, 25, 23, 0.1); background: rgba(255, 255, 255, 0.26); color: rgba(15, 21, 18, 0.86); }
+  .remote-mic-source select, .remote-mic-test { border-color: rgba(20, 25, 23, 0.1); background: rgba(255, 255, 255, 0.26); color: rgba(15, 21, 18, 0.86); }
   .remote-mic-test-hint { color: rgba(24, 31, 28, 0.4); }
   .app-toolbar-device-title:focus-visible { color: rgba(20, 27, 24, 0.72); }
   .cody-tooltip-content { border-color: rgba(20, 25, 23, 0.14); background: rgba(244, 246, 245, 0.84); box-shadow: 0 14px 38px rgba(46, 56, 52, 0.18), inset 0 1px rgba(255, 255, 255, 0.78); color: rgba(25, 31, 29, 0.52); }

@@ -205,8 +205,9 @@ called both `audio.configure` and `voice.configure`; installation alone does not
   YAML; there is no voice-specific shortcut store.
 - Only paired keyboard/modifier outputs are accepted for voice. Passthrough/suppress means
   audio-only; one-shot application, URL, text and system actions are rejected.
-- The settings panel owns enable/disable, CoreAudio target, gain and test tone. It never installs the
-  driver; temporary default-input switching belongs to the native voice-session transaction.
+- The settings panel owns enable/disable, CoreAudio target and test tone. Runtime gain is fixed at
+  `0 dB`; legacy persisted values are normalized to zero. The panel never installs the driver;
+  temporary default-input switching belongs to the native voice-session transaction.
 
 ## Boundaries for later phases
 

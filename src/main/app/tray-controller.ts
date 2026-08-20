@@ -79,8 +79,8 @@ export class TrayController {
         click: () => this.dependencies.showSettings('/'),
       },
       {
-        label: 'Manage Permissions…',
-        click: () => this.dependencies.showSettings('/permissions'),
+        label: 'Setup…',
+        click: () => this.dependencies.showSettings('/setup'),
       },
       { type: 'separator' },
       { label: 'Quit', role: 'quit' },

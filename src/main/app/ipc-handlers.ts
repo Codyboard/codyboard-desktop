@@ -124,13 +124,16 @@ async function openPermissionSettings(
   daemon: CodyboardDaemonClient,
   permission: CodyboardPermission,
 ): Promise<void> {
-  if (permission !== 'accessibility' && permission !== 'inputMonitoring')
+  if (permission !== 'accessibility' && permission !== 'bluetooth'
+    && permission !== 'inputMonitoring')
     throw new Error('Unknown permission');
+  const current = await daemon.permissionStatus();
   await daemon.requestPermission(permission).catch(() => undefined);
+  if (permission === 'bluetooth' && current.bluetooth === 'notDetermined') return;
   const pane =
     permission === 'accessibility'
       ? 'Privacy_Accessibility'
-      : 'Privacy_ListenEvent';
+      : permission === 'bluetooth' ? 'Privacy_Bluetooth' : 'Privacy_ListenEvent';
   await shell.openExternal(
     `x-apple.systempreferences:com.apple.preference.security?${pane}`,
   );

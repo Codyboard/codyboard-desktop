@@ -82,7 +82,7 @@ Paths beginning `native/...` mean `native/Sources/CodyboardDaemon/`; renderer co
 
 ## Renderer/style invariants
 
-- Routes: `/permissions`, `/`, `/devices/:deviceId`, `/midi` via `HashRouter`.
+- Routes: `/setup`, `/`, `/devices/:deviceId`, `/midi` via `HashRouter`.
 - Device routes require actual Swift Accessibility + Input Monitoring status. `/midi` remains usable virtually without hardware/permissions.
 - Window is translucent `hiddenInset`; light/dark is explicit local storage state, not system-following.
 - `styles.css` contains Tailwind/base only. `styles/zz-components.css` is the ordered global CSS entry; preserve its import order. Add styles to the narrowest existing file.

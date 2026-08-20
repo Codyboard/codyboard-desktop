@@ -2,6 +2,7 @@ import Foundation
 import Darwin
 
 final class NativeCommandServer {
+    private let bluetoothPermission = BluetoothPermissionController()
     private let decoder = JSONDecoder()
     private let devices: HIDDeviceManager
     private let keyboard: KeyboardController
@@ -107,6 +108,7 @@ final class NativeCommandServer {
             case "permissions.request":
                 switch command.params?.permission {
                 case "accessibility": _ = keyboard.requestPermission(prompt: true)
+                case "bluetooth": bluetoothPermission.request()
                 case "inputMonitoring": _ = RawHIDMonitor.requestInputMonitoringAccess()
                 default: throw commandError("Unknown permission")
                 }
@@ -127,6 +129,7 @@ final class NativeCommandServer {
     private func permissionStatus() -> PermissionStatus {
         PermissionStatus(
             accessibility: keyboard.requestPermission(prompt: false),
+            bluetooth: BluetoothPermissionController.status,
             inputMonitoring: RawHIDMonitor.hasInputMonitoringAccess
         )
     }

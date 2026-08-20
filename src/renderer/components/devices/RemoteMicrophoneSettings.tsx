@@ -26,7 +26,6 @@ export function RemoteMicrophoneSettings({
   sourceDisabled,
 }: RemoteMicrophoneSettingsProps) {
   const [error, setError] = useState<string>();
-  const [gain, setGain] = useState(0);
   const [saving, setSaving] = useState(false);
   const [snapshot, setSnapshot] = useState<VoiceSnapshot>();
   const [toneFeedback, setToneFeedback] = useState<"idle" | "playing" | "sent">("idle");
@@ -35,18 +34,12 @@ export function RemoteMicrophoneSettings({
   useEffect(() => {
     let mounted = true;
     void window.codyboard.voice.snapshot().then((value) => {
-      if (mounted) {
-        setSnapshot(value);
-        setGain(value.settings.gainDB);
-      }
+      if (mounted) setSnapshot(value);
     }).catch((cause: unknown) => mounted && setError(errorMessage(cause)));
     const unsubscribe = window.codyboard.voice.onEvent((event) => {
       if (!mounted) return;
       if (event.type === "error") setError(event.message);
-      else {
-        setSnapshot(event.snapshot);
-        setGain(event.snapshot.settings.gainDB);
-      }
+      else setSnapshot(event.snapshot);
     });
     return () => { mounted = false; unsubscribe(); };
   }, []);
@@ -71,10 +64,6 @@ export function RemoteMicrophoneSettings({
     catch (cause) { setError(errorMessage(cause)); }
     finally { setSaving(false); }
   };
-  const commitGain = () => {
-    if (snapshot && gain !== snapshot.settings.gainDB)
-      void update({ ...snapshot.settings, gainDB: gain });
-  };
   const testTone = async () => {
     setError(undefined);
     setToneFeedback("playing");
@@ -96,22 +85,17 @@ export function RemoteMicrophoneSettings({
 
   return (
     <section className="remote-mic-settings" aria-label="Remote microphone">
-      <div className="remote-mic-heading">
-        <span><Radio />Remote microphone</span>
-        <div className="remote-mic-state">
-          <span>{stateLabel}</span>
-          <Switch
-            aria-label="Enable remote microphone"
-            checked={snapshot.settings.enabled}
-            disabled={saving}
-            onCheckedChange={(enabled) => void update({
-              ...snapshot.settings,
-              enabled,
-            })}
-          />
+      <div className="remote-mic-layout">
+        <div className="remote-mic-identity">
+          <span className="remote-mic-icon"><Radio aria-hidden="true" /></span>
+          <span className="remote-mic-title">
+            <strong>Remote microphone</strong>
+            <span className="remote-mic-state">
+              <i aria-hidden="true" />
+              {stateLabel}
+            </span>
+          </span>
         </div>
-      </div>
-      <div className="remote-mic-controls">
         <label className="remote-mic-source">
           <span>Input source</span>
           <select
@@ -128,36 +112,37 @@ export function RemoteMicrophoneSettings({
             <option value="system">Current app microphone</option>
           </select>
         </label>
-        <label className="remote-mic-gain">
-          <span>Gain <b>{gain > 0 ? "+" : ""}{gain} dB</b></span>
-          <input
-            disabled={saving || source === "system"}
-            max="24"
-            min="-24"
-            onBlur={commitGain}
-            onChange={(event) => setGain(Number(event.currentTarget.value))}
-            onKeyUp={commitGain}
-            onPointerUp={commitGain}
-            step="1"
-            type="range"
-            value={gain}
+        <div className="remote-mic-test-control">
+          <span>Output check</span>
+          <button
+            className="remote-mic-test"
+            disabled={saving || source === "system"
+              || !snapshot.settings.audioDeviceUID || snapshot.audio.active}
+            onClick={() => void testTone()}
+            type="button"
+          >
+            <Volume2 aria-hidden="true" />
+            {toneFeedback === "playing" ? "Playing…" : toneFeedback === "sent" ? "Sent" : "Test"}
+          </button>
+        </div>
+        <div className="remote-mic-power">
+          <span>Enabled</span>
+          <Switch
+            aria-label="Enable remote microphone"
+            checked={snapshot.settings.enabled}
+            disabled={saving}
+            onCheckedChange={(enabled) => void update({
+              ...snapshot.settings,
+              enabled,
+            })}
           />
-        </label>
-        <button
-          className="remote-mic-test"
-          disabled={saving || source === "system"
-            || !snapshot.settings.audioDeviceUID || snapshot.audio.active}
-          onClick={() => void testTone()}
-          type="button"
-        >
-          <Volume2 /> {toneFeedback === "playing" ? "Playing…" : toneFeedback === "sent" ? "Sent" : "Test"}
-        </button>
+        </div>
+        <p className="remote-mic-test-hint">
+          {source === "remote"
+            ? "Remote speech and test tone are sent to Codyboard Virtual Microphone."
+            : "Codyboard sends no audio; the active app keeps using its own microphone."}
+        </p>
       </div>
-      <p className="remote-mic-test-hint">
-        {source === "remote"
-          ? "Remote speech and test tone are sent to Codyboard Virtual Microphone."
-          : "Codyboard sends no audio; the active app keeps using its own microphone."}
-      </p>
       {error && <p className="remote-mic-error">{error}</p>}
     </section>
   );
