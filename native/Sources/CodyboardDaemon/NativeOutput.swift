@@ -22,4 +22,10 @@ final class NativeOutput: @unchecked Sendable {
         if let id { send(FailureResponse(id: id, error: payload)) }
         else { send(NativeErrorEvent(error: payload)) }
     }
+
+    func log(_ message: String) {
+        queue.async {
+            FileHandle.standardError.write(Data("[CodyboardDaemon] \(message)\n".utf8))
+        }
+    }
 }

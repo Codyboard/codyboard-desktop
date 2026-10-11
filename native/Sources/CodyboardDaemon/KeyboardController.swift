@@ -171,6 +171,9 @@ final class KeyboardController: @unchecked Sendable {
         let trigger = CompiledTrigger(kind: kind, code: code, modifiers: modifiers.sorted())
         let keyboardType = type == systemDefined ? nil : Int(event.getIntegerValueField(.keyboardEventKeyboardType))
         let pressed = system?.pressed ?? eventPressed(type: type, keyCode: code, flags: event.flags)
+        if keyboardType == RawHIDMonitor.keyboardType {
+            NativeOutput.shared.log("eventTap type=\(kind) code=\(code) \(pressed ? "down" : "up") flags=\(event.flags.rawValue)")
+        }
         let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
         if kind == "keyboard",
            powerEventSuppressor.shouldSuppress(keyCode: code, pressed: pressed) {

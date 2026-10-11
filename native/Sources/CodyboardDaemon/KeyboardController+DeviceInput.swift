@@ -3,6 +3,7 @@ import Foundation
 
 extension KeyboardController {
     func receiveRawHIDUsage(deviceId: String, usage: UInt16, pressed: Bool) {
+        NativeOutput.shared.log("raw device=\(deviceId) usage=0x\(String(usage, radix: 16)) \(pressed ? "down" : "up")")
         if diagnosticKeyboardType == RawHIDMonitor.keyboardType {
             NativeOutput.shared.send(NativeEvent(
                 event: "diagnosticKey",
@@ -43,6 +44,7 @@ extension KeyboardController {
         deviceId: String, isMIDICaptureSource: Bool = false,
         kind: String, code: Int, usage: UInt32, pressed: Bool
     ) {
+        NativeOutput.shared.log("physical device=\(deviceId) kind=\(kind) code=\(code) \(pressed ? "down" : "up")")
         let now = DispatchTime.now().uptimeNanoseconds
         pendingPhysicalEvents.removeAll { now - $0.timestamp > 250_000_000 }
         pendingPhysicalEvents.append(PendingDeviceInputEvent(
