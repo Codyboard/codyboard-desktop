@@ -210,7 +210,6 @@ final class KeyboardController: @unchecked Sendable {
                     keyCode: code, flags: event.flags.rawValue, timestamp: event.timestamp
                 )
             ))
-            if diagnosticKeyboardType == keyboardType { return nil }
             return resolveDeviceEvent(
                 input: DeviceInputIdentity(
                     deviceId: "小米蓝牙语音遥控器", kind: kind, code: code

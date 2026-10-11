@@ -52,6 +52,14 @@ export function DeviceDetailPage({ deviceId }: { deviceId: string }) {
   const keyboardType = hid?.type ?? definition?.keyboardType;
 
   useEffect(() => {
+    if (keyboardType === undefined) return;
+    void window.codyboard.diagnostics.setKeyboardType(keyboardType).catch(() => undefined);
+    return () => {
+      void window.codyboard.diagnostics.setKeyboardType().catch(() => undefined);
+    };
+  }, [keyboardType]);
+
+  useEffect(() => {
     if (resolvedDeviceId !== deviceId) return;
     let mounted = true;
     setProfileError(undefined);

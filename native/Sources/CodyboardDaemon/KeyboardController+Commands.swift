@@ -32,7 +32,14 @@ extension KeyboardController {
                 )
             }
             let rawHIDWasRunning = rawHIDMonitor.isRunning
-            if keyboardType == RawHIDMonitor.keyboardType { try rawHIDMonitor.start() }
+            if keyboardType == RawHIDMonitor.keyboardType {
+                do { try rawHIDMonitor.start() }
+                catch {
+                    NativeOutput.shared.error(
+                        id: nil, code: "rawHIDUnavailable", message: error.localizedDescription
+                    )
+                }
+            }
             guard start(promptForPermission: true) else {
                 if !rawHIDWasRunning && !profilesNeedRawHID { rawHIDMonitor.stop() }
                 throw permissionError()
