@@ -194,6 +194,28 @@ final class KeyboardController: @unchecked Sendable {
                 trigger: trigger, event: event, pressed: pressed, autorepeat: autorepeat
             )
         }
+        // The Xiaomi Bluetooth keyboard can be visible to the Event Tap while
+        // its raw HID manager is temporarily unavailable. Its keyboard type is
+        // stable, so retain profile mapping and diagnostics through this path.
+        if let keyboardType, keyboardType == RawHIDMonitor.keyboardType {
+            let eventName = type == .keyDown ? "keydown" : type == .keyUp ? "keyup" : "flagschanged"
+            NativeOutput.shared.send(NativeEvent(
+                event: "diagnosticKey",
+                data: DiagnosticKeyEvent(
+                    deviceId: "小米蓝牙语音遥控器", keyboardType: keyboardType,
+                    eventType: eventName, source: "keyCode", code: code,
+                    keyCode: code, flags: event.flags.rawValue, timestamp: event.timestamp
+                )
+            ))
+            if diagnosticKeyboardType == keyboardType { return nil }
+            return resolveDeviceEvent(
+                input: DeviceInputIdentity(
+                    deviceId: "小米蓝牙语音遥控器", kind: kind, code: code
+                ),
+                isMIDICaptureSource: false, trigger: trigger, event: event,
+                pressed: pressed, autorepeat: autorepeat
+            )
+        }
         if let keyboardType, keyboardType == diagnosticKeyboardType {
             let eventName = type == .keyDown ? "keydown" : type == .keyUp ? "keyup" : "flagschanged"
             NativeOutput.shared.send(NativeEvent(
