@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowRightToLine,
   ArrowUp,
   ArrowUpFromLine,
   Bell,
@@ -60,6 +61,12 @@ export interface KeyOutputGroup {
 }
 
 export const KEY_OUTPUT_GROUPS: readonly KeyOutputGroup[] = [
+  {
+    label: "Input Behavior",
+    options: [
+      preset(ArrowRightToLine, "passthrough", "Pass through", { kind: "passthrough" }),
+    ],
+  },
   {
     label: "Media & Volume",
     options: [
