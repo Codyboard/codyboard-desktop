@@ -170,8 +170,15 @@ final class KeyboardController: @unchecked Sendable {
         if kind == "modifier", let ownModifier = modifierName(for: code) { modifiers.removeAll(where: { $0 == ownModifier }) }
         let trigger = CompiledTrigger(kind: kind, code: code, modifiers: modifiers.sorted())
         let keyboardType = type == systemDefined ? nil : Int(event.getIntegerValueField(.keyboardEventKeyboardType))
+        // macOS can omit the originating keyboard type on flagsChanged events.
+        // While the Xiaomi diagnostic is selected, those transitions still
+        // belong to the selected device and must reach the log and UI.
+        let selectedXiaomiModifier = diagnosticKeyboardType == RawHIDMonitor.keyboardType
+            && type == .flagsChanged
+        let diagnosticKeyboardTypeForEvent = selectedXiaomiModifier
+            ? RawHIDMonitor.keyboardType : keyboardType
         let pressed = system?.pressed ?? eventPressed(type: type, keyCode: code, flags: event.flags)
-        if keyboardType == RawHIDMonitor.keyboardType {
+        if diagnosticKeyboardTypeForEvent == RawHIDMonitor.keyboardType {
             NativeOutput.shared.log("eventTap type=\(kind) code=\(code) \(pressed ? "down" : "up") flags=\(event.flags.rawValue)")
         }
         let autorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
@@ -200,12 +207,12 @@ final class KeyboardController: @unchecked Sendable {
         // The Xiaomi Bluetooth keyboard can be visible to the Event Tap while
         // its raw HID manager is temporarily unavailable. Its keyboard type is
         // stable, so retain profile mapping and diagnostics through this path.
-        if let keyboardType, keyboardType == RawHIDMonitor.keyboardType {
+        if diagnosticKeyboardTypeForEvent == RawHIDMonitor.keyboardType {
             let eventName = type == .keyDown ? "keydown" : type == .keyUp ? "keyup" : "flagschanged"
             NativeOutput.shared.send(NativeEvent(
                 event: "diagnosticKey",
                 data: DiagnosticKeyEvent(
-                    deviceId: "小米蓝牙语音遥控器", keyboardType: keyboardType,
+                    deviceId: "小米蓝牙语音遥控器", keyboardType: diagnosticKeyboardTypeForEvent,
                     eventType: eventName, source: "keyCode", code: code,
                     keyCode: code, flags: event.flags.rawValue, timestamp: event.timestamp
                 )

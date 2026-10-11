@@ -34,6 +34,7 @@ try {
     executableName: "Codyboard",
     extendInfo: {
       NSBluetoothAlwaysUsageDescription: "Codyboard connects to the Xiaomi voice remote to receive microphone audio.",
+      NSInputMonitoringUsageDescription: "Codyboard monitors supported hardware controls for device mappings.",
     },
     extraResource: [
       path.join(projectDirectory, "resources", "bin"),

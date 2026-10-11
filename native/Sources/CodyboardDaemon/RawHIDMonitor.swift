@@ -99,9 +99,12 @@ final class RawHIDMonitor {
         guard result == kIOReturnSuccess else {
             IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
             protection.restore()
+            let message = result == kIOReturnExclusiveAccess
+                ? "macOS 已由其他程序独占小米遥控器 HID 接口；请退出其他键盘工具或重复运行的 CodyboardDaemon 后重试。"
+                : "无法打开 Codyboard Presenter 原始 HID 报告（错误 (result)）"
             throw NSError(
                 domain: "app.codyboard.hid", code: Int(result),
-                userInfo: [NSLocalizedDescriptionKey: "无法打开 Codyboard Presenter 原始 HID 报告（错误 \(result)）"]
+                userInfo: [NSLocalizedDescriptionKey: message]
             )
         }
         if let device = (IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>)?.first {

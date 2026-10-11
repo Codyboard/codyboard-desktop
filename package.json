@@ -12,6 +12,7 @@
     "build:icon": "node scripts/build-app-icon.mjs",
     "build:native": "node scripts/build-native.mjs",
     "build:virtual-mic": "scripts/build-virtual-microphone.sh",
+    "diagnostics:keyboard": "node scripts/keyboard-diagnostics.mjs",
     "install:virtual-mic": "scripts/install-virtual-microphone.sh",
     "build:electron": "node scripts/build-electron.mjs",
     "lint": "eslint --max-warnings 0 .",
