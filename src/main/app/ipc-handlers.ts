@@ -93,6 +93,11 @@ export function registerIPCHandlers({
   ipcMain.handle('profiles:reload', () => profiles.reload());
   ipcMain.handle('profiles:snapshot', () => profiles.snapshot());
   ipcMain.handle(
+    'profiles:ensure-default',
+    (_event, domain: ProfileDomain, draft: ProfileDraft) =>
+      profiles.ensureDefault(domain, draft),
+  );
+  ipcMain.handle(
     'profiles:create',
     (_event, domain: ProfileDomain, draft: ProfileDraft) =>
       profiles.create(domain, draft),

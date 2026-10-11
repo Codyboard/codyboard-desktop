@@ -21,6 +21,7 @@ export interface RawProfilesAPI {
   reload(): Promise<ProfilesSnapshot>;
   snapshot(): Promise<ProfilesSnapshot>;
   create(domain: ProfileDomain, draft: ProfileDraft): Promise<ProfilesSnapshot>;
+  ensureDefault(domain: ProfileDomain, draft: ProfileDraft): Promise<ProfilesSnapshot>;
   update(domain: ProfileDomain, profileId: string, draft: ProfileDraft): Promise<ProfilesSnapshot>;
   remove(domain: ProfileDomain, profileId: string): Promise<ProfilesSnapshot>;
   activate(domain: ProfileDomain, profileId: string): Promise<ProfilesSnapshot>;

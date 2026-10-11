@@ -44,11 +44,14 @@ export function useDeviceMappings<Key extends string>(
 
   useEffect(() => {
     let mounted = true;
-    void window.codyboard.profiles.snapshot().then((nextSnapshot) => {
-      if (mounted) setSnapshot(nextSnapshot);
-    });
+    const acceptSnapshot = (next: ProfilesSnapshot) => {
+      if (mounted) setSnapshot((current) =>
+        current && current.generation > next.generation ? current : next,
+      );
+    };
+    void window.codyboard.profiles.snapshot().then(acceptSnapshot);
     const unsubscribe = window.codyboard.profiles.onEvent((event) => {
-      if (event.type === "changed") setSnapshot(event.snapshot);
+      if (event.type === "changed") acceptSnapshot(event.snapshot);
     });
     return () => { mounted = false; unsubscribe(); };
   }, []);

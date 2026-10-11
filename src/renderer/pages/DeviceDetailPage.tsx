@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type PointerEvent } from "re
 import { useSearchParams } from "react-router-dom";
 
 import { getDeviceDefinition, profileDomainForDevice } from "../../shared/device-catalog";
-import { profileDomainKey, type HIDDeviceInfo } from "../../shared/hid";
+import type { HIDDeviceInfo } from "../../shared/hid";
 import { Device } from "../components/devices/Device";
 import {
   DeviceButtonMappings,
@@ -25,6 +25,8 @@ export function DeviceDetailPage({ deviceId }: { deviceId: string }) {
   const [searchParameters] = useSearchParams();
   const definition = getDeviceDefinition(searchParameters.get("model"));
   const [hid, setHid] = useState<HIDDeviceInfo>();
+  const [resolvedDeviceId, setResolvedDeviceId] = useState<string>();
+  const [profileError, setProfileError] = useState<string>();
   const [selectedSweepProKey, setSelectedSweepProKey] = useState<SweepProKey>();
   const [selectedXiaomiKey, setSelectedXiaomiKey] = useState<XiaomiRemoteKey>();
   const [sweepProMappingPreviews, setSweepProMappingPreviews] = useState<SweepProMappingPreviews>({});
@@ -35,6 +37,8 @@ export function DeviceDetailPage({ deviceId }: { deviceId: string }) {
       if (mounted) setHid(devices.find((device) => device.id === deviceId));
     }).catch(() => {
       // The catalog fallback keeps the detail page useful if a device disconnects.
+    }).finally(() => {
+      if (mounted) setResolvedDeviceId(deviceId);
     });
     return () => { mounted = false; };
   }, [deviceId]);
@@ -48,14 +52,17 @@ export function DeviceDetailPage({ deviceId }: { deviceId: string }) {
   const keyboardType = hid?.type ?? definition?.keyboardType;
 
   useEffect(() => {
-    void window.codyboard.profiles.snapshot().then(async (snapshot) => {
-      if (snapshot.keyboards[profileDomainKey(profileDomain)]?.profiles.length) return;
-      await window.codyboard.profiles.create(
-        profileDomain,
-        isSweepPro ? SWEEP_PRO_DEFAULT_PROFILE : XIAOMI_REMOTE_DEFAULT_PROFILE,
-      );
-    }).catch((error: unknown) => console.error("Unable to create Sweep Pro profile", error));
-  }, [isSweepPro, profileDomain]);
+    if (resolvedDeviceId !== deviceId) return;
+    let mounted = true;
+    setProfileError(undefined);
+    void window.codyboard.profiles.ensureDefault(
+      profileDomain,
+      isSweepPro ? SWEEP_PRO_DEFAULT_PROFILE : XIAOMI_REMOTE_DEFAULT_PROFILE,
+    ).catch((error: unknown) => {
+      if (mounted) setProfileError(error instanceof Error ? error.message : String(error));
+    });
+    return () => { mounted = false; };
+  }, [deviceId, isSweepPro, profileDomain, resolvedDeviceId]);
 
   const onKeyPress = useCallback((event: XiaomiRemoteKeyPressEvent) => {
     if (event.phase === "down") setSelectedXiaomiKey(event.key);
@@ -96,6 +103,7 @@ export function DeviceDetailPage({ deviceId }: { deviceId: string }) {
           {remote}
         </Device>
         <aside className="device-detail-panel" aria-label={`${deviceName} settings`}>
+          {profileError && <p role="alert">Unable to create default profile: {profileError}</p>}
           {definition?.model === "sweep-pro"
             ? (
                 <DeviceButtonMappings

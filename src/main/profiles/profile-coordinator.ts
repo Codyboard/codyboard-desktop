@@ -83,6 +83,30 @@ export class ProfileCoordinator extends EventEmitter {
     });
   }
 
+  ensureDefault(domain: ProfileDomain, draft: ProfileDraft): Promise<ProfilesSnapshot> {
+    return this.enqueue(async () => {
+      assertProfileDomain(domain);
+      // Startup may have skipped loading until permissions were granted.
+      // Read saved profiles before deciding that this device needs its first one.
+      if (this.generation === 0) await this.loadFromDisk();
+      if (findDomain(this.document, domain)?.profiles.length) return this.snapshot();
+      const profile = normalizeApplicationMappings(profileDraftSchema.parse(draft));
+      if (profile.id !== "default") throw new Error("Expected a default profile");
+      const document = clone(this.document);
+      const state = clone(this.state);
+      let keyboard = findDomain(document, domain);
+      if (!keyboard) {
+        keyboard = { deviceId: domain, profiles: [] };
+        document.keyboards.push(keyboard);
+      }
+      keyboard.profiles.push(profile);
+      state.activeProfiles[profileDomainKey(domain)] = profile.id;
+      // Persist the first profile even when a just-paired HID cannot be opened
+      // yet. The next daemon recovery will apply the saved profile to hardware.
+      return this.commit(document, state, true, true);
+    });
+  }
+
   update(domain: ProfileDomain, profileId: string, draft: ProfileDraft): Promise<ProfilesSnapshot> {
     return this.mutate((document) => {
       assertProfileDomain(domain);
@@ -151,6 +175,7 @@ export class ProfileCoordinator extends EventEmitter {
     documentInput: ProfileDocument,
     stateInput: ProfileStateDocument,
     persist: boolean,
+    allowRuntimeFailure = false,
   ): Promise<ProfilesSnapshot> {
     const document = parseProfileDocument(documentInput);
     const state = parseStateDocument(stateInput);
@@ -158,7 +183,13 @@ export class ProfileCoordinator extends EventEmitter {
     if (errors.length) throw new Error(errors.join("; "));
     const nextGeneration = this.generation + 1;
     const previousCompiled = compileProfiles(this.document, this.state, this.generation);
-    await this.runtime.replaceProfiles(compileProfiles(document, state, nextGeneration));
+    let runtimeError: unknown;
+    try {
+      await this.runtime.replaceProfiles(compileProfiles(document, state, nextGeneration));
+    } catch (error) {
+      if (!allowRuntimeFailure) throw error;
+      runtimeError = error;
+    }
     if (persist) {
       try { await this.store.persist(this.document, document, state); }
       catch (error) {
@@ -170,6 +201,13 @@ export class ProfileCoordinator extends EventEmitter {
     this.state = clone(state);
     this.generation = nextGeneration;
     const snapshot = this.snapshot();
+    if (runtimeError) {
+      this.emitConfigurationError(
+        runtimeError instanceof Error
+          ? runtimeError.message
+          : JSON.stringify(runtimeError) ?? "Unknown runtime error",
+      );
+    }
     this.emit("event", { type: "changed", snapshot } satisfies ProfileEvent);
     return snapshot;
   }

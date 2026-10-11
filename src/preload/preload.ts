@@ -23,6 +23,7 @@ const api: CodyboardAPI = {
     reload: () => ipcRenderer.invoke("profiles:reload"),
     snapshot: () => ipcRenderer.invoke("profiles:snapshot"),
     create: (type, draft) => ipcRenderer.invoke("profiles:create", type, draft),
+    ensureDefault: (domain, draft) => ipcRenderer.invoke("profiles:ensure-default", domain, draft),
     update: (type, id, draft) => ipcRenderer.invoke("profiles:update", type, id, draft),
     remove: (type, id) => ipcRenderer.invoke("profiles:remove", type, id),
     activate: (type, id) => ipcRenderer.invoke("profiles:activate", type, id),

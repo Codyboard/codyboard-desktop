@@ -68,7 +68,18 @@ final class KeyboardController: @unchecked Sendable {
         let needsPhysicalHID = !snapshot.profiles.isEmpty || midiCaptureDeviceId != nil
         let rawHIDWasRunning = rawHIDMonitor.isRunning
         let physicalHIDWasRunning = physicalHIDMonitor.isRunning
-        if needsRawHID { try rawHIDMonitor.start() }
+        if needsRawHID {
+            do {
+                try rawHIDMonitor.start()
+            } catch {
+                // A Xiaomi remote can already be owned by macOS's HID stack after
+                // Bluetooth pairing. Keep the profile runtime usable through the
+                // Event Tap and report the raw-report limitation separately.
+                NativeOutput.shared.error(
+                    id: nil, code: "rawHIDUnavailable", message: error.localizedDescription
+                )
+            }
+        }
         if needsPhysicalHID {
             do { try physicalHIDMonitor.start() }
             catch {
